@@ -5661,3 +5661,8 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Daemon mode: session kept alive by cockpit-daemon. */
+.ctx-card-live {
+  color: var(--vscode-charts-green, #3fb950);
+}

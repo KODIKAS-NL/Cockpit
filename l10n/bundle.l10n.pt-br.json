@@ -19,5 +19,17 @@
   "In the terminal, use /login to sign in. Then click \"Re-check\".": "No terminal, use /login para entrar. Depois clique em \"Verificar novamente\".",
   "Claude process exited unexpectedly (code {0}) before finishing the turn. Send again to continue.": "O processo do Claude encerrou inesperadamente (código {0}) antes de concluir o turno. Envie novamente para continuar.",
   "Connection was unstable — the turn may be incomplete. Send again if needed.{0}": "A conexão ficou instável — o turno pode estar incompleto. Envie novamente se precisar.{0}",
-  "The turn ended with an error.{0}": "O turno terminou com erro.{0}"
+  "The turn ended with an error.{0}": "O turno terminou com erro.{0}",
+  "This session is busy with a turn started on another device. Your message was not sent; it is back in the input box.": "Esta sessão está ocupada com um turno iniciado em outro dispositivo. Sua mensagem não foi enviada; ela voltou para a caixa de entrada.",
+  "Install daemon": "Instalar daemon",
+  "Daemon mode is on, but cockpit-daemon is not running ({0}). This tab runs Claude in this window for now.": "O modo daemon está ligado, mas o cockpit-daemon não está rodando ({0}). Por enquanto, esta aba roda o Claude nesta janela.",
+  "dist/daemon.js is missing from this build.": "O dist/daemon.js não existe nesta build.",
+  "Could not install cockpit-daemon: {0}": "Não foi possível instalar o cockpit-daemon: {0}",
+  "cockpit-daemon is running. New and reopened tabs now keep Claude running when this window closes.": "O cockpit-daemon está rodando. Abas novas e reabertas agora mantêm o Claude rodando quando esta janela fecha.",
+  "cockpit-daemon is not installed as a service. Run \"Install daemon\" first.": "O cockpit-daemon não está instalado como serviço. Rode \"Instalar daemon\" primeiro.",
+  "cockpit-daemon restarted. Running turns were stopped; conversations resume on the next message.": "O cockpit-daemon foi reiniciado. Os turnos em andamento pararam; as conversas retomam na próxima mensagem.",
+  "Could not restart cockpit-daemon: {0}": "Não foi possível reiniciar o cockpit-daemon: {0}",
+  "No daemon log yet ({0}).": "Ainda não há log do daemon ({0}).",
+  "The active tab is not running in cockpit-daemon.": "A aba ativa não está rodando no cockpit-daemon.",
+  "Session stopped in cockpit-daemon.": "Sessão parada no cockpit-daemon."
 }

@@ -47,5 +47,15 @@
   "cfg.model": "Modelo default para novas sessões. Deixe 'default' para o CLI escolher. Não há lista fixa aqui: o combo Model do painel oferece o que a sua conta realmente tem (descoberta ao vivo); mude lá para sobrepor só a sessão atual.",
   "cfg.effort": "Esforço de raciocínio default para novas sessões. 'CLI default' usa o effortLevel do ~/.claude/settings.json. Reflete (pré-seleciona) no combo Effort do painel; mude lá para sobrepor só a sessão atual.",
   "cfg.autoResumeLastSession": "Ao abrir uma pasta, retoma automaticamente a sessão mais recente dela (carrega o histórico). Desligue para sempre começar vazio.",
-  "cfg.autosave": "Salva automaticamente um arquivo aberto antes do Claude ler ou escrever nele, para o agente trabalhar com o conteúdo atual."
+  "cfg.autosave": "Salva automaticamente um arquivo aberto antes do Claude ler ou escrever nele, para o agente trabalhar com o conteúdo atual.",
+  "cmd.daemonInstall": "Instalar daemon (manter o Claude rodando entre janelas)",
+  "cmd.daemonRestart": "Reiniciar daemon",
+  "cmd.daemonShowLog": "Mostrar log do daemon",
+  "cmd.daemonStopSession": "Parar o processo desta sessão no daemon",
+  "cfg.daemonEnabled": "Roda o Claude no cockpit-daemon em vez de nesta janela. As conversas continuam quando a janela fecha ou o notebook dorme, e qualquer janela desta máquina (Remote-SSH, code-server) pode se conectar a elas. Requer o daemon: rode \"Tootega: Instalar daemon\".",
+  "cfg.daemonSocketPath": "Socket Unix do cockpit-daemon. Vazio = ~/.cockpit/daemon.sock.",
+  "cfg.daemonIdleStopHours": "Para um processo do Claude mantido pelo daemon depois de tantas horas ocioso, sem janela conectada e sem pergunta pendente (ele retoma na próxima mensagem). 0 = nunca. Aplicado quando o daemon é (re)instalado.",
+  "cfg.thinking": "Raciocínio estendido (thinking) dos processos do Claude que o Cockpit inicia.",
+  "cfg.thinking.cli": "Segue a sua configuração do Claude Code (padrão).",
+  "cfg.thinking.off": "Força o thinking desligado (MAX_THINKING_TOKENS=0 e alwaysThinkingEnabled=false), como as versões anteriores do Cockpit sempre faziam."
 }

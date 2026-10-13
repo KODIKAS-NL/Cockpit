@@ -386,6 +386,8 @@ export interface SessionInfo {
   assistantCount?: number; // mensagens do assistente
   toolCount?: number; // chamadas de tool (tool_use)
   model?: string; // last observed model
+  // Daemon mode: the session's process is alive in cockpit-daemon (busy = a turn is running).
+  live?: 'busy' | 'running';
 }
 
 // One option of an AskUserQuestion question.
@@ -498,6 +500,12 @@ type HostMsg =
       planFile?: string;
     }
   | { kind: 'askRequest'; requestId: string; questions: AskQuestion[] }
+  // Daemon mode: another window answered this prompt (permission card or question).
+  | { kind: 'promptSettled'; requestId: string }
+  // Daemon mode: another window sent this prompt; it shows as a user bubble here too.
+  | { kind: 'remoteUser'; text: string }
+  // Daemon mode: our last message was refused (a turn was running): drop its bubble.
+  | { kind: 'sendRejected' }
   | { kind: 'authRequired' }
   | { kind: 'stats'; stats: StatsSnapshot }
   // Session timeline/compactions (heavy): sent per turn, not per token.

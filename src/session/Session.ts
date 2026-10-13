@@ -2,7 +2,11 @@
 // all the streaming state. It emits UI messages through a callback (the provider
 // tags them with the tab id and forwards them to the webview). Several instances run
 // in parallel — one per tab.
-import { CliProcessManager } from '../cli/CliProcessManager';
+import { CliProcessManager, type CliOptions } from '../cli/CliProcessManager';
+import type { CliProcess } from '../cli/CliProcess';
+import { RemoteCliProcess } from '../cli/RemoteCliProcess';
+import type { DaemonClient } from '../daemon/DaemonClient';
+import type { SessionSnapshot } from '../../shared/daemon';
 import type { EngineId } from '../cli/Engine';
 import { StatsAggregator } from '../stats/StatsAggregator';
 import { loadStats, saveStats } from '../stats/StatsStore';
@@ -52,6 +56,9 @@ export interface SessionHooks {
     permission: string;
     allowAgents: boolean;
     enableTodoTools?: boolean;
+    // 'off' forces extended thinking off for every spawn; anything else leaves it to the
+    // user's Claude Code configuration.
+    thinking?: string;
   };
   // Language (short code: pt, en…) for the agent's questions (AskUserQuestion).
   askLanguage: () => string;
@@ -61,10 +68,16 @@ export interface SessionHooks {
   extraSystemPrompt: () => string | undefined;
   // Diretiva "quiet" (settings): vai no início do texto injetado. Vazio = não injeta.
   quietPrompt: () => string | undefined;
+  // Daemon mode: when this returns a client, the Claude process lives in cockpit-daemon and
+  // outlives the window. Undefined (or no hook) = a local child process, as before.
+  daemon?: () => DaemonClient | undefined;
+  // Daemon mode: our message arrived while another window's turn was running and was NOT
+  // sent. The host gives the text back to the input and says why.
+  onSendRejected?: (text: string, images?: { mediaType: string; data: string }[]) => void;
 }
 
 export class Session {
-  cli?: CliProcessManager;
+  cli?: CliProcess;
   stats: StatsAggregator;
   resumeId?: string;
   busy = false;
@@ -125,6 +138,14 @@ export class Session {
   // event isn't emitted a second time (same guard as `streamedText` for the main agent).
   private subagentStreamed = new Set<string>();
   private pendingPerm = new Map<string, { tool: string; input: unknown; suggestions?: unknown[] }>();
+  // The card/question emitted for each pending prompt, to show it again after the webview
+  // repaints its history (which clears prompts) or when another window catches up.
+  private pendingPromptMsg = new Map<string, HostToWebview>();
+  // Feeding a daemon snapshot through onCliEvent: the events already happened, so side
+  // effects that must happen once (writing the plan file) are skipped.
+  private replaying = false;
+  // A keep-alive ping is in flight: a rejection of it is not the user's message.
+  private pingInFlight = false;
 
   constructor(private hooks: SessionHooks) {
     this.stats = this.newStats();
@@ -194,7 +215,7 @@ export class Session {
     const model = this.model();
     const effort = this.effort();
     const engine = this.engine();
-    this.cli = new CliProcessManager({
+    const opts: CliOptions = {
       claudePath: this.hooks.claudePath(engine),
       cwd: this.hooks.cwd(),
       engine,
@@ -218,7 +239,22 @@ export class Session {
       skillOverrides: Object.fromEntries(
         Object.entries(this.skillOverrides).filter(([, v]) => v !== 'on'),
       ),
-    });
+      forceThinkingOff: this.hooks.settings().thinking === 'off',
+    };
+    // Daemon mode is for the Claude engine only: the local agent keeps its own lifecycle.
+    const daemon = engine === 'claude' ? this.hooks.daemon?.() : undefined;
+    if (daemon) {
+      const remote = new RemoteCliProcess(opts, daemon);
+      remote.on('snapshot', (snap: SessionSnapshot) => this.onSnapshot(snap));
+      remote.on('settled', (requestId: string) => this.onPromptSettled(requestId));
+      remote.on('remoteUser', (message: unknown) => this.onRemoteUser(message));
+      remote.on('rejected', (last: { text: string; images?: { mediaType: string; data: string }[] }) =>
+        this.onRejected(last),
+      );
+      this.cli = remote;
+    } else {
+      this.cli = new CliProcessManager(opts);
+    }
     this.cli.on('event', (e: ClaudeEvent) => this.onCliEvent(e));
     this.cli.on('stderr', (t: string) => {
       log(`[cli stderr] ${t.trim()}`);
@@ -311,6 +347,8 @@ export class Session {
   stop(): void {
     this.resetStreamingState();
     this.pendingPerm.clear();
+    this.pendingPromptMsg.clear();
+    this.pingInFlight = false;
     this.stats.endTurn(); // closes the turn in flight (idle time after it isn't counted)
     this.persist();
     if (this.cli) dlog('session', `stop (${this.sessionId ?? this.resumeId ?? '?'})`);
@@ -320,9 +358,108 @@ export class Session {
     this.resetBgTasks();
   }
 
+  /**
+   * The window is done with this tab, but in daemon mode the conversation goes on without
+   * it: lets go of the process instead of ending it. A local process just stops.
+   */
+  detach(): void {
+    if (!this.cli?.persistent) {
+      this.stop();
+      return;
+    }
+    this.resetStreamingState();
+    this.pendingPerm.clear();
+    this.pendingPromptMsg.clear();
+    this.pingInFlight = false;
+    this.stats.endTurn();
+    this.persist();
+    dlog('session', `detach (${this.sessionId ?? this.resumeId ?? '?'})`);
+    this.cli.detach();
+    this.cli = undefined;
+    this.setBusy(false);
+    this.resetBgTasks();
+  }
+
+  /** True when the process outlives this window (daemon mode). */
+  isPersistent(): boolean {
+    return !!this.cli?.persistent;
+  }
+
+  /** Shows the pending prompts again (the webview clears them when it repaints history). */
+  reemitPrompts(): void {
+    for (const msg of this.pendingPromptMsg.values()) this.emit(msg);
+  }
+
+  // ---- daemon mode: staying in step with other windows ----
+
+  /**
+   * Attached to a daemon session: catch up. History comes from the transcript (the host
+   * already painted it); the snapshot adds the message being written right now and the
+   * prompts still waiting for an answer.
+   */
+  private onSnapshot(snap: SessionSnapshot): void {
+    const cliId = snap.session.cliSessionId;
+    if (cliId && !this.resumeId) this.resumeId = cliId;
+    if (snap.session.state === 'busy' && !this.busy) {
+      this.setBusy(true);
+      this.stats.beginTurn();
+    }
+    this.replaying = true;
+    try {
+      for (const ev of [...snap.partial, ...snap.pendingControl]) this.onCliEvent(ev as ClaudeEvent);
+    } finally {
+      this.replaying = false;
+    }
+    dlog(
+      'session',
+      `daemon attach ${snap.session.id} (${cliId ?? 'new'}): ${snap.session.state}, ` +
+        `${snap.partial.length} partial, ${snap.pendingControl.length} prompts`,
+    );
+  }
+
+  /** Another window answered this prompt: close it here. */
+  private onPromptSettled(requestId: string): void {
+    this.pendingPerm.delete(requestId);
+    this.pendingPromptMsg.delete(requestId);
+    this.emit({ kind: 'promptSettled', requestId });
+  }
+
+  /** Another window sent a prompt: show it, and follow the turn it started. */
+  private onRemoteUser(message: unknown): void {
+    const content = (message as { content?: unknown })?.content;
+    let text = '';
+    if (typeof content === 'string') text = content;
+    else if (Array.isArray(content)) {
+      text = content
+        .filter((b: any) => b?.type === 'text' && typeof b.text === 'string')
+        .map((b: any) => b.text)
+        .join('');
+    }
+    if (!this.busy) {
+      this.setBusy(true);
+      this.stats.beginTurn();
+    }
+    this.emit({ kind: 'remoteUser', text });
+  }
+
+  /**
+   * Our message was refused because a turn is running (started from another window). The
+   * turn really is running, so busy stays on until its result; only the message comes back.
+   */
+  private onRejected(last: { text: string; images?: { mediaType: string; data: string }[] }): void {
+    if (this.pingInFlight) {
+      this.pingInFlight = false;
+      return;
+    }
+    log(`[session] message refused: a turn is running in another window (${this.sessionId ?? '?'})`);
+    this.hooks.onSendRejected?.(last.text, last.images);
+  }
+
   /** Clears the conversation entirely (new/resume): also resets the statistics. */
   clearConversation(): void {
-    this.stop();
+    // Daemon mode: the conversation this tab leaves keeps running (another window, or this
+    // one later, can pick it up). Local mode: detach() is stop().
+    this.detach();
     this.sessionId = undefined;
     // Also clears the resumeId: a REALLY new conversation. Without this, after "clear
     // context" on a resumed session the next send() would respawn with --resume of the
@@ -369,6 +506,7 @@ export class Session {
     this.setBusy(true);
     this.stats.beginTurn();
     dlog('session', `keep-alive ping (${this.sessionId ?? this.resumeId ?? '?'})`);
+    this.pingInFlight = true;
     this.cli!.sendUserMessage('keep-alive: answer only "ok". Do not use tools and do not change files.');
     return true;
   }
@@ -436,6 +574,7 @@ export class Session {
   decide(requestId: string, decision: 'allow' | 'deny' | 'allow_always', message?: string): void {
     const pend = this.pendingPerm.get(requestId);
     this.pendingPerm.delete(requestId);
+    this.pendingPromptMsg.delete(requestId);
     if (pend?.tool) {
       // On denials, records the reason (the user's feedback) in the denial log.
       this.stats.recordDecision(pend.tool, decision, decision === 'deny' ? message : undefined);
@@ -459,6 +598,7 @@ export class Session {
   answer(requestId: string, answers: Record<string, string>): void {
     const pend = this.pendingPerm.get(requestId);
     this.pendingPerm.delete(requestId);
+    this.pendingPromptMsg.delete(requestId);
     const base = (pend?.input as Record<string, unknown>) ?? {};
     this.cli?.sendControlResponse(requestId, {
       behavior: 'allow',
@@ -715,7 +855,7 @@ export class Session {
             // ExitPlanMode still saves the plan before it is approved — the file in
             // Planing/ is the record, and losing it to the auto-allow would be a
             // silent regression.
-            if (tool === 'ExitPlanMode') {
+            if (tool === 'ExitPlanMode' && !this.replaying) {
               const plan = typeof (input as any)?.plan === 'string' ? (input as any).plan : '';
               if (plan) this.hooks.savePlan?.(plan);
             }
@@ -724,16 +864,18 @@ export class Session {
           }
           if (tool === 'AskUserQuestion') {
             const questions = ((input as any)?.questions ?? []) as any[];
-            this.emit({ kind: 'askRequest', requestId: reqId, questions });
+            const ask: HostToWebview = { kind: 'askRequest', requestId: reqId, questions };
+            this.pendingPromptMsg.set(reqId, ask);
+            this.emit(ask);
           } else {
             // Plan mode: persist the plan to Planing/ and open it in the editor. The file is the
             // primary surface now; the permission card keeps only the approval gate.
             let planFile: string | undefined;
-            if (tool === 'ExitPlanMode') {
+            if (tool === 'ExitPlanMode' && !this.replaying) {
               const plan = typeof (input as any)?.plan === 'string' ? (input as any).plan : '';
               if (plan) planFile = this.hooks.savePlan?.(plan);
             }
-            this.emit({
+            const card: HostToWebview = {
               kind: 'permissionRequest',
               requestId: reqId,
               tool,
@@ -743,9 +885,17 @@ export class Session {
               suggestions: suggestions as any,
               oldText: this.hooks.fileText(tool, input),
               planFile,
-            });
+            };
+            this.pendingPromptMsg.set(reqId, card);
+            this.emit(card);
           }
         }
+        break;
+      }
+      case 'control_cancel_request': {
+        // The CLI withdrew a prompt (its turn ended another way): close it.
+        const id = String((ev as any).request_id ?? '');
+        if (id && (this.pendingPerm.has(id) || this.pendingPromptMsg.has(id))) this.onPromptSettled(id);
         break;
       }
       case 'control_response': {
@@ -794,6 +944,7 @@ export class Session {
         this.emit({ kind: 'stats', stats: this.stats.snapshot() }); // activeMs consolidado
         this.emitTimeline(); // nova amostra de timeline (1x por turno)
         this.persist(); // saves the session state (stays coherent on reopen)
+        this.pingInFlight = false;
         this.setBusy(false);
         this.hooks.onResult();
         this.resetStreamingState();

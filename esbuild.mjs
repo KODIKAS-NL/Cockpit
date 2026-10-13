@@ -28,7 +28,16 @@ const hostCtx = await esbuild.context({
   external: ['vscode', 'bufferutil', 'utf-8-validate'],
 });
 
-// 2) Webview — React, roda no browser do webview.
+// 2) cockpit-daemon — a standalone Node process (launchd); no 'vscode' anywhere in it.
+const daemonCtx = await esbuild.context({
+  ...common,
+  entryPoints: ['src/daemon/main.ts'],
+  outfile: 'dist/daemon.js',
+  platform: 'node',
+  format: 'cjs',
+});
+
+// 3) Webview — React, roda no browser do webview.
 const webCtx = await esbuild.context({
   ...common,
   entryPoints: ['webview/src/main.tsx'],
@@ -40,10 +49,10 @@ const webCtx = await esbuild.context({
 });
 
 if (watch) {
-  await Promise.all([hostCtx.watch(), webCtx.watch()]);
+  await Promise.all([hostCtx.watch(), daemonCtx.watch(), webCtx.watch()]);
   console.log('[esbuild] watching…');
 } else {
-  await Promise.all([hostCtx.rebuild(), webCtx.rebuild()]);
-  await Promise.all([hostCtx.dispose(), webCtx.dispose()]);
+  await Promise.all([hostCtx.rebuild(), daemonCtx.rebuild(), webCtx.rebuild()]);
+  await Promise.all([hostCtx.dispose(), daemonCtx.dispose(), webCtx.dispose()]);
   console.log('[esbuild] build complete');
 }

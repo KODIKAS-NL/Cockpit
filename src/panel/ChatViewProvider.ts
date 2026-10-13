@@ -5,6 +5,9 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import { CliProcessManager } from '../cli/CliProcessManager';
+import { DaemonClient } from '../daemon/DaemonClient';
+import { defaultSocketPath, expandHome } from '../daemon/paths';
+import type { DaemonSessionInfo } from '../../shared/daemon';
 import {
   availableEngines,
   currentEngine,
@@ -128,6 +131,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   // Tabs: each one is a Session (CLI runtime + stats + streaming) in parallel.
   private sessions = new Map<string, Session>();
+  // Daemon mode (`tootega.daemon.enabled`): Claude processes live in cockpit-daemon and
+  // outlive this window. One connection per window, shared by every tab.
+  private daemon?: DaemonClient;
+  private daemonWarned = false;
+  // Daemon mode: deciding which running conversation the first tab attaches to. Priming
+  // slash commands meanwhile would start a throwaway session in its place.
+  private daemonAutoAttachPending = false;
+  // Last daemon listing for this folder (the hub's live badges, auto-attach on open).
+  private daemonSessions: DaemonSessionInfo[] = [];
   // Cache keep-alive: renews the ticked contexts in the background (even closed ones).
   private cacheKeeper = new CacheKeeper({
     claudePath: () => this.claudePath(),
@@ -268,7 +280,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // On Windows a child does NOT die with its parent, so each reload of the
     // host left the previous engines running — seven agent.exe at once, on a
     // machine where each one is a live conversation.
-    for (const s of this.sessions.values()) s.stop();
+    // In daemon mode the processes are not ours to end: the window lets go and the
+    // conversations keep running for the next window that opens them.
+    for (const s of this.sessions.values()) s.detach();
+    this.daemon?.dispose();
     this.cacheKeeper.stop();
     this.otel.stop();
     if (this.watchdog) clearInterval(this.watchdog);
@@ -317,6 +332,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         return s.keepAlivePing() ? 'pinged' : 'busy';
       }
     }
+    // Daemon mode: a closed tab's conversation may still have its process in the daemon.
+    // An ephemeral `--resume` next to it would be two processes on one transcript: skip it.
+    if (this.daemonSessions.some((d) => d.cliSessionId === sessionId && d.state !== 'idle')) return 'busy';
     return 'none';
   }
 
@@ -382,11 +400,92 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         permission: this.cfg().get<string>('permissionMode', 'default') || 'default',
         allowAgents: this.cfg().get<boolean>('allowAgents', false),
         enableTodoTools: this.cfg().get<boolean>('enableTodoTools', false),
+        thinking: this.cfg().get<string>('thinking', 'cli'),
       }),
       askLanguage: () => this.askLanguageCode(),
       extraSystemPrompt: () => this.extraSystemPrompt(),
       quietPrompt: () => this.quietPrompt(),
+      daemon: () => this.daemonClient(),
+      onSendRejected: (text) => {
+        this.post({ kind: 'sendRejected' }, tabId);
+        if (text) this.post({ kind: 'draftRestore', text }, tabId);
+        this.post(
+          {
+            kind: 'error',
+            message: vscode.l10n.t(
+              'This session is busy with a turn started on another device. Your message was not sent; it is back in the input box.',
+            ),
+          },
+          tabId,
+        );
+      },
     };
+  }
+
+  // ---- Daemon mode ----
+
+  /** Socket the daemon listens on (setting, `~` expanded). */
+  daemonSocketPath(): string {
+    const configured = this.cfg().get<string>('daemon.socketPath', '').trim();
+    return configured ? expandHome(configured) : defaultSocketPath();
+  }
+
+  /**
+   * The daemon connection when daemon mode is on and the daemon looks reachable; otherwise
+   * undefined, and the tab runs a local process as before. When the daemon is missing the
+   * user is told once (with the way to install it) instead of failing silently.
+   */
+  private daemonClient(): DaemonClient | undefined {
+    if (!this.cfg().get<boolean>('daemon.enabled', false)) return undefined;
+    const socketPath = this.daemonSocketPath();
+    if (!this.daemon || this.daemon.socketPath !== socketPath) {
+      this.daemon?.dispose();
+      this.daemon = new DaemonClient(socketPath, log);
+    }
+    if (!this.daemon.socketExists()) {
+      if (!this.daemonWarned) {
+        this.daemonWarned = true;
+        const install = vscode.l10n.t('Install daemon');
+        void vscode.window
+          .showWarningMessage(
+            vscode.l10n.t(
+              'Daemon mode is on, but cockpit-daemon is not running ({0}). This tab runs Claude in this window for now.',
+              socketPath,
+            ),
+            install,
+          )
+          .then((pick) => {
+            if (pick === install) void vscode.commands.executeCommand('tootega.daemon.install');
+          });
+      }
+      return undefined;
+    }
+    return this.daemon;
+  }
+
+  /** Refreshes the daemon's sessions for this folder (best effort: empty on any failure). */
+  private async refreshDaemonSessions(): Promise<DaemonSessionInfo[]> {
+    const client = this.daemonClient();
+    if (!client) {
+      this.daemonSessions = [];
+      return [];
+    }
+    try {
+      this.daemonSessions = await client.list(this.workspaceCwd());
+    } catch (e) {
+      log(`[daemon] list failed: ${String(e)}`);
+      this.daemonSessions = [];
+    }
+    return this.daemonSessions;
+  }
+
+  /** Ends the active tab's process in the daemon (the conversation stays on disk). */
+  stopActiveDaemonSession(): boolean {
+    const s = this.sessions.get(this.activeTab);
+    if (!s || !s.isPersistent()) return false;
+    s.stop();
+    void this.refreshDaemonSessions().then(() => this.sendSessions());
+    return true;
   }
 
   /**
@@ -491,7 +590,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private closeTab(tabId: string): void {
     const s = this.sessions.get(tabId);
     if (!s) return;
-    s.stop();
+    // Closing the tab is not ending the conversation in daemon mode: it keeps running and
+    // shows as live in the session list. (Local mode: detach() just stops it.)
+    s.detach();
     const p = this.panels.get(tabId);
     if (p) {
       try {
@@ -964,6 +1065,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const dir = path.join(root, 'Planing');
       fs.mkdirSync(dir, { recursive: true });
 
+      // Several windows on one daemon session each see the same ExitPlanMode prompt: the
+      // first writes the plan, the others find it and open that file instead of a copy.
+      const body = plan.endsWith('\n') ? plan : plan + '\n';
+      const recent = findRecentPlan(dir, body);
+      if (recent) {
+        void vscode.window.showTextDocument(vscode.Uri.file(recent), { preview: true, preserveFocus: true });
+        return path.relative(root, recent).split(path.sep).join('/');
+      }
+
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
       const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
@@ -971,7 +1081,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const name = slug ? `${stamp}-${slug}.md` : `${stamp}.md`;
       const abs = path.join(dir, name);
 
-      fs.writeFileSync(abs, plan.endsWith('\n') ? plan : plan + '\n', 'utf8');
+      fs.writeFileSync(abs, body, 'utf8');
 
       // Open it without stealing focus from the approval card the user is about to act on.
       void vscode.window.showTextDocument(vscode.Uri.file(abs), { preview: true, preserveFocus: true });
@@ -1074,6 +1184,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const s = this.sessions.get(tabId);
     if (!s || s.cli || s.busy || s.slashCommands.length) return;
     if (!this.cliAvailable) return; // resolved in reportCliStatus (which runs earlier in init)
+    if (this.daemonAutoAttachPending) return; // autoAttachDaemon primes when it is done
     try {
       s.ensureCli();
     } catch (e) {
@@ -1135,6 +1246,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       });
     }
     sessions.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+    if (this.daemonSessions.length) {
+      const live = new Map<string, 'busy' | 'running'>();
+      for (const d of this.daemonSessions) {
+        if (d.cliSessionId && d.state !== 'idle') live.set(d.cliSessionId, d.state);
+      }
+      for (const info of sessions) {
+        const state = live.get(info.id);
+        if (state) info.live = state;
+      }
+    }
     this.post({ kind: 'sessions', sessions, cwd });
   }
 
@@ -1244,6 +1365,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private autoResumeLast(): void {
     if (this.autoResumeDone) return;
     this.autoResumeDone = true;
+    // Daemon mode: a conversation still running for this folder wins over the latest
+    // transcript, and the tab attaches to it right away.
+    if (this.cfg().get<boolean>('daemon.enabled', false)) {
+      this.daemonAutoAttachPending = true;
+      void this.autoAttachDaemon().finally(() => {
+        this.daemonAutoAttachPending = false;
+        // Nothing to attach to: prime the (new) tab now, as the window normally does.
+        if (this.activeTab) this.primeCommands(this.activeTab);
+      });
+      return;
+    }
     if (!this.cfg().get<boolean>('autoResumeLastSession', true)) return;
     const s = this.active();
     if (s.resumeId || s.cli || s.sessionId) return; // there is already an active session
@@ -1252,6 +1384,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       s.resume(id);
       this.restoreSessionModel(s, id); // restaura model/effort salvos
       this.sendConfig(); // reflects the restored model/effort in the dropdowns
+    }
+  }
+
+  /**
+   * Daemon mode, on open: attach the active tab to the most recently active live session of
+   * this folder (one with a process). Without one, falls back to the latest transcript (the
+   * usual auto-resume), whose process the daemon starts on the first message.
+   */
+  private async autoAttachDaemon(): Promise<void> {
+    const live = (await this.refreshDaemonSessions()).filter((d) => d.state !== 'idle' && d.cliSessionId);
+    const tab = this.activeTab || this.createTab();
+    const s = this.sessions.get(tab);
+    if (!s || s.resumeId || s.cli || s.sessionId) return;
+    const id = live[0]?.cliSessionId ??
+      (this.cfg().get<boolean>('autoResumeLastSession', true) ? latestSessionId(this.workspaceCwd()) : undefined);
+    if (!id) return;
+    this.resumeInTab(tab, id);
+    this.sendConfig();
+    if (live.length > 1) {
+      log(`[daemon] ${live.length} live sessions in this folder; attached to the most recent, the others are in the session list`);
     }
   }
 
@@ -1283,6 +1435,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.setTabTitle(tabId, names[id] || this.titleFromItems(items));
     }
     this.post({ kind: 'history', items }, tabId);
+    // Repainting history clears the prompt cards: show the ones still waiting again.
+    s.reemitPrompts();
   }
 
   /**
@@ -1529,6 +1683,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.post({ kind: 'history', items }, tab);
     this.postTabs();
     log(`Resuming session ${sessionId} (${items.length} items) in ${tab}`);
+    // Daemon mode: attach now, so a conversation running elsewhere streams in without
+    // waiting for a message from this window (the daemon starts it if it isn't running).
+    if (s && this.daemonClient()) {
+      try {
+        s.ensureCli();
+      } catch (e) {
+        log(`[daemon] attach failed: ${String(e)}`);
+      }
+    }
   }
 
   // ---- Skills ----
@@ -2648,6 +2811,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'listSessions':
         this.sendSessions();
+        // Daemon mode: badges for the conversations kept running, once the daemon answers.
+        if (this.cfg().get<boolean>('daemon.enabled', false)) {
+          void this.refreshDaemonSessions().then(() => this.sendSessions());
+        }
         break;
       case 'resumeSession':
         this.openSession(m.sessionId);
@@ -3333,4 +3500,21 @@ function makeNonce(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   for (let i = 0; i < 32; i++) t += chars.charAt(Math.floor(Math.random() * chars.length));
   return t;
+}
+
+/** A plan file written in the last 15 minutes with exactly this content, if any. */
+function findRecentPlan(dir: string, body: string): string | undefined {
+  const cutoff = Date.now() - 15 * 60_000;
+  try {
+    for (const name of fs.readdirSync(dir)) {
+      if (!name.endsWith('.md')) continue;
+      const file = path.join(dir, name);
+      const st = fs.statSync(file);
+      if (st.mtimeMs < cutoff || st.size !== Buffer.byteLength(body, 'utf8')) continue;
+      if (fs.readFileSync(file, 'utf8') === body) return file;
+    }
+  } catch {
+    /* no folder yet */
+  }
+  return undefined;
 }

@@ -9,6 +9,15 @@ import {
 } from './cli/Utf8HookInstaller';
 import { flushStats } from './stats/StatsStore';
 import { log, setDebugLogging } from './util/logger';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import {
+  daemonLogPath,
+  installLaunchAgent,
+  launchAgentInstalled,
+  restartLaunchAgent,
+  startDetached,
+} from './daemon/service';
 
 export function activate(context: vscode.ExtensionContext): void {
   setDebugLogging(vscode.workspace.getConfiguration('tootega').get<boolean>('debugLog', false));
@@ -54,6 +63,58 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('tootega.open', () => {
       provider.openInEditor();
+    }),
+    // ---- Daemon mode (cockpit-daemon keeps Claude running across windows/devices) ----
+    vscode.commands.registerCommand('tootega.daemon.install', async () => {
+      const cfg = vscode.workspace.getConfiguration('tootega');
+      const bundledScript = path.join(context.extensionPath, 'dist', 'daemon.js');
+      const idleStopHours = cfg.get<number>('daemon.idleStopHours', 0) ?? 0;
+      const socketPath = provider.daemonSocketPath();
+      if (!fs.existsSync(bundledScript)) {
+        void vscode.window.showErrorMessage(vscode.l10n.t('dist/daemon.js is missing from this build.'));
+        return;
+      }
+      if (process.platform === 'darwin') {
+        const r = installLaunchAgent({ bundledScript, fallbackNode: process.execPath, socketPath, idleStopHours });
+        log(`[daemon] install: ${r.message}`);
+        if (!r.ok) {
+          void vscode.window.showErrorMessage(vscode.l10n.t('Could not install cockpit-daemon: {0}', r.message));
+          return;
+        }
+      } else {
+        // No launchd: a detached process that survives this window (not a reboot).
+        startDetached({ node: process.execPath, script: bundledScript, socketPath, idleStopHours });
+      }
+      if (!cfg.get<boolean>('daemon.enabled', false)) {
+        await cfg.update('daemon.enabled', true, vscode.ConfigurationTarget.Global);
+      }
+      void vscode.window.showInformationMessage(
+        vscode.l10n.t('cockpit-daemon is running. New and reopened tabs now keep Claude running when this window closes.'),
+      );
+    }),
+    vscode.commands.registerCommand('tootega.daemon.restart', () => {
+      if (!launchAgentInstalled()) {
+        void vscode.window.showWarningMessage(vscode.l10n.t('cockpit-daemon is not installed as a service. Run "Install daemon" first.'));
+        return;
+      }
+      const r = restartLaunchAgent();
+      if (r.ok) void vscode.window.showInformationMessage(vscode.l10n.t('cockpit-daemon restarted. Running turns were stopped; conversations resume on the next message.'));
+      else void vscode.window.showErrorMessage(vscode.l10n.t('Could not restart cockpit-daemon: {0}', r.message));
+    }),
+    vscode.commands.registerCommand('tootega.daemon.showLog', async () => {
+      const file = daemonLogPath();
+      if (!fs.existsSync(file)) {
+        void vscode.window.showInformationMessage(vscode.l10n.t('No daemon log yet ({0}).', file));
+        return;
+      }
+      await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: true });
+    }),
+    vscode.commands.registerCommand('tootega.daemon.stopSession', () => {
+      if (!provider.stopActiveDaemonSession()) {
+        void vscode.window.showInformationMessage(vscode.l10n.t('The active tab is not running in cockpit-daemon.'));
+        return;
+      }
+      vscode.window.setStatusBarMessage(vscode.l10n.t('Session stopped in cockpit-daemon.'), 3000);
     }),
     vscode.commands.registerCommand('tootega.newSession', () => {
       provider.newSession();

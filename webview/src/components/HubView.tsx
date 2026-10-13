@@ -293,7 +293,7 @@ export function HubView({
                         s={s}
                         t={t}
                         active={s.id === activeSessionId}
-                        running={busySessions?.has(s.id) ?? false}
+                        running={(busySessions?.has(s.id) ?? false) || s.live === 'busy'}
                         onResume={onResume}
                         onReload={onReload}
                         onRemote={onRemote}
@@ -405,6 +405,11 @@ function SessionCard({
         <span className="ctx-card-meta">
           {fmtDate(s.updatedAt)} · {s.messageCount} {t('sessions.messages')}
           {s.sizeBytes != null && <span className="muted"> · {fmtBytes(s.sizeBytes)}</span>}
+          {s.live && (
+            <span className="ctx-card-live" title={t('sessions.liveHint')}>
+              {' '}· ● {t(s.live === 'busy' ? 'sessions.liveBusy' : 'sessions.live')}
+            </span>
+          )}
         </span>
         <span className="ctx-card-actions">
           <span

@@ -248,6 +248,7 @@ terminal mode.
 - [Features](#features)
 - [Cockpit-exclusive features](#cockpit-exclusive-features)
 - [Models, effort, and sessions](#models-effort-and-sessions)
+- [Daemon mode (persistent sessions)](#daemon-mode-persistent-sessions)
 - [Remote Control](#remote-control)
 - [Plugins](#plugins)
 - [Skills](#skills)
@@ -709,6 +710,59 @@ context, and **never** write or log credentials.
   (`serve.cmd`; `tootega.tootegaServer` says where).
 
 ---
+
+## Daemon mode (persistent sessions)
+
+By default each tab runs Claude as a child of the VS Code window: close the window, or let a
+Remote-SSH connection drop for too long, and the conversation's process ends with it. In
+daemon mode the process belongs to **cockpit-daemon**, a small background service on the same
+machine, so a conversation keeps running with no window attached, and any window on that
+machine can attach to it, from Remote-SSH on a laptop or code-server on a tablet.
+
+Set it up once on the machine that runs your code:
+
+1. Run **Tootega: Install daemon** from the command palette. On macOS it installs a launchd
+   agent (`~/Library/LaunchAgents/local.cockpit.daemon.plist`) that starts at login and is
+   restarted if it dies; elsewhere it starts a background process. It also turns on
+   `tootega.daemon.enabled`.
+2. Install this extension in every VS Code server that should use it (the Remote-SSH server
+   and code-server keep separate extension folders). All of them must run as the same user:
+   the socket (`~/.cockpit/daemon.sock`) is owner-only.
+
+How it behaves:
+
+- **Sessions are matched by folder.** A window sees the conversations started in its exact
+  workspace folder (real path, so symlinks and trailing slashes don't matter); a parent or a
+  child folder is a different project. On open, the first tab attaches to the most recently
+  active running conversation of the folder. The others show as **live** in the session list;
+  opening one attaches to it.
+- **Catching up.** Attaching shows the history (from the transcript), the message being
+  written right now, and any permission prompt or question still waiting.
+- **Several windows at once.** Prompts appear in every attached window; the first answer
+  wins and the card closes elsewhere. A message sent from one window appears in the others.
+- **One turn at a time.** A message sent while a turn is running (started from another
+  device) is not queued: you get a notice and the text goes back to the input box.
+- **Closing is not stopping.** Closing a tab or window leaves the conversation running. To
+  end its process, use **Tootega: Stop this session's process in the daemon**; the
+  conversation stays on disk and resumes on the next message.
+- **Restarts.** The daemon remembers its sessions. After a restart (or a reboot) they are
+  listed as idle and resume with `--resume` on the next message; turns that were running
+  are lost.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `tootega.daemon.enabled` | `false` | Run Claude in cockpit-daemon instead of the window. |
+| `tootega.daemon.socketPath` | `~/.cockpit/daemon.sock` | The daemon's Unix socket. |
+| `tootega.daemon.idleStopHours` | `0` (never) | Stop a process idle this long with no window attached and no prompt waiting. Applied on (re)install. |
+
+Architecture, operations and troubleshooting: [Docs/daemon-mode.md](Docs/daemon-mode.md).
+
+Commands: **Install daemon**, **Restart daemon** (stops running turns), **Show daemon log**
+(`~/.cockpit/daemon.log`), **Stop this session's process in the daemon**.
+
+Limits: daemon mode applies to the Claude engine only; the daemon and the windows must be on
+the same machine (the socket is local); the daemon runs Claude with the PATH of your login
+shell, captured when you install it, so reinstall after moving `claude` or `node`.
 
 ## Remote Control
 

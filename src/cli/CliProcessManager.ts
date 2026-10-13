@@ -9,6 +9,8 @@ import { StreamParser } from './StreamParser';
 import { log, dlog } from '../util/logger';
 import type { EngineId } from './Engine';
 import type { ClaudeEvent } from '../../shared/events';
+import type { CliProcess } from './CliProcess';
+import { killGroup } from '../util/killTree';
 
 export interface CliOptions {
   claudePath: string;
@@ -42,6 +44,10 @@ export interface CliOptions {
   forwardSubagentText?: boolean;
   // Liga TodoWrite/Task* nos modelos em que o CLI os tirou (2.1.268) — ver engineEnv().
   enableTodoTools?: boolean;
+  // Forces extended thinking off (MAX_THINKING_TOKENS=0 + alwaysThinkingEnabled:false).
+  // Off by default: thinking then follows the user's own Claude Code configuration.
+  // Setting `tootega.thinking` = "off" turns it on.
+  forceThinkingOff?: boolean;
 }
 
 // Short BCP47 code -> language name for the prompt instruction.
@@ -69,7 +75,8 @@ export interface CliEvents {
   stderr: (text: string) => void;
 }
 
-export class CliProcessManager extends EventEmitter {
+export class CliProcessManager extends EventEmitter implements CliProcess {
+  readonly persistent = false;
   private proc: ChildProcessWithoutNullStreams | null = null;
   private parser = new StreamParser();
   private reqSeq = 0;
@@ -191,81 +198,12 @@ export class CliProcessManager extends EventEmitter {
    * it runs once per spawn.
    */
   private claudeArgs(): string[] {
-    const args = [
-      '-p',
-      '--output-format', 'stream-json',
-      '--input-format', 'stream-json',
-      '--include-partial-messages',
-      // Routes permission decisions through the control protocol (stdin/stdout):
-      // with this sentinel the CLI emits a `can_use_tool` control_request instead of denying
-      // silently in headless mode. AskUserQuestion also arrives through here.
-      '--permission-prompt-tool', 'stdio',
-      '--verbose',
-    ];
-    if (this.opts.model) args.push('--model', this.opts.model);
-    if (this.opts.effort) args.push('--effort', this.opts.effort);
-    // Always explicit, `default` included. Since CLI 2.1.285 a `-p` session with no mode
-    // configured starts in AUTO on third-party providers or with telemetry off, so leaving
-    // the flag out let the dropdown say "default" while the CLI ran its classifier. The CLI
-    // now lists the mode as `manual`; `default` is still accepted and older CLIs only know it.
-    if (this.opts.permissionMode) {
-      args.push('--permission-mode', this.opts.permissionMode);
-    }
-    if (this.opts.disallowedTools?.length) {
-      args.push('--disallowedTools', this.opts.disallowedTools.join(','));
-    }
-    if (this.opts.forwardSubagentText) args.push('--forward-subagent-text');
-    if (this.opts.resumeSessionId) args.push('--resume', this.opts.resumeSessionId);
-    // Repetir --append-system-prompt NÃO soma: o último vence (medido no CLI 2.1.217 —
-    // dois valores, só o segundo chegou ao modelo). Por isso vai tudo junto.
-    //
-    // A diretiva quiet vem PRIMEIRO de propósito: é uma regra sobre a forma de TODA
-    // resposta, e uma regra de forma lida depois do conteúdo perde para ele.
-    const appended = [
-      this.opts.quietPrompt ?? '',
-      this.opts.askLanguage ? askLanguagePrompt(this.opts.askLanguage) : '',
-      this.opts.extraSystemPrompt ?? '',
-    ]
-      .filter(Boolean)
-      .join('\n\n');
-    if (appended) {
-      // Texto do usuário passa por ARQUIVO: com shell:true no Windows, um argumento
-      // multi-linha com `|`, `$` ou crase é mastigado pelo cmd.exe e chega vazio ao
-      // modelo (medido: o sentinel injetado inline sumiu; por arquivo, chegou).
-      const userText = this.opts.extraSystemPrompt || this.opts.quietPrompt;
-      const file = userText ? this.writeTempFile('prompt', appended) : undefined;
-      if (file) args.push('--append-system-prompt-file', file);
-      else args.push('--append-system-prompt', appended);
-    }
-    // `--settings` é MERGE (não substitui as settings do usuário) e aceita caminho OU
-    // string JSON — mas JSON inline não sobrevive ao shell do Windows (aspas/chaves são
-    // mastigadas por cmd.exe e o CLI sobe sem os overrides). Gravamos um arquivo temporário.
-    const settingsFile = this.writeSettingsFile();
-    if (settingsFile) args.push('--settings', settingsFile);
-    return args;
+    return buildClaudeArgs(this.opts, (kind, content) => this.writeTempFile(kind, content));
   }
 
-  /**
-   * The engine's environment.
-   *
-   * Auto mode (the CLI classifier decides allow/deny) is opt-in on Bedrock/Vertex/
-   * Foundry via env (2.1.158/159). Defensive: we turn the flag on when the mode is 'auto'
-   * so it behaves uniformly across providers. It does NOT bypass permissions — it only enables the
-   * CLI's native mode, which still routes what it must through control_request.
-   *
-   * MAX_THINKING_TOKENS=0: o thinking fica sempre desligado. É o par da setting
-   * `alwaysThinkingEnabled: false` (writeSettingsFile) — o orçamento herdado do
-   * ambiente do VS Code religaria o raciocínio mesmo com a setting em falso.
-   *
-   * CLAUDE_CODE_ENABLE_TODO_TOOLS: since CLI 2.1.268 TodoWrite/Task* are only offered up to
-   * Opus 4.7 / Sonnet 4.6, so on Opus 5.5 the Tasks panel has nothing to show. Opt-in
-   * (`tootega.enableTodoTools`): the CLI dropped them on purpose for the newer models.
-   */
+  /** The engine's environment: the parent's, plus engineEnvOverrides(). */
   private engineEnv(): NodeJS.ProcessEnv {
-    const env: NodeJS.ProcessEnv = { ...process.env, MAX_THINKING_TOKENS: '0' };
-    if (this.opts.permissionMode === 'auto') env.CLAUDE_CODE_ENABLE_AUTO_MODE = '1';
-    if (this.opts.enableTodoTools) env.CLAUDE_CODE_ENABLE_TODO_TOOLS = '1';
-    return env;
+    return { ...process.env, ...engineEnvOverrides(this.opts) };
   }
 
   /** Spawns the engine binary and wires the streams. Shared by both engines. */
@@ -387,21 +325,6 @@ export class CliProcessManager extends EventEmitter {
   }
 
   /**
-   * Settings extras deste processo: overrides de skills e o desligamento do thinking.
-   *
-   * O thinking fica SEMPRE desligado, e por isso o arquivo passou a ser escrito em todo
-   * spawn (antes só existia quando havia override de skill). São duas travas porque o CLI
-   * tem dois caminhos para ligá-lo: a setting `alwaysThinkingEnabled` e o orçamento
-   * `MAX_THINKING_TOKENS` (env, aplicado em `spawnWith`). Desligar só um deixa o outro valendo.
-   */
-  private writeSettingsFile(): string | undefined {
-    const overrides = this.opts.skillOverrides;
-    const payload: Record<string, unknown> = { alwaysThinkingEnabled: false };
-    if (overrides && Object.keys(overrides).length > 0) payload.skillOverrides = overrides;
-    return this.writeTempFile('settings', JSON.stringify(payload));
-  }
-
-  /**
    * Envia um control_request nosso e espera a resposta correlacionada por `request_id`.
    * Usado pelo `get_context_usage` (cálculo local do engine: sem turno, sem tokens).
    * Resolve `undefined` no timeout ou quando o CLI responde erro — nunca rejeita, para
@@ -457,6 +380,11 @@ export class CliProcessManager extends EventEmitter {
     });
   }
 
+  /** A local process belongs to this window: letting go of it means ending it. */
+  detach(): void {
+    this.stop();
+  }
+
   stop(): void {
     if (!this.proc) return;
     const proc = this.proc;
@@ -496,6 +424,112 @@ export class CliProcessManager extends EventEmitter {
   }
 }
 
+/**
+ * The Claude CLI's argument list for these options. Files the CLI reads (appended system
+ * prompt, `--settings`) are handed to `writeFile`, which returns the path to put on the
+ * command line, or undefined when it couldn't write (the flag is then left out).
+ *
+ * Shared by both process owners: the local one writes real temp files; the daemon client
+ * collects the contents and lets the daemon write them on its side.
+ */
+export function buildClaudeArgs(
+  opts: CliOptions,
+  writeFile: (kind: string, content: string) => string | undefined,
+): string[] {
+  const args = [
+    '-p',
+    '--output-format', 'stream-json',
+    '--input-format', 'stream-json',
+    '--include-partial-messages',
+    // Routes permission decisions through the control protocol (stdin/stdout):
+    // with this sentinel the CLI emits a `can_use_tool` control_request instead of denying
+    // silently in headless mode. AskUserQuestion also arrives through here.
+    '--permission-prompt-tool', 'stdio',
+    '--verbose',
+  ];
+  if (opts.model) args.push('--model', opts.model);
+  if (opts.effort) args.push('--effort', opts.effort);
+  // Always explicit, `default` included. Since CLI 2.1.285 a `-p` session with no mode
+  // configured starts in AUTO on third-party providers or with telemetry off, so leaving
+  // the flag out let the dropdown say "default" while the CLI ran its classifier. The CLI
+  // now lists the mode as `manual`; `default` is still accepted and older CLIs only know it.
+  if (opts.permissionMode) {
+    args.push('--permission-mode', opts.permissionMode);
+  }
+  if (opts.disallowedTools?.length) {
+    args.push('--disallowedTools', opts.disallowedTools.join(','));
+  }
+  if (opts.forwardSubagentText) args.push('--forward-subagent-text');
+  if (opts.resumeSessionId) args.push('--resume', opts.resumeSessionId);
+  // Repetir --append-system-prompt NÃO soma: o último vence (medido no CLI 2.1.217 —
+  // dois valores, só o segundo chegou ao modelo). Por isso vai tudo junto.
+  //
+  // A diretiva quiet vem PRIMEIRO de propósito: é uma regra sobre a forma de TODA
+  // resposta, e uma regra de forma lida depois do conteúdo perde para ele.
+  const appended = [
+    opts.quietPrompt ?? '',
+    opts.askLanguage ? askLanguagePrompt(opts.askLanguage) : '',
+    opts.extraSystemPrompt ?? '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+  if (appended) {
+    // Texto do usuário passa por ARQUIVO: com shell:true no Windows, um argumento
+    // multi-linha com `|`, `$` ou crase é mastigado pelo cmd.exe e chega vazio ao
+    // modelo (medido: o sentinel injetado inline sumiu; por arquivo, chegou).
+    const userText = opts.extraSystemPrompt || opts.quietPrompt;
+    const file = userText ? writeFile('prompt', appended) : undefined;
+    if (file) args.push('--append-system-prompt-file', file);
+    else args.push('--append-system-prompt', appended);
+  }
+  // `--settings` é MERGE (não substitui as settings do usuário) e aceita caminho OU
+  // string JSON — mas JSON inline não sobrevive ao shell do Windows (aspas/chaves são
+  // mastigadas por cmd.exe e o CLI sobe sem os overrides). Gravamos um arquivo temporário.
+  const settings = settingsPayload(opts);
+  if (settings) {
+    const file = writeFile('settings', JSON.stringify(settings));
+    if (file) args.push('--settings', file);
+  }
+  return args;
+}
+
+/**
+ * Settings extras for this process: skill listing overrides and, when asked for, thinking
+ * forced off. Undefined when there is nothing to add (no `--settings` flag at all).
+ *
+ * Thinking has two switches in the CLI: the `alwaysThinkingEnabled` setting and the
+ * `MAX_THINKING_TOKENS` budget (env, see engineEnvOverrides). Forcing it off sets both.
+ */
+export function settingsPayload(opts: CliOptions): Record<string, unknown> | undefined {
+  const payload: Record<string, unknown> = {};
+  if (opts.forceThinkingOff) payload.alwaysThinkingEnabled = false;
+  const overrides = opts.skillOverrides;
+  if (overrides && Object.keys(overrides).length > 0) payload.skillOverrides = overrides;
+  return Object.keys(payload).length ? payload : undefined;
+}
+
+/**
+ * Environment variables the engine needs on top of the parent environment.
+ *
+ * Auto mode (the CLI classifier decides allow/deny) is opt-in on Bedrock/Vertex/
+ * Foundry via env (2.1.158/159). Defensive: we turn the flag on when the mode is 'auto'
+ * so it behaves uniformly across providers. It does NOT bypass permissions — it only enables the
+ * CLI's native mode, which still routes what it must through control_request.
+ *
+ * MAX_THINKING_TOKENS=0 only when thinking is forced off (see settingsPayload).
+ *
+ * CLAUDE_CODE_ENABLE_TODO_TOOLS: since CLI 2.1.268 TodoWrite/Task* are only offered up to
+ * Opus 4.7 / Sonnet 4.6, so on Opus 5.5 the Tasks panel has nothing to show. Opt-in
+ * (`tootega.enableTodoTools`): the CLI dropped them on purpose for the newer models.
+ */
+export function engineEnvOverrides(opts: CliOptions): Record<string, string> {
+  const env: Record<string, string> = {};
+  if (opts.forceThinkingOff) env.MAX_THINKING_TOKENS = '0';
+  if (opts.permissionMode === 'auto') env.CLAUDE_CODE_ENABLE_AUTO_MODE = '1';
+  if (opts.enableTodoTools) env.CLAUDE_CODE_ENABLE_TODO_TOOLS = '1';
+  return env;
+}
+
 /** One readable line per event, for the debug log. */
 function describeEvent(ev: ClaudeEvent): string {
   const e = ev as unknown as Record<string, unknown>;
@@ -513,31 +547,6 @@ function describeEvent(ev: ClaudeEvent): string {
   if (req?.subtype) parts.push(`${req.subtype}${req.tool_name ? `:${req.tool_name}` : ''}`);
   if (e.is_error) parts.push('IS_ERROR');
   return parts.join(' ');
-}
-
-/**
- * Ends the tree of a detached process outside Windows. `process.kill(-pid)`
- * signals the WHOLE GROUP (leader + children). SIGTERM first (clean exit) and,
- * if something persists, SIGKILL after a grace period. Tolerant to ESRCH (already dead).
- */
-function killGroup(pid: number): void {
-  try {
-    process.kill(-pid, 'SIGTERM');
-  } catch {
-    try {
-      process.kill(pid, 'SIGTERM'); // no group (rare): at least kills the leader
-    } catch {
-      /* already ended */
-    }
-  }
-  const t = setTimeout(() => {
-    try {
-      process.kill(-pid, 'SIGKILL');
-    } catch {
-      /* already ended */
-    }
-  }, 2000);
-  t.unref?.(); // doesn't hold the event loop
 }
 
 /** On Windows with a shell, wraps the path in quotes when it has spaces. */

@@ -375,6 +375,26 @@ function tabReducer(tab: TabState, msg: HostToWebview): TabState {
       };
     }
 
+    // Daemon mode (several windows on one session).
+    case 'promptSettled': {
+      // Answered in another window: close the card/question if it is this one.
+      const permission = tab.permission?.requestId === msg.requestId ? undefined : tab.permission;
+      const ask = tab.ask?.requestId === msg.requestId ? undefined : tab.ask;
+      return permission === tab.permission && ask === tab.ask ? tab : { ...tab, permission, ask };
+    }
+    case 'remoteUser':
+      return {
+        ...tab,
+        items: [...tab.items, { kind: 'user', id: nextUserId(), text: msg.text, ts: Date.now() }],
+      };
+    case 'sendRejected': {
+      // The message never reached the agent: its bubble goes (the text returns to the input).
+      const idx = [...tab.items].reverse().findIndex((i) => i.kind === 'user');
+      if (idx < 0) return tab;
+      const at = tab.items.length - 1 - idx;
+      return { ...tab, items: tab.items.filter((_, i) => i !== at) };
+    }
+
     case 'permissionRequest':
       return {
         ...tab,

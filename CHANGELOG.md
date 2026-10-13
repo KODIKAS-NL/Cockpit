@@ -6,6 +6,26 @@ and the project adopts semantic versioning.
 
 ## [Unreleased]
 
+### Added
+- **Daemon mode: conversations that outlive the window.** With `tootega.daemon.enabled`,
+  Claude runs in cockpit-daemon, a background service on the same machine, instead of as a
+  child of the VS Code window. Closing the window or letting the laptop sleep no longer ends
+  a conversation, and any window on that machine (Remote-SSH, code-server) can attach to it:
+  it shows the history, the message being written and any prompt still waiting. Prompts are
+  shared between windows (first answer wins), a message sent from one window appears in the
+  others, and a message sent mid-turn is refused with a notice instead of queued. Sessions
+  are matched by real folder path. Commands: Install daemon (a launchd agent on macOS),
+  Restart daemon, Show daemon log, Stop this session's process in the daemon.
+- **`tootega.thinking`.** Extended thinking now follows your Claude Code configuration by
+  default; set it to `off` for the previous behaviour (thinking always forced off).
+
+### Changed
+- **Thinking is no longer forced off.** Earlier versions started every process with
+  `MAX_THINKING_TOKENS=0` and `alwaysThinkingEnabled: false`. That is now opt-in
+  (`tootega.thinking: "off"`).
+- Several windows on one conversation write a plan-mode plan once: a window finding the same
+  plan in `Planing/` from the last 15 minutes opens that file instead of writing a copy.
+
 ## [1.0.265] - 2026-09-30
 
 Reviewed against Claude Code CLI 2.1.266 → 2.1.286. Almost everything in that window

@@ -14,5 +14,17 @@
   "Nothing to install: shells on this platform already output UTF-8.": "Nothing to install: shells on this platform already output UTF-8.",
   "Claude process exited unexpectedly (code {0}) before finishing the turn. Send again to continue.": "Claude process exited unexpectedly (code {0}) before finishing the turn. Send again to continue.",
   "Connection was unstable — the turn may be incomplete. Send again if needed.{0}": "Connection was unstable — the turn may be incomplete. Send again if needed.{0}",
-  "The turn ended with an error.{0}": "The turn ended with an error.{0}"
+  "The turn ended with an error.{0}": "The turn ended with an error.{0}",
+  "This session is busy with a turn started on another device. Your message was not sent; it is back in the input box.": "This session is busy with a turn started on another device. Your message was not sent; it is back in the input box.",
+  "Install daemon": "Install daemon",
+  "Daemon mode is on, but cockpit-daemon is not running ({0}). This tab runs Claude in this window for now.": "Daemon mode is on, but cockpit-daemon is not running ({0}). This tab runs Claude in this window for now.",
+  "dist/daemon.js is missing from this build.": "dist/daemon.js is missing from this build.",
+  "Could not install cockpit-daemon: {0}": "Could not install cockpit-daemon: {0}",
+  "cockpit-daemon is running. New and reopened tabs now keep Claude running when this window closes.": "cockpit-daemon is running. New and reopened tabs now keep Claude running when this window closes.",
+  "cockpit-daemon is not installed as a service. Run \"Install daemon\" first.": "cockpit-daemon is not installed as a service. Run \"Install daemon\" first.",
+  "cockpit-daemon restarted. Running turns were stopped; conversations resume on the next message.": "cockpit-daemon restarted. Running turns were stopped; conversations resume on the next message.",
+  "Could not restart cockpit-daemon: {0}": "Could not restart cockpit-daemon: {0}",
+  "No daemon log yet ({0}).": "No daemon log yet ({0}).",
+  "The active tab is not running in cockpit-daemon.": "The active tab is not running in cockpit-daemon.",
+  "Session stopped in cockpit-daemon.": "Session stopped in cockpit-daemon."
 }
