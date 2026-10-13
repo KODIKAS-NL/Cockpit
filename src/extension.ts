@@ -15,6 +15,7 @@ import {
   daemonLogPath,
   installLaunchAgent,
   launchAgentInstalled,
+  probeDaemon,
   restartLaunchAgent,
   startDetached,
 } from './daemon/service';
@@ -72,6 +73,22 @@ export function activate(context: vscode.ExtensionContext): void {
       const socketPath = provider.daemonSocketPath();
       if (!fs.existsSync(bundledScript)) {
         void vscode.window.showErrorMessage(vscode.l10n.t('dist/daemon.js is missing from this build.'));
+        return;
+      }
+      // A daemon that runs without our launchd agent (the Cockpit Daemon menu bar app, or one
+      // started by hand) already does the job: installing a second one would fight it for the
+      // socket. Just switch daemon mode on.
+      const runningPid = await probeDaemon(socketPath);
+      if (runningPid && !launchAgentInstalled()) {
+        if (!cfg.get<boolean>('daemon.enabled', false)) {
+          await cfg.update('daemon.enabled', true, vscode.ConfigurationTarget.Global);
+        }
+        void vscode.window.showInformationMessage(
+          vscode.l10n.t(
+            'cockpit-daemon is already running (pid {0}), for example from the Cockpit Daemon app. Daemon mode is on; nothing was installed.',
+            String(runningPid),
+          ),
+        );
         return;
       }
       if (process.platform === 'darwin') {

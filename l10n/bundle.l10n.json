@@ -26,5 +26,6 @@
   "Could not restart cockpit-daemon: {0}": "Could not restart cockpit-daemon: {0}",
   "No daemon log yet ({0}).": "No daemon log yet ({0}).",
   "The active tab is not running in cockpit-daemon.": "The active tab is not running in cockpit-daemon.",
-  "Session stopped in cockpit-daemon.": "Session stopped in cockpit-daemon."
+  "Session stopped in cockpit-daemon.": "Session stopped in cockpit-daemon.",
+  "cockpit-daemon is already running (pid {0}), for example from the Cockpit Daemon app. Daemon mode is on; nothing was installed.": "cockpit-daemon is already running (pid {0}), for example from the Cockpit Daemon app. Daemon mode is on; nothing was installed."
 }

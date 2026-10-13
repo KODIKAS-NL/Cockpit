@@ -756,6 +756,8 @@ How it behaves:
 | `tootega.daemon.idleStopHours` | `0` (never) | Stop a process idle this long with no window attached and no prompt waiting. Applied on (re)install. |
 
 Architecture, operations and troubleshooting: [Docs/daemon-mode.md](Docs/daemon-mode.md).
+On a Mac you can run the daemon from a menu bar app instead of the launchd agent, with a
+live log and Start/Stop/Restart: see [mac/CockpitDaemon](mac/CockpitDaemon/README.md).
 
 Commands: **Install daemon**, **Restart daemon** (stops running turns), **Show daemon log**
 (`~/.cockpit/daemon.log`), **Stop this session's process in the daemon**.

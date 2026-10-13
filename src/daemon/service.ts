@@ -2,6 +2,7 @@
 // at login and is restarted if it dies. Elsewhere: a detached process (until the next reboot).
 // No VS Code imports; the commands that call this live in extension.ts.
 import { spawn, spawnSync } from 'node:child_process';
+import * as net from 'node:net';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -139,6 +140,44 @@ export function restartLaunchAgent(): InstallResult {
 
 export function launchAgentInstalled(): boolean {
   return process.platform === 'darwin' && fs.existsSync(plistPath());
+}
+
+/**
+ * The pid of the daemon listening on `socketPath`, or undefined when none answers. Used to
+ * avoid installing a second daemon next to one that already runs (e.g. the Cockpit Daemon
+ * menu bar app).
+ */
+export function probeDaemon(socketPath: string, timeoutMs = 1500): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    if (!fs.existsSync(socketPath)) {
+      resolve(undefined);
+      return;
+    }
+    const socket = net.connect(socketPath);
+    let buf = '';
+    const done = (pid: number | undefined) => {
+      clearTimeout(timer);
+      socket.destroy();
+      resolve(pid);
+    };
+    const timer = setTimeout(() => done(undefined), timeoutMs);
+    socket.setEncoding('utf8');
+    socket.once('connect', () => {
+      socket.write(JSON.stringify({ op: 'hello', clientId: 'probe', version: 1 }) + '\n');
+    });
+    socket.on('data', (chunk: string) => {
+      buf += chunk;
+      const nl = buf.indexOf('\n');
+      if (nl < 0) return;
+      try {
+        const msg = JSON.parse(buf.slice(0, nl));
+        done(msg?.type === 'hello_ok' && typeof msg.pid === 'number' ? msg.pid : undefined);
+      } catch {
+        done(undefined);
+      }
+    });
+    socket.once('error', () => done(undefined));
+  });
 }
 
 /**

@@ -133,7 +133,22 @@ turn as running, because the other device's message was echoed to it (`remote_us
 
 ## Starting and managing the daemon
 
-### Install (recommended)
+There are two ways to run the daemon on a Mac. Pick one: only one daemon can own the socket.
+
+| | Cockpit Daemon app | launchd agent |
+|---|---|---|
+| What | A menu bar app that runs the daemon as its child | A background service, no UI |
+| Starts at login | Yes (login item) | Yes |
+| Restarted if it dies | Yes (with back-off) | Yes |
+| Live log, sessions list, Start/Stop/Restart | Yes | Log file and `launchctl` only |
+| Set up with | `mac/CockpitDaemon/scripts/build-app.sh --install` | **Tootega: Install daemon** |
+| Quitting it | Stops the daemon and its Claude processes | Not applicable |
+
+The app is described in [mac/CockpitDaemon/README.md](../mac/CockpitDaemon/README.md). The
+rest of this section covers the launchd agent. With the app running, **Tootega: Install
+daemon** detects it, switches daemon mode on and installs nothing.
+
+### Install the launchd agent
 
 On the machine that holds the code (the Mac mini):
 
@@ -275,7 +290,8 @@ knows the session id, so a restart always continues the same transcript.
 | `src/daemon/DaemonSession.ts` | One CLI process: handshake cache, prompt arbitration, busy refusal, catch-up snapshot, `@file:` arguments. |
 | `src/daemon/DaemonClient.ts` | The window's connection (one per extension host, shared by all tabs). |
 | `src/daemon/paths.ts` | Socket location and folder normalization, shared by both sides. |
-| `src/daemon/service.ts` | launchd install/restart, detached start on other platforms. |
+| `src/daemon/service.ts` | launchd install/restart, detached start on other platforms, probe for a running daemon. |
+| `mac/CockpitDaemon/` | The macOS menu bar app that can run the daemon instead of launchd. |
 | `src/cli/CliProcess.ts` | The interface `Session` uses for either kind of process. |
 | `src/cli/RemoteCliProcess.ts` | `CliProcess` relayed through the daemon. |
 | `src/cli/CliProcessManager.ts` | The local process (unchanged behaviour); exports the argument builder both share. |

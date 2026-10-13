@@ -16,6 +16,9 @@ and the project adopts semantic versioning.
   others, and a message sent mid-turn is refused with a notice instead of queued. Sessions
   are matched by real folder path. Commands: Install daemon (a launchd agent on macOS),
   Restart daemon, Show daemon log, Stop this session's process in the daemon.
+- **Cockpit Daemon, a macOS menu bar app** (`mac/CockpitDaemon`) that runs the daemon instead
+  of the launchd agent: opens at login, streams the daemon's log, lists its sessions, and has
+  Start / Stop / Restart. **Install daemon** detects it and only switches daemon mode on.
 - **`tootega.thinking`.** Extended thinking now follows your Claude Code configuration by
   default; set it to `off` for the previous behaviour (thinking always forced off).
 
