@@ -348,6 +348,7 @@ export interface SessionConfig {
   permissionMode: string;
   permissionModes: string[];
   allowAgents: boolean; // liberar agentes (Task) e workflows (Workflow); off economiza tokens
+  autoCompact: string; // this conversation's auto-compact: 'auto' | 'off' | window in tokens
   showThinking: boolean; // expand thinking by default
   spellCheck: boolean; // spell-check while typing (composer overlay)
   expandToolCards: boolean; // expand tool cards by default in the timeline
@@ -674,6 +675,7 @@ export type WebviewToHost =
   | { kind: 'newTab' }
   | { kind: 'closeTab'; tabId: string }
   | { kind: 'switchTab'; tabId: string }
+  | { kind: 'setAutoCompact'; value: string }
   | { kind: 'installCli' }
   | { kind: 'daemonInstall' }
   | { kind: 'updateCli' }

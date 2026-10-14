@@ -6074,3 +6074,84 @@ body {
 .marker-tip-thumb {
   border-color: var(--vscode-widget-border, rgba(127, 127, 127, 0.35));
 }
+
+/* Cog menu in the prompt toolbar: the rarer per-conversation options. */
+.composer-pick-cog {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  opacity: 0.7;
+  cursor: pointer;
+}
+.composer-pick-cog:hover,
+.composer-pick-cog.on {
+  opacity: 1;
+  background: color-mix(in srgb, var(--vscode-foreground) 12%, transparent);
+}
+.composer-pick-cog .hub-icon {
+  width: 15px;
+  height: 15px;
+}
+.composer-cog-pop {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: calc(100% + 4px);
+  z-index: 40;
+  padding: 8px 10px;
+  background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background, var(--vscode-editor-background)));
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-widget-border, rgba(127, 127, 127, 0.35)));
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  font-size: 12px;
+}
+.cog-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.cog-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 0;
+}
+.cog-row select,
+.cog-row input[type='text'],
+.cog-custom input {
+  font: inherit;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--vscode-widget-border, rgba(127, 127, 127, 0.35)));
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.cog-custom input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cog-custom button {
+  font: inherit;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 4px;
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  cursor: pointer;
+}
+.cog-custom button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.cog-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  opacity: 0.6;
+}

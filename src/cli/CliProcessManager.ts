@@ -22,6 +22,8 @@ export interface CliOptions {
   server?: string;
   model?: string;
   effort?: string;
+  /** `auto` (the CLI's own), `off`, or the auto-compact window in tokens (100000 to 1000000). */
+  autoCompact?: string;
   permissionMode?: string;
   // Ferramentas a desabilitar no CLI (--disallowedTools). Ex.: ['Task','Workflow']
   // to block subagents/workflows (which spend a lot of tokens). Empty = nothing.
@@ -455,6 +457,7 @@ export function buildClaudeArgs(
   ];
   if (opts.model) args.push('--model', opts.model);
   if (opts.effort) args.push('--effort', opts.effort);
+  if (opts.autoCompact && /^\d+$/.test(opts.autoCompact)) args.push('--autocompact', opts.autoCompact);
   // Always explicit, `default` included. Since CLI 2.1.285 a `-p` session with no mode
   // configured starts in AUTO on third-party providers or with telemetry off, so leaving
   // the flag out let the dropdown say "default" while the CLI ran its classifier. The CLI
@@ -533,6 +536,7 @@ export function engineEnvOverrides(opts: CliOptions): Record<string, string> {
   if (opts.forceThinkingOff) env.MAX_THINKING_TOKENS = '0';
   if (opts.permissionMode === 'auto') env.CLAUDE_CODE_ENABLE_AUTO_MODE = '1';
   if (opts.enableTodoTools) env.CLAUDE_CODE_ENABLE_TODO_TOOLS = '1';
+  if (opts.autoCompact === 'off') env.DISABLE_AUTO_COMPACT = '1';
   return env;
 }
 

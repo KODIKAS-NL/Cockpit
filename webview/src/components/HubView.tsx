@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Translator } from '../i18n';
 import { Icon } from './Icon';
-import type { StatsSnapshot, SessionConfig, SessionInfo } from '../../../shared/protocol';
+import type { StatsSnapshot, SessionInfo } from '../../../shared/protocol';
 import { fmtInt, fmtPct, fmtCompact, fmtBytes, fmtDuration, fmtUsdShort } from '../util/format';
 import type { TooltipRow } from './Tooltip';
-import { Controls } from './Controls';
 import { Tooltip, type TooltipMeta } from './Tooltip';
 import { send, readState, saveState } from '../vscodeApi';
 
@@ -32,8 +31,6 @@ interface Props {
   cliLatest?: string;
   stats?: StatsSnapshot;
   busy?: boolean; // contexto ativo processando um turno → spinner no card
-  config?: SessionConfig;
-  activeModel?: string;
   loggedIn: boolean;
   sessions: SessionInfo[];
   cwd?: string;
@@ -52,12 +49,6 @@ interface Props {
   onUpdate: () => void;
   onInstall: () => void;
   onOpenLink: (href: string) => void;
-  onModel: (model: string) => void;
-  onRemoveModel: (model: string) => void;
-  onEffort: (effort: string) => void;
-  onPermission: (mode: string) => void;
-  onAllowAgents: (value: boolean) => void;
-  onEngine: (engine: string) => void;
   onResume: (id: string) => void;
   onReload: (id: string) => void;
   onRemote: (id: string) => void;
@@ -80,8 +71,6 @@ export function HubView({
   cliLatest,
   stats,
   busy,
-  config,
-  activeModel,
   loggedIn,
   sessions,
   cwd,
@@ -100,12 +89,6 @@ export function HubView({
   onUpdate,
   onInstall,
   onOpenLink,
-  onModel,
-  onRemoveModel,
-  onEffort,
-  onPermission,
-  onAllowAgents,
-  onEngine,
   onResume,
   onReload,
   onRemote,
@@ -259,21 +242,6 @@ export function HubView({
             <ContextInfo t={t} locale={locale} stats={stats} busy={busy} />
           ) : (
             <div className="muted">{t('ctxPanel.noStats')}</div>
-          )}
-          {config && (
-            <div className="ctx-panel-controls">
-              <Controls
-                t={t}
-                config={config}
-                activeModel={activeModel}
-                onModel={onModel}
-                onRemoveModel={onRemoveModel}
-                onEffort={onEffort}
-                onPermission={onPermission}
-                onAllowAgents={onAllowAgents}
-                onEngine={onEngine}
-              />
-            </div>
           )}
         </section>
 

@@ -62,5 +62,6 @@
   "cmd.openInSidebar": "Mover para o chat da barra lateral",
   "cfg.preferredLocation": "Onde as novas conversas abrem: no chat da barra lateral (como a extensão oficial) ou em uma aba do editor. Uma conversa fica em um lugar por vez; \"Abrir no editor\" e \"Mover para o chat da barra lateral\" a movem.",
   "cfg.preferredLocation.sidebar": "Chat da barra lateral (direita)",
-  "cfg.preferredLocation.editor": "Aba do editor"
+  "cfg.preferredLocation.editor": "Aba do editor",
+  "cfg.autoCompact": "Auto-compactação padrão das novas conversas: \"auto\" (a janela do próprio CLI), \"off\", ou a janela em tokens (100000 a 1000000) em que as mensagens antigas são resumidas. Cada conversa pode mudar isso no menu de ajustes da caixa de prompt."
 }

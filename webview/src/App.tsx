@@ -427,8 +427,6 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
           cliLatest={state.cli.latest}
           stats={tab?.stats}
           busy={tab?.status === 'busy' || tab?.bgBusy === true}
-          config={state.config}
-          activeModel={tab?.stats?.model ?? tab?.session?.model}
           loggedIn={state.loggedIn}
           sessions={state.sessions}
           cwd={state.sessionsCwd}
@@ -453,12 +451,6 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
           onUpdate={() => send({ kind: 'updateCli' })}
           onInstall={() => send({ kind: 'installCli' })}
           onOpenLink={(href) => send({ kind: 'openLink', href })}
-          onModel={onModel}
-          onRemoveModel={onRemoveModel}
-          onEffort={onEffort}
-          onPermission={onPermissionMode}
-          onAllowAgents={onAllowAgents}
-          onEngine={onEngine}
           onResume={onResume}
           onReload={(id) => send({ kind: 'reloadSession', sessionId: id })}
           onRemote={(id) => send({ kind: 'remoteControl', sessionId: id })}
@@ -726,6 +718,9 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
             onRemoveModel={onRemoveModel}
             onEffort={onEffort}
             onPermission={onPermissionMode}
+            onAllowAgents={onAllowAgents}
+            onEngine={onEngine}
+            onAutoCompact={(value) => send({ kind: 'setAutoCompact', value })}
           />
         }
       />

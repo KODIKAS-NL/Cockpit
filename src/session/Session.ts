@@ -58,6 +58,7 @@ export interface SessionHooks {
     effort: string;
     permission: string;
     allowAgents: boolean;
+    autoCompact?: string;
     enableTodoTools?: boolean;
     // 'off' forces extended thinking off for every spawn; anything else leaves it to the
     // user's Claude Code configuration.
@@ -130,6 +131,8 @@ export class Session {
   permissionOverride?: string;
   // Allow agents (Task) and workflows (Workflow). undefined = uses the settings default.
   allowAgentsOverride?: boolean;
+  // Auto-compact for this conversation: 'auto' | 'off' | window in tokens. undefined = the setting.
+  autoCompactOverride?: string;
 
   // Streaming state
   private currentAssistantId?: string;
@@ -195,6 +198,9 @@ export class Session {
   allowAgents(): boolean {
     return this.allowAgentsOverride ?? this.hooks.settings().allowAgents;
   }
+  autoCompact(): string {
+    return this.autoCompactOverride ?? this.hooks.settings().autoCompact ?? 'auto';
+  }
 
   setModel(m: string): void {
     this.modelOverride = m;
@@ -212,6 +218,10 @@ export class Session {
     this.allowAgentsOverride = v;
     this.stop();
   }
+  setAutoCompact(v: string): void {
+    this.autoCompactOverride = v;
+    this.stop();
+  }
 
   ensureCli(): void {
     if (this.cli) return;
@@ -225,6 +235,7 @@ export class Session {
       server: engine === 'tootega' ? this.hooks.engineServer?.() : undefined,
       model: model && model !== 'default' ? model : undefined,
       effort: effort && effort !== 'default' ? effort : undefined,
+      autoCompact: this.autoCompact(),
       permissionMode: this.permission(),
       // Blocks subagents/workflows when off (token saving).
       disallowedTools: this.allowAgents() ? undefined : ['Task', 'Workflow'],

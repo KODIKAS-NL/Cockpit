@@ -544,6 +544,11 @@
           ],
           "default": "sidebar",
           "description": "%cfg.preferredLocation%"
+        },
+        "tootega.autoCompact": {
+          "type": "string",
+          "default": "auto",
+          "description": "%cfg.autoCompact%"
         }
       }
     }

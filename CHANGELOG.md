@@ -7,6 +7,12 @@ and the project adopts semantic versioning.
 ## [Unreleased]
 
 ### Added
+- **Per-conversation controls live with the chat.** Model, effort and permission mode are chips in
+  the prompt box (like the official panel) and a cog menu holds the rarer ones: Agents &
+  workflows, the engine, **auto-compact** and a custom model id. The dashboard no longer has these
+  controls; it keeps status, usage and settings. Auto-compact is a new per-conversation option
+  (`auto`, `off`, or a window of 100K to 1M tokens passed to the CLI as `--autocompact`), with
+  `tootega.autoCompact` as the default for new conversations; it is remembered per conversation.
 - **Side bar chat.** The conversation can now run in a side bar next to the code, like the
   official Claude Code extension: a chat view in the secondary side bar (the Activity Bar on VS
   Code older than 1.106) with a strip of conversation tabs, new, close, and "open in an editor

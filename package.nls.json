@@ -62,5 +62,6 @@
   "cmd.openInSidebar": "Move to the side bar chat",
   "cfg.preferredLocation": "Where new conversations open: the side bar chat (like the official extension) or an editor tab. A conversation is in one place at a time; \"Open in editor\" and \"Move to the side bar chat\" move it.",
   "cfg.preferredLocation.sidebar": "Side bar chat (right)",
-  "cfg.preferredLocation.editor": "Editor tab"
+  "cfg.preferredLocation.editor": "Editor tab",
+  "cfg.autoCompact": "Default auto-compact for new conversations: \"auto\" (the CLI's own window), \"off\", or the window in tokens (100000 to 1000000) at which older messages are summarised. Each conversation can override it from the settings menu in its prompt box."
 }

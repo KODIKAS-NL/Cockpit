@@ -96,6 +96,7 @@ interface SessionPrefs {
   model?: string;
   effort?: string;
   allowAgents?: boolean;
+  autoCompact?: string;
 }
 
 // --- Render watchdog ---
@@ -412,6 +413,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         effort: this.cfg().get<string>('effort', 'default') || 'default',
         permission: this.cfg().get<string>('permissionMode', 'default') || 'default',
         allowAgents: this.cfg().get<boolean>('allowAgents', false),
+        autoCompact: this.cfg().get<string>('autoCompact', 'auto') || 'auto',
         enableTodoTools: this.cfg().get<boolean>('enableTodoTools', false),
         thinking: this.cfg().get<string>('thinking', 'cli'),
       }),
@@ -566,6 +568,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           effort: prev.effortOverride,
           permission: prev.permissionOverride,
           allowAgents: prev.allowAgentsOverride,
+          autoCompact: prev.autoCompactOverride,
         }
       : undefined;
     // If the dropdowns were edited over the active tab, the choice was for the new
@@ -587,6 +590,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       s.effortOverride = inherited.effort;
       s.permissionOverride = inherited.permission;
       s.allowAgentsOverride = inherited.allowAgents;
+      s.autoCompactOverride = inherited.autoCompact;
       this.saveSessionModel(s);
     }
     this.openSessionPanel(id);
@@ -1855,6 +1859,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       model: s.modelOverride,
       effort: s.effortOverride,
       allowAgents: s.allowAgentsOverride,
+      autoCompact: s.autoCompactOverride,
     };
     void this.memory.update('sessionModels', map);
   }
@@ -1867,6 +1872,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (o.model) s.modelOverride = o.model;
     if (o.effort) s.effortOverride = o.effort;
     if (typeof o.allowAgents === 'boolean') s.allowAgentsOverride = o.allowAgents;
+    if (o.autoCompact) s.autoCompactOverride = o.autoCompact;
   }
 
   /**
@@ -2456,6 +2462,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         permissionMode: this.currentPermissionMode(),
         permissionModes: PERMISSION_MODES,
         allowAgents: this.currentAllowAgents(),
+        autoCompact: this.active().autoCompact(),
         showThinking: this.cfg().get<boolean>('showThinking', false),
         spellCheck: this.cfg().get<boolean>('spellCheck', false),
         expandToolCards: this.cfg().get<boolean>('expandToolCards', false),
@@ -2952,6 +2959,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'setEngine':
         this.setTabEngine(srcTab, m.engine === 'tootega' ? 'tootega' : 'claude');
+        break;
+      case 'setAutoCompact':
+        srcSession().setAutoCompact(m.value);
+        this.saveSessionModel(srcSession());
+        this.pendingRestart = true;
+        this.sendConfig();
         break;
       case 'setAllowAgents':
         this.snapComboBaseline(srcTab);
