@@ -6155,3 +6155,30 @@ body {
   font-size: 11px;
   opacity: 0.6;
 }
+
+/* Send / Stop as an icon button pinned to the bottom right of the prompt box, so it stays on the
+   toolbar's last row however the chips and buttons wrap. */
+.composer-side {
+  padding-right: 46px;
+}
+.composer-side .btn.send-icon {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  min-width: 0;
+  width: 32px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+.composer-side .btn.send.send-icon {
+  color: var(--vscode-button-foreground, #fff);
+  background: var(--vscode-button-background);
+}
+.composer-side .btn.send.send-icon:disabled {
+  opacity: 0.4;
+}
