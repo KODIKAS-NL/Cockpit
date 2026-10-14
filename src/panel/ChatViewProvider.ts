@@ -373,6 +373,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.openSessionPanel(tabId);
       },
       onInit: (model, cmds) => this.onSessionInit(model, cmds, tabId),
+      onModels: (models) => this.onCliModels(models),
       onAuthRequired: () => this.post({ kind: 'authRequired' }, tabId),
       onTurnError: (info) => {
         const message =
@@ -643,6 +644,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       };
     });
     this.post({ kind: 'tabs', tabs, activeTab: this.activeTab });
+  }
+
+  /**
+   * The CLI's own model list (from its `initialize` reply). It needs no API key or token, which
+   * the /v1/models route does, so the picker is complete for every account that can run the CLI.
+   * Entries from /v1/models, when they exist, keep their richer metadata (context size, date).
+   */
+  private onCliModels(models: DiscoveredModel[]): void {
+    let changed = false;
+    for (const m of models) {
+      const known = this.discoveredModels.get(m.id);
+      if (known && known.displayName === m.displayName && known.resolvedId === m.resolvedId) continue;
+      this.discoveredModels.set(m.id, { ...known, ...m });
+      changed = true;
+    }
+    if (!changed) return;
+    void this.memory.update('modelCatalog', [...this.discoveredModels.values()]);
+    log(`Model list from the CLI: ${models.length} models`);
+    this.sendConfig();
   }
 
   /** Global side of a session's init: model discovery + default cache. */
@@ -2367,7 +2387,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private buildModelMeta(models: string[], anchorId?: string): Record<string, ModelMeta> {
     const priceOf = (id: string): PricingMap[string] | undefined =>
       // Price key: without the [1m] suffix and without a dated snapshot (-YYYYMMDD).
-      this.pricing[id.replace(/\[1m\]/i, '').replace(/-\d{8}$/, '')];
+      this.pricing[
+        (this.discoveredModels.get(id.replace(/\[1m\]/i, ''))?.resolvedId ?? id)
+          .replace(/\[1m\]/i, '')
+          .replace(/-\d{8}$/, '')
+      ];
     // No known default (or no price for it): falls back to the priciest model on offer.
     const anchor =
       (anchorId ? priceOf(anchorId)?.inMTok : undefined) ??

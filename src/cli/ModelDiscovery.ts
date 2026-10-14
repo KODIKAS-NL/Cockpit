@@ -34,6 +34,8 @@ export interface DiscoveredModel {
   contextTokens?: number;
   displayName?: string;
   createdAt?: string;
+  /** The model an alias (`opus`, `sonnet`) resolves to, when `id` is not itself a model id. */
+  resolvedId?: string;
 }
 
 export const ONE_M = 1_000_000;

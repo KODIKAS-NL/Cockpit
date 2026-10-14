@@ -2,6 +2,7 @@
 // all the streaming state. It emits UI messages through a callback (the provider
 // tags them with the tab id and forwards them to the webview). Several instances run
 // in parallel — one per tab.
+import type { DiscoveredModel } from '../cli/ModelDiscovery';
 import { CliProcessManager, type CliOptions } from '../cli/CliProcessManager';
 import type { CliProcess } from '../cli/CliProcess';
 import { RemoteCliProcess } from '../cli/RemoteCliProcess';
@@ -30,6 +31,8 @@ export interface SessionHooks {
   onResult: () => void;
   onInteraction: () => void;
   onInit: (model?: string, slashCommands?: string[]) => void;
+  /** The model list the CLI reports in its `initialize` reply (what the account can use). */
+  onModels?: (models: DiscoveredModel[]) => void;
   onAuthRequired: () => void;
   // The turn ended abnormally: the host locates it and shows the warning in the tab.
   //  - 'aborted': the CLI process died mid-turn (no result).
@@ -905,6 +908,9 @@ export class Session {
         // first send. (The `system init` only arrives after the first message.)
         const r = ev as any;
         const resp = r.response;
+        let models = extractModels(resp?.response);
+        if (!models.length) models = extractModels(resp);
+        if (models.length) this.hooks.onModels?.(models);
         const cmds = extractSlashCommands(resp?.response) || extractSlashCommands(resp);
         if (cmds.length && this.slashCommands.length === 0) {
           this.slashCommands = cmds;
@@ -1172,6 +1178,25 @@ function safeJson(s: string): unknown {
   } catch {
     return { _raw: s };
   }
+}
+
+// The model list in the `initialize` reply: the same one the official panel offers. `value` is
+// what goes after `--model` (an alias like `opus` or a full id); `resolvedModel` is the model
+// behind it. `default` is not a model, the picker has its own entry for it.
+function extractModels(o: any): DiscoveredModel[] {
+  const arr = o && typeof o === 'object' ? o.models : undefined;
+  if (!Array.isArray(arr)) return [];
+  const out: DiscoveredModel[] = [];
+  for (const it of arr) {
+    const id = typeof it?.value === 'string' ? it.value : '';
+    if (!id || id === 'default') continue;
+    out.push({
+      id,
+      displayName: typeof it.displayName === 'string' ? it.displayName : undefined,
+      resolvedId: typeof it.resolvedModel === 'string' && it.resolvedModel !== id ? it.resolvedModel : undefined,
+    });
+  }
+  return out;
 }
 
 // Extracts slash command names from the `initialize` handshake payload (tolerant
