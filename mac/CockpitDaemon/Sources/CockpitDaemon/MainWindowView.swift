@@ -286,6 +286,8 @@ private struct LogPanel: View {
     @EnvironmentObject private var supervisor: DaemonSupervisor
     @State private var filter = ""
     @State private var follow = true
+    /// Long lines (the CLI's arguments) wrap instead of scrolling sideways; remembered.
+    @AppStorage("logWrap") private var wrap = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -295,6 +297,8 @@ private struct LogPanel: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 260)
                 Toggle("Follow", isOn: $follow)
+                    .toggleStyle(.checkbox)
+                Toggle("Wrap text", isOn: $wrap)
                     .toggleStyle(.checkbox)
                 Spacer()
                 Button("Copy") { copy() }
@@ -307,14 +311,15 @@ private struct LogPanel: View {
             .padding(.vertical, 8)
 
             ScrollViewReader { proxy in
-                ScrollView([.vertical, .horizontal]) {
+                ScrollView(wrap ? [.vertical] : [.vertical, .horizontal]) {
                     LazyVStack(alignment: .leading, spacing: 1) {
                         ForEach(visible) { line in
                             Text(line.text)
                                 .font(.system(size: 11, design: .monospaced))
                                 .foregroundStyle(color(for: line))
                                 .textSelection(.enabled)
-                                .fixedSize(horizontal: true, vertical: false)
+                                .fixedSize(horizontal: !wrap, vertical: wrap)
+                                .frame(maxWidth: wrap ? .infinity : nil, alignment: .leading)
                                 .id(line.id)
                         }
                     }

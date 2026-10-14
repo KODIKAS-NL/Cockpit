@@ -67,7 +67,7 @@ Then, once:
   Quit. The icon is filled while the daemon runs and shows a warning when it stopped on its own.
 - **Window**: status (pid, uptime, socket), the controls, the sessions the daemon holds
   (folder, title, busy / running / idle, windows attached, prompts waiting, last activity,
-  and a Stop button per session), and the daemon's log, streaming, with filter, follow, copy
+  and a Stop button per session), and the daemon's log, streaming, with filter, follow, wrap text, copy
   and clear.
 - **Supervision**: if the daemon exits on its own it is restarted (1, 2, 4… s back-off; it
   gives up after 5 exits within a minute, so a broken setup doesn't loop).
