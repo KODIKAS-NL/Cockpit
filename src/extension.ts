@@ -82,12 +82,9 @@ export function activate(context: vscode.ExtensionContext): void {
       // socket. Just switch daemon mode on.
       const runningPid = await probeDaemon(socketPath);
       if (runningPid && !launchAgentInstalled()) {
-        if (!cfg.get<boolean>('daemon.enabled', false)) {
-          await cfg.update('daemon.enabled', true, vscode.ConfigurationTarget.Global);
-        }
         void vscode.window.showInformationMessage(
           vscode.l10n.t(
-            'cockpit-daemon is already running (pid {0}), for example from the Cockpit Daemon app. Daemon mode is on; nothing was installed.',
+            'cockpit-daemon is already running (pid {0}), for example from the Cockpit Daemon app. Nothing was installed.',
             String(runningPid),
           ),
         );
@@ -104,11 +101,8 @@ export function activate(context: vscode.ExtensionContext): void {
         // No launchd: a detached process that survives this window (not a reboot).
         startDetached({ node: process.execPath, script: bundledScript, socketPath, idleStopHours });
       }
-      if (!cfg.get<boolean>('daemon.enabled', false)) {
-        await cfg.update('daemon.enabled', true, vscode.ConfigurationTarget.Global);
-      }
       void vscode.window.showInformationMessage(
-        vscode.l10n.t('cockpit-daemon is running. New and reopened tabs now keep Claude running when this window closes.'),
+        vscode.l10n.t('cockpit-daemon is running. Claude keeps running when this window closes.'),
       );
     }),
     vscode.commands.registerCommand('tootega.daemon.restart', () => {
@@ -138,7 +132,7 @@ export function activate(context: vscode.ExtensionContext): void {
         {
           modal: true,
           detail: vscode.l10n.t(
-            'It stops the daemon and the Claude processes it runs, removes the launchd agent and deletes ~/.cockpit (including its list of sessions) and turns daemon mode off. Your conversations stay on disk.',
+            'It stops the daemon and the Claude processes it runs, removes the launchd agent and deletes ~/.cockpit (including its list of sessions). Claude cannot run in Cockpit until the daemon is installed again. Your conversations stay on disk.',
           ),
         },
         remove,
@@ -150,8 +144,7 @@ export function activate(context: vscode.ExtensionContext): void {
         void vscode.window.showErrorMessage(vscode.l10n.t('Could not uninstall cockpit-daemon: {0}', r.message));
         return;
       }
-      await vscode.workspace.getConfiguration('tootega').update('daemon.enabled', false, vscode.ConfigurationTarget.Global);
-      void vscode.window.showInformationMessage(vscode.l10n.t('cockpit-daemon uninstalled and daemon mode turned off.'));
+      void vscode.window.showInformationMessage(vscode.l10n.t('cockpit-daemon uninstalled. Claude cannot run until it is installed again.'));
     }),
     vscode.commands.registerCommand('tootega.daemon.showLog', async () => {
       const file = daemonLogPath();
@@ -296,7 +289,7 @@ export function activate(context: vscode.ExtensionContext): void {
       ) {
         provider.applyEngineChange();
       }
-      if (e.affectsConfiguration('tootega.daemon')) void provider.reportDaemonStatus();
+      if (e.affectsConfiguration('tootega.daemon') || e.affectsConfiguration('tootega.engine')) void provider.reportDaemonStatus();
       if (e.affectsConfiguration('tootega.internalModel')) provider.applyInternalModel();
       if (e.affectsConfiguration('tootega.enableTodoTools')) provider.applyTodoToolsChange();
       if (e.affectsConfiguration('tootega.debugLog')) {

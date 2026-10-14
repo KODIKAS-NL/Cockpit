@@ -54,7 +54,6 @@
   "cmd.daemonUninstall": "Uninstall daemon",
   "cmd.daemonShowLog": "Show daemon log",
   "cmd.daemonStopSession": "Stop this session's process in the daemon",
-  "cfg.daemonEnabled": "Run Claude in cockpit-daemon instead of in this window. Conversations keep running when the window closes or the laptop sleeps, and any window on this machine (Remote-SSH, code-server) can attach to them. Requires the daemon: run \"Tootega: Install daemon\".",
   "cfg.daemonSocketPath": "Unix socket of cockpit-daemon. Empty = ~/.cockpit/daemon.sock.",
   "cfg.daemonIdleStopHours": "Stop a daemon-owned Claude process after this many hours idle with no window attached and no prompt waiting (it resumes on the next message). 0 = never. Applied when the daemon is (re)installed.",
   "cfg.thinking": "Extended thinking for the Claude processes Cockpit starts.",

@@ -54,7 +54,6 @@
   "cmd.daemonUninstall": "Desinstalar daemon",
   "cmd.daemonShowLog": "Mostrar log do daemon",
   "cmd.daemonStopSession": "Parar o processo desta sessão no daemon",
-  "cfg.daemonEnabled": "Roda o Claude no cockpit-daemon em vez de nesta janela. As conversas continuam quando a janela fecha ou o notebook dorme, e qualquer janela desta máquina (Remote-SSH, code-server) pode se conectar a elas. Requer o daemon: rode \"Tootega: Instalar daemon\".",
   "cfg.daemonSocketPath": "Socket Unix do cockpit-daemon. Vazio = ~/.cockpit/daemon.sock.",
   "cfg.daemonIdleStopHours": "Para um processo do Claude mantido pelo daemon depois de tantas horas ocioso, sem janela conectada e sem pergunta pendente (ele retoma na próxima mensagem). 0 = nunca. Aplicado quando o daemon é (re)instalado.",
   "cfg.thinking": "Raciocínio estendido (thinking) dos processos do Claude que o Cockpit inicia.",

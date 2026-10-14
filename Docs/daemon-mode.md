@@ -146,7 +146,7 @@ There are two ways to run the daemon on a Mac. Pick one: only one daemon can own
 
 The app is described in [mac/CockpitDaemon/README.md](../mac/CockpitDaemon/README.md). The
 rest of this section covers the launchd agent. With the app running, **Tootega: Install
-daemon** detects it, switches daemon mode on and installs nothing.
+daemon** detects it and installs nothing.
 
 ### Install the launchd agent
 
@@ -166,7 +166,6 @@ What the install command does:
 - Writes a launchd agent, `~/Library/LaunchAgents/local.cockpit.daemon.plist`, with
   `RunAtLoad` (starts at login) and `KeepAlive` (restarted if it dies).
 - Loads it (`launchctl bootout` of any previous version, then `launchctl bootstrap`).
-- Turns on `tootega.daemon.enabled`.
 
 Re-run it after updating the extension (to copy the new daemon), after moving `node` or
 `claude`, or after changing `tootega.daemon.idleStopHours`.
@@ -195,9 +194,8 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.cockpit.daemon.pli
 
 From the command palette: **Tootega: Stop daemon** (the launchd agent is unloaded until the
 next login; a daemon without one gets a SIGTERM) and **Tootega: Uninstall daemon** (stops it,
-removes the launchd agent and `~/.cockpit/`, and turns off `tootega.daemon.enabled`; asks first).
-By hand: `bootout` as above, delete the plist and `~/.cockpit/`, and turn off
-`tootega.daemon.enabled`. Conversations are the CLI's transcripts and stay either way.
+removes the launchd agent and `~/.cockpit/`; asks first).
+By hand: `bootout` as above, then delete the plist and `~/.cockpit/`. Conversations are the CLI's transcripts and stay either way.
 
 ### Run it by hand
 
@@ -220,12 +218,12 @@ left from a crash, it is removed at start; if another daemon is listening, it re
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `tootega.daemon.enabled` | `false` | Run Claude in the daemon instead of in the window. |
 | `tootega.daemon.socketPath` | `~/.cockpit/daemon.sock` | The daemon's socket. |
 | `tootega.daemon.idleStopHours` | `0` | Passed to the daemon on install. |
 
-If daemon mode is on but the socket is missing, the window warns once (with an **Install
-daemon** button) and runs that tab locally, as without daemon mode.
+The daemon is required for the Claude engine. If the socket is missing, the window warns once
+(with an **Install daemon** button), the dashboard shows it as disconnected and Claude cannot
+run until it is up; there is no local fallback. The Tootega engine is not affected.
 
 ## Files on disk
 

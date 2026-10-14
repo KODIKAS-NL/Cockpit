@@ -58,8 +58,8 @@ Then, once:
    launchd agent**. Only one daemon can own the socket.
 2. In the app's Settings, turn on **Open at login** (approve it in System Settings › General ›
    Login Items if macOS asks).
-3. In VS Code, turn on `tootega.daemon.enabled` (or run **Tootega: Install daemon**: with the
-   app running it just switches daemon mode on and installs nothing).
+3. In VS Code nothing needs switching on: the dashboard header shows **Daemon: connected**.
+   (**Tootega: Install daemon** detects the running app and installs nothing.)
 
 ## What you get
 

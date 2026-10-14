@@ -132,8 +132,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   // Tabs: each one is a Session (CLI runtime + stats + streaming) in parallel.
   private sessions = new Map<string, Session>();
-  // Daemon mode (`tootega.daemon.enabled`): Claude processes live in cockpit-daemon and
-  // outlive this window. One connection per window, shared by every tab.
+  // Claude processes live in cockpit-daemon and outlive this window (the Tootega engine is the
+  // only one that still runs a local process). One connection per window, shared by every tab.
   private daemon?: DaemonClient;
   private daemonWarned = false;
   // Daemon mode: deciding which running conversation the first tab attaches to. Priming
@@ -433,12 +433,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * The daemon connection when daemon mode is on and the daemon looks reachable; otherwise
-   * undefined, and the tab runs a local process as before. When the daemon is missing the
-   * user is told once (with the way to install it) instead of failing silently.
+   * The connection to cockpit-daemon, which runs every Claude conversation. When the daemon is
+   * missing the user is told once (with the way to install it); the tab then fails like a CLI
+   * that cannot start, there is no local fallback.
    */
-  private daemonClient(): DaemonClient | undefined {
-    if (!this.cfg().get<boolean>('daemon.enabled', false)) return undefined;
+  private daemonClient(): DaemonClient {
     const socketPath = this.daemonSocketPath();
     if (!this.daemon || this.daemon.socketPath !== socketPath) {
       this.daemon?.dispose();
@@ -451,7 +450,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         void vscode.window
           .showWarningMessage(
             vscode.l10n.t(
-              'Daemon mode is on, but cockpit-daemon is not running ({0}). This tab runs Claude in this window for now.',
+              'cockpit-daemon is not running ({0}). Claude cannot run until it is: install or start it.',
               socketPath,
             ),
             install,
@@ -460,20 +459,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             if (pick === install) void vscode.commands.executeCommand('tootega.daemon.install');
           });
       }
-      return undefined;
     }
     return this.daemon;
   }
 
   /** Refreshes the daemon's sessions for this folder (best effort: empty on any failure). */
   private async refreshDaemonSessions(): Promise<DaemonSessionInfo[]> {
-    const client = this.daemonClient();
-    if (!client) {
-      this.daemonSessions = [];
-      return [];
-    }
     try {
-      this.daemonSessions = await client.list(this.workspaceCwd());
+      this.daemonSessions = await this.daemonClient().list(this.workspaceCwd());
     } catch (e) {
       log(`[daemon] list failed: ${String(e)}`);
       this.daemonSessions = [];
@@ -727,7 +720,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /** Starts (once) the periodic computation of local usage (5h/7d). */
   /** Tells the dashboard whether daemon mode is on and the daemon answers. Cheap: one connect. */
   async reportDaemonStatus(): Promise<void> {
-    if (!this.cfg().get<boolean>('daemon.enabled', false)) {
+    // The Tootega engine runs locally: nothing to report for it.
+    if (currentEngine() !== 'claude') {
       this.post({ kind: 'daemonStatus', enabled: false, connected: false });
       return;
     }
@@ -1405,9 +1399,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private autoResumeLast(): void {
     if (this.autoResumeDone) return;
     this.autoResumeDone = true;
-    // Daemon mode: a conversation still running for this folder wins over the latest
-    // transcript, and the tab attaches to it right away.
-    if (this.cfg().get<boolean>('daemon.enabled', false)) {
+    // A conversation still running for this folder wins over the latest transcript, and the
+    // tab attaches to it right away.
+    if (currentEngine() === 'claude') {
       this.daemonAutoAttachPending = true;
       void this.autoAttachDaemon().finally(() => {
         this.daemonAutoAttachPending = false;
@@ -1723,9 +1717,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.post({ kind: 'history', items }, tab);
     this.postTabs();
     log(`Resuming session ${sessionId} (${items.length} items) in ${tab}`);
-    // Daemon mode: attach now, so a conversation running elsewhere streams in without
-    // waiting for a message from this window (the daemon starts it if it isn't running).
-    if (s && this.daemonClient()) {
+    // Attach now, so a conversation running elsewhere streams in without waiting for a message
+    // from this window (the daemon starts it if it isn't running). The Tootega engine is local.
+    if (s && s.engine() === 'claude') {
       try {
         s.ensureCli();
       } catch (e) {
@@ -2256,7 +2250,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private async endLiveSessions(sessionId?: string, all = false): Promise<void> {
     this.detachLiveSessions(sessionId, all, true);
     const client = this.daemonClient();
-    if (!client) return;
     try {
       const mine = (await this.refreshDaemonSessions()).filter((d) => all || d.cliSessionId === sessionId);
       await Promise.all(mine.map((d) => client.forgetAndWait(d.id)));
@@ -2876,10 +2869,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'listSessions':
         this.sendSessions();
-        // Daemon mode: badges for the conversations kept running, once the daemon answers.
-        if (this.cfg().get<boolean>('daemon.enabled', false)) {
-          void this.refreshDaemonSessions().then(() => this.sendSessions());
-        }
+        // Badges for the conversations kept running, once the daemon answers.
+        void this.refreshDaemonSessions().then(() => this.sendSessions());
         break;
       case 'resumeSession':
         this.openSession(m.sessionId);
@@ -3268,8 +3259,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** On activation: when the CLI is missing, it asks (with consent) and installs. */
   async promptInstallIfMissing(): Promise<void> {
+    // `resolve`, not `detect`: a window started from the Dock has no ~/.local/bin on its PATH,
+    // and the bare name then fails although the CLI is installed (resolve also probes there).
     const path = this.cfg().get<string>('claudePath', 'claude');
-    if (CliProcessManager.detect(path).ok) return;
+    if (CliProcessManager.resolve(path).ok) return;
     const install = vscode.l10n.t('Install');
     const docs = vscode.l10n.t('Documentation');
     const pick = await vscode.window.showWarningMessage(

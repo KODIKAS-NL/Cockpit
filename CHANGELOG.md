@@ -7,8 +7,8 @@ and the project adopts semantic versioning.
 ## [Unreleased]
 
 ### Added
-- **Daemon mode: conversations that outlive the window.** With `tootega.daemon.enabled`,
-  Claude runs in cockpit-daemon, a background service on the same machine, instead of as a
+- **Daemon mode: conversations that outlive the window.** Claude (the Claude engine; the
+  Tootega engine stays local) always runs in cockpit-daemon, a background service on the same machine, instead of as a
   child of the VS Code window. Closing the window or letting the laptop sleep no longer ends
   a conversation, and any window on that machine (Remote-SSH, code-server) can attach to it:
   it shows the history, the message being written and any prompt still waiting. Prompts are

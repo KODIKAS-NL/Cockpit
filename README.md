@@ -713,18 +713,18 @@ context, and **never** write or log credentials.
 
 ## Daemon mode (persistent sessions)
 
-By default each tab runs Claude as a child of the VS Code window: close the window, or let a
-Remote-SSH connection drop for too long, and the conversation's process ends with it. In
-daemon mode the process belongs to **cockpit-daemon**, a small background service on the same
-machine, so a conversation keeps running with no window attached, and any window on that
-machine can attach to it, from Remote-SSH on a laptop or code-server on a tablet.
+Claude does not run as a child of the VS Code window: the process belongs to
+**cockpit-daemon**, a small background service on the same machine. A conversation keeps
+running with no window attached, and any window on that machine can attach to it, from
+Remote-SSH on a laptop or code-server on a tablet. The daemon is required for the Claude
+engine (the Tootega engine still runs locally); the dashboard header shows whether it is
+connected.
 
 Set it up once on the machine that runs your code:
 
 1. Run **Tootega: Install daemon** from the command palette. On macOS it installs a launchd
    agent (`~/Library/LaunchAgents/local.cockpit.daemon.plist`) that starts at login and is
-   restarted if it dies; elsewhere it starts a background process. It also turns on
-   `tootega.daemon.enabled`.
+   restarted if it dies; elsewhere it starts a background process.
 2. Install this extension in every VS Code server that should use it (the Remote-SSH server
    and code-server keep separate extension folders). All of them must run as the same user:
    the socket (`~/.cockpit/daemon.sock`) is owner-only.
@@ -751,7 +751,6 @@ How it behaves:
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `tootega.daemon.enabled` | `false` | Run Claude in cockpit-daemon instead of the window. |
 | `tootega.daemon.socketPath` | `~/.cockpit/daemon.sock` | The daemon's Unix socket. |
 | `tootega.daemon.idleStopHours` | `0` (never) | Stop a process idle this long with no window attached and no prompt waiting. Applied on (re)install. |
 
@@ -762,7 +761,7 @@ live log and Start/Stop/Restart: see [mac/CockpitDaemon](mac/CockpitDaemon/READM
 Commands: **Install daemon**, **Restart daemon** (stops running turns), **Show daemon log**
 (`~/.cockpit/daemon.log`), **Stop this session's process in the daemon**.
 
-Limits: daemon mode applies to the Claude engine only; the daemon and the windows must be on
+Limits: the daemon applies to the Claude engine only; the daemon and the windows must be on
 the same machine (the socket is local); the daemon runs Claude with the PATH of your login
 shell, captured when you install it, so reinstall after moving `claude` or `node`.
 
