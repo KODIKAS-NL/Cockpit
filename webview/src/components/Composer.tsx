@@ -7,6 +7,7 @@ import {
   type ClipboardEvent,
   type DragEvent,
 } from 'react';
+import type { ReactNode } from 'react';
 import type { Translator } from '../i18n';
 import type { ImageAttachment, SlashCmdMeta, MentionItem } from '../../../shared/protocol';
 import { send, saveState, readState } from '../vscodeApi';
@@ -53,6 +54,8 @@ interface Props {
   canRemoteControl?: boolean; // there is a live session id to publish
   remoteActive?: boolean; // a aba já está sob Remote Control (terminal conduzindo)
   remotePhase?: 'connecting' | 'active' | 'failed' | 'cloud' | 'offline'; // o que se SABE da conexão remota
+  /** Model / effort / mode pickers, shown in the toolbar before Send (chat views only). */
+  picks?: ReactNode;
 }
 
 interface PendingImage {
@@ -92,6 +95,7 @@ export const Composer = memo(function Composer({
   canRemoteControl,
   remoteActive,
   remotePhase,
+  picks,
   selectionRef,
 }: Props) {
   const [includeSel, setIncludeSel] = useState(true);
@@ -919,6 +923,7 @@ export const Composer = memo(function Composer({
               {allExpanded ? '⏶' : '⏷'}
             </button>
           </Tooltip>
+          {picks}
           {busy ? (
             <button type="button" className="btn stop" onClick={onStop}>
               {t('composer.stop')}

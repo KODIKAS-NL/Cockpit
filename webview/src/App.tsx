@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { reducer, initialState, activeTab, sidebarTab } from './store';
 import { TabStrip } from './components/TabStrip';
+import { ComposerPicks } from './components/ComposerPicks';
 import type {
   HostToWebview,
   ImageAttachment,
@@ -716,6 +717,17 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
         canRemoteControl={!!(tab?.sessionId ?? tab?.session?.sessionId)}
         remoteActive={tab?.remote === true}
         remotePhase={tab?.remotePhase}
+        picks={
+          <ComposerPicks
+            t={t}
+            config={state.config}
+            activeModel={tab?.session?.model}
+            onModel={onModel}
+            onRemoveModel={onRemoveModel}
+            onEffort={onEffort}
+            onPermission={onPermissionMode}
+          />
+        }
       />
 
       {credsModalEl}

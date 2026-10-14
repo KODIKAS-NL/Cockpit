@@ -177,11 +177,13 @@ interface ModelSelectProps {
   defaultFor?: string; // o que 'default' resolve (p/ rótulo)
   onSelect: (v: string) => void;
   onRemove: (v: string) => void;
+  /** In the prompt box: the resolved model name only, and no "custom model" row. */
+  compact?: boolean;
 }
 
 /** Model selector with 3 columns (model · context · price). It is a custom dropdown
  *  because a native <option> can't render columns. Context/price come from `meta`. */
-function ModelSelect({
+export function ModelSelect({
   t,
   value,
   models,
@@ -191,6 +193,7 @@ function ModelSelect({
   defaultFor,
   onSelect,
   onRemove,
+  compact,
 }: ModelSelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -211,6 +214,7 @@ function ModelSelect({
 
   const currentLabel = (() => {
     if (value === CUSTOM) return `${t('controls.model')} …`;
+    if (compact) return modelLabel(value === 'default' && defaultFor ? defaultFor : value, t, undefined, meta);
     const base = modelLabel(value, t, defaultFor, meta);
     const md =
       meta?.[value] ?? (value === 'default' && defaultFor ? meta?.[defaultFor] : undefined);
@@ -280,6 +284,7 @@ function ModelSelect({
               </div>
             );
           })}
+          {!compact && (
           <button
             type="button"
             role="option"
@@ -290,6 +295,7 @@ function ModelSelect({
             <span className="c-ctx" />
             <span className="c-price" />
           </button>
+          )}
         </div>
       )}
     </div>
@@ -336,7 +342,7 @@ interface EffortSelectProps {
 }
 
 /** Effort selector with an estimated per-level token consumption multiplier. */
-function EffortSelect({ t, value, efforts, defaultEffort, onSelect }: EffortSelectProps) {
+export function EffortSelect({ t, value, efforts, defaultEffort, onSelect }: EffortSelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -445,7 +451,7 @@ function engineLabel(en: string, t: Translator): string {
   return v === key ? en : v;
 }
 
-function permLabel(pm: string, t: Translator): string {
+export function permLabel(pm: string, t: Translator): string {
   const key = `perm.${pm}` as Parameters<Translator>[0];
   const v = t(key);
   return v === key ? pm : v;

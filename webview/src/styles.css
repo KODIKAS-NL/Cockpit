@@ -6001,3 +6001,43 @@ body {
 .tt-fact-v::before {
   box-shadow: none;
 }
+
+/* Model / effort / mode in the prompt toolbar: flat chips, menus opening upward over the toolbar. */
+.composer-side {
+  position: relative;
+}
+.composer-picks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+}
+.composer-picks .ctrl-modelsel {
+  position: static;
+}
+.composer-picks .ctrl-select,
+.composer-picks .composer-pick-mode {
+  width: auto;
+  max-width: 150px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  border: none;
+  border-radius: 12px;
+  color: var(--vscode-foreground);
+  background: color-mix(in srgb, var(--vscode-foreground) 9%, transparent);
+  cursor: pointer;
+}
+.composer-picks .ctrl-select:hover,
+.composer-picks .composer-pick-mode:hover {
+  background: color-mix(in srgb, var(--vscode-foreground) 16%, transparent);
+}
+.composer-picks .ctrl-modelsel-pop {
+  top: auto;
+  bottom: calc(100% + 4px);
+  left: 6px;
+  right: 6px;
+  min-width: 0;
+  max-height: 260px;
+}
