@@ -415,6 +415,8 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub'; sessionId: stri
           cliMissing={cliMissing}
           cockpitVersion={state.cli.cockpitVersion}
           cliVersion={state.cli.version}
+          daemon={state.daemon}
+          onDaemonInstall={() => send({ kind: 'daemonInstall' })}
           cliLatest={state.cli.latest}
           stats={tab?.stats}
           busy={tab?.status === 'busy' || tab?.bgBusy === true}

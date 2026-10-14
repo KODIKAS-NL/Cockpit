@@ -27,6 +27,8 @@ interface Props {
   cliMissing: boolean;
   cockpitVersion?: string;
   cliVersion?: string;
+  daemon?: { enabled: boolean; connected: boolean; pid?: number };
+  onDaemonInstall: () => void;
   cliLatest?: string;
   stats?: StatsSnapshot;
   busy?: boolean; // contexto ativo processando um turno → spinner no card
@@ -73,6 +75,8 @@ export function HubView({
   cliMissing,
   cockpitVersion,
   cliVersion,
+  daemon,
+  onDaemonInstall,
   cliLatest,
   stats,
   busy,
@@ -132,6 +136,8 @@ export function HubView({
         </svg>
         <span className="hub-title">Tootega Cockpit</span>
         {cockpitVersion && <span className="hub-ver">v{cockpitVersion}</span>}
+          </>
+        )}
         {cliVersion ? (
           <>
             <Tooltip
@@ -169,6 +175,27 @@ export function HubView({
               ⤓ {t('about.install')}
             </button>
           </Tooltip>
+        )}
+        {daemon?.enabled && (
+          <div className="hub-daemon-row">
+            <Tooltip
+              text={
+                daemon.connected
+                  ? t('daemon.tip.connected', daemon.pid ?? '?')
+                  : t('daemon.tip.disconnected')
+              }
+            >
+              <span className={`hub-daemon ${daemon.connected ? 'on' : 'off'}`}>
+                <span className="hub-daemon-dot" aria-hidden="true" />
+                {t('daemon.label')}: {daemon.connected ? t('daemon.connected') : t('daemon.disconnected')}
+              </span>
+            </Tooltip>
+            {!daemon.connected && (
+              <button type="button" className="hub-update install" onClick={onDaemonInstall}>
+                {t('daemon.install')}
+              </button>
+            )}
+          </div>
         )}
       </header>
 

@@ -7,6 +7,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { CliProcessManager } from '../cli/CliProcessManager';
 import { DaemonClient } from '../daemon/DaemonClient';
 import { defaultSocketPath, expandHome } from '../daemon/paths';
+import { probeDaemon } from '../daemon/service';
 import type { DaemonSessionInfo } from '../../shared/daemon';
 import {
   availableEngines,
@@ -724,6 +725,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private usageStarted = false;
 
   /** Starts (once) the periodic computation of local usage (5h/7d). */
+  /** Tells the dashboard whether daemon mode is on and the daemon answers. Cheap: one connect. */
+  async reportDaemonStatus(): Promise<void> {
+    if (!this.cfg().get<boolean>('daemon.enabled', false)) {
+      this.post({ kind: 'daemonStatus', enabled: false, connected: false });
+      return;
+    }
+    const pid = await probeDaemon(this.daemonSocketPath(), 1000);
+    this.post({ kind: 'daemonStatus', enabled: true, connected: pid !== undefined, pid });
+  }
+
+  private daemonStatusTimer?: ReturnType<typeof setInterval>;
+
+  /** Keeps the status fresh (the daemon can stop or start without this window noticing). */
+  private startDaemonStatusTimer(): void {
+    if (this.daemonStatusTimer) return;
+    this.daemonStatusTimer = setInterval(() => void this.reportDaemonStatus(), 5000);
+    this.daemonStatusTimer.unref?.();
+  }
+
   private startUsageTimer(): void {
     if (this.usageStarted) return;
     this.usageStarted = true;
@@ -2682,6 +2702,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.reportCliStatus();
         void this.tryDiscoverModels();
         this.startUsageTimer();
+        this.startDaemonStatusTimer();
+        void this.reportDaemonStatus();
         this.reportAuth(); // login state for the Sign in/out button
         this.postTaskTimings(bound ?? this.activeTab); // scope averages to calibrate the gauge
         this.autoResumeLast();
@@ -2902,6 +2924,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'installCli':
         this.installCli();
+        break;
+      case 'daemonInstall':
+        void vscode.commands.executeCommand('tootega.daemon.install');
         break;
       case 'updateCli':
         this.updateCli();

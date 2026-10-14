@@ -5832,3 +5832,33 @@ body {
 .hub-settings-wrap {
   margin-left: 0;
 }
+
+/* Daemon mode status in the dashboard header. */
+.hub-daemon {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.hub-daemon-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--vscode-charts-green, #3fb950);
+}
+.hub-daemon.off {
+  color: var(--vscode-errorForeground, #f14c4c);
+  font-weight: 600;
+}
+.hub-daemon.off .hub-daemon-dot {
+  background: var(--vscode-charts-red, #f85149);
+}
+
+/* Its own line in the header, under the CLI version. */
+.hub-daemon-row {
+  flex: 0 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

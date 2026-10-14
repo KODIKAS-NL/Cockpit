@@ -53,6 +53,8 @@ export interface TabState {
 
 export interface UiState {
   locale: string;
+  /** Daemon mode status from the host (absent until the first report). */
+  daemon?: { enabled: boolean; connected: boolean; pid?: number };
   cli: {
     available: boolean;
     checked?: boolean; // the host already reported the status (false = still loading)
@@ -171,6 +173,8 @@ export function reducer(state: UiState, action: Action): UiState {
       return { ...state, locale: msg.locale };
     case 'config':
       return { ...state, config: msg.config };
+    case 'daemonStatus':
+      return { ...state, daemon: { enabled: msg.enabled, connected: msg.connected, pid: msg.pid } };
     case 'cliStatus':
       return {
         ...state,

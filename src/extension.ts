@@ -296,6 +296,7 @@ export function activate(context: vscode.ExtensionContext): void {
       ) {
         provider.applyEngineChange();
       }
+      if (e.affectsConfiguration('tootega.daemon')) void provider.reportDaemonStatus();
       if (e.affectsConfiguration('tootega.internalModel')) provider.applyInternalModel();
       if (e.affectsConfiguration('tootega.enableTodoTools')) provider.applyTodoToolsChange();
       if (e.affectsConfiguration('tootega.debugLog')) {

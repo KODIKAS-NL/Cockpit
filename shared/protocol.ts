@@ -457,6 +457,8 @@ export type HostToWebview = HostMsg & { tab?: string };
 
 type HostMsg =
   | { kind: 'ready'; locale: string }
+  /** Daemon mode: whether it is on, and whether the daemon answers on its socket. */
+  | { kind: 'daemonStatus'; enabled: boolean; connected: boolean; pid?: number }
   | { kind: 'tabs'; tabs: TabInfo[]; activeTab: string }
   | { kind: 'config'; config: SessionConfig }
   | {
@@ -671,6 +673,7 @@ export type WebviewToHost =
   | { kind: 'closeTab'; tabId: string }
   | { kind: 'switchTab'; tabId: string }
   | { kind: 'installCli' }
+  | { kind: 'daemonInstall' }
   | { kind: 'updateCli' }
   | { kind: 'recheckCli' }
   | { kind: 'loginCli' }
