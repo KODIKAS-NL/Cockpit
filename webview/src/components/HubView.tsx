@@ -136,8 +136,6 @@ export function HubView({
         </svg>
         <span className="hub-title">Tootega Cockpit</span>
         {cockpitVersion && <span className="hub-ver">v{cockpitVersion}</span>}
-          </>
-        )}
         {cliVersion ? (
           <>
             <Tooltip
