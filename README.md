@@ -5,6 +5,11 @@
 > only to describe interoperability. This project talks to the official Claude Code CLI;
 > it does not bundle or redistribute it.
 
+> **Early version: not thoroughly tested yet.** This fork is a first version. Daemon mode, the side
+> bar chat, the managed CLI download and the per-chat controls work in day-to-day use on macOS, but
+> they have had little testing, and none on Linux or Windows. Expect rough edges and report what you
+> find. This note will be removed once the fork has had more use.
+
 **Cockpit for Claude Code Daemon is a fork of [Tootega Cockpit for Claude Code](https://github.com/HermesSilva/Cockpit)**
 by Tootega Pesquisa e Inovação (HermesSilva). Everything good in this extension starts with their
 work, and I am grateful for it: a serious, well-thought-out GUI for Claude Code, with
