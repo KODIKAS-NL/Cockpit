@@ -647,6 +647,16 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
             ↓
           </button>
         )}
+        <button
+          type="button"
+          className="expand-all"
+          title={allExpanded ? t('composer.collapseAll') : t('composer.expandAll')}
+          aria-label={allExpanded ? t('composer.collapseAll') : t('composer.expandAll')}
+          aria-pressed={allExpanded ?? false}
+          onClick={onToggleExpandAll}
+        >
+          {allExpanded ? '⏶' : '⏷'}
+        </button>
         </>
         )}
       </div>
@@ -694,12 +704,10 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
         slashCommands={tab?.slashCommands ?? NO_SLASH}
         slashMeta={state.slashMeta}
         slashBusy={state.slashResearching}
-        allExpanded={allExpanded ?? false}
         injectDraft={draftRestore}
         onDraftInjected={onDraftInjected}
         injectText={injectText}
         onTextInjected={onTextInjected}
-        onToggleExpandAll={onToggleExpandAll}
         onSend={onSend}
         selectionRef={state.selectionRef}
         onStop={onStop}

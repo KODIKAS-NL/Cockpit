@@ -36,7 +36,6 @@ interface Props {
   slashCommands: string[];
   slashMeta: Record<string, SlashCmdMeta>;
   slashBusy: boolean;
-  allExpanded: boolean;
   // Draft a restaurar no input (ex.: cancelou o gate de effort). Muda de ref p/ disparar.
   injectDraft?: { text: string; images: ImageAttachment[] } | null;
   onDraftInjected?: () => void;
@@ -44,7 +43,6 @@ interface Props {
   // released by the vault). Its ref changes to trigger the insertion.
   injectText?: { text: string } | null;
   onTextInjected?: () => void;
-  onToggleExpandAll: () => void;
   onSend: (text: string, images: ImageAttachment[], selection?: string) => void;
   selectionRef?: string; // @file#a-b of the editor's active selection
   onStop: () => void;
@@ -81,12 +79,10 @@ export const Composer = memo(function Composer({
   slashCommands,
   slashMeta,
   slashBusy,
-  allExpanded,
   injectDraft,
   onDraftInjected,
   injectText,
   onTextInjected,
-  onToggleExpandAll,
   onSend,
   onStop,
   onVoiceDict,
@@ -780,52 +776,52 @@ export const Composer = memo(function Composer({
               if (spellMenu) setSpellMenu(null);
             }}
           />
+            <Tooltip
+              text={
+                correcting
+                  ? t('voice.correcting')
+                  : connecting
+                    ? t('voice.connecting')
+                    : recording
+                      ? t('voice.stop')
+                      : t('voice.start')
+              }
+            >
+              <button
+                type="button"
+                className={`composer-side-btn voice ${recording ? 'recording' : ''} ${correcting ? 'correcting' : ''} ${connecting ? 'connecting' : ''}`}
+                onClick={toggleVoice}
+                disabled={disabled || correcting}
+                aria-pressed={recording}
+              >
+                {correcting || connecting ? (
+                  <span className="voice-spinner" aria-hidden="true" />
+                ) : recording ? (
+                  <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" />
+                  </svg>
+                ) : (
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="9" y="2" width="6" height="11" rx="3" />
+                    <path d="M5 10a7 7 0 0 0 14 0" />
+                    <line x1="12" y1="17" x2="12" y2="21" />
+                    <line x1="8" y1="21" x2="16" y2="21" />
+                  </svg>
+                )}
+              </button>
+            </Tooltip>
         </div>
         <div className="composer-side">
-          <Tooltip
-            text={
-              correcting
-                ? t('voice.correcting')
-                : connecting
-                  ? t('voice.connecting')
-                  : recording
-                    ? t('voice.stop')
-                    : t('voice.start')
-            }
-          >
-            <button
-              type="button"
-              className={`composer-side-btn voice ${recording ? 'recording' : ''} ${correcting ? 'correcting' : ''} ${connecting ? 'connecting' : ''}`}
-              onClick={toggleVoice}
-              disabled={disabled || correcting}
-              aria-pressed={recording}
-            >
-              {correcting || connecting ? (
-                <span className="voice-spinner" aria-hidden="true" />
-              ) : recording ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
-                  <rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" />
-                </svg>
-              ) : (
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="9" y="2" width="6" height="11" rx="3" />
-                  <path d="M5 10a7 7 0 0 0 14 0" />
-                  <line x1="12" y1="17" x2="12" y2="21" />
-                  <line x1="8" y1="21" x2="16" y2="21" />
-                </svg>
-              )}
-            </button>
-          </Tooltip>
           {onVoiceDict && (
             <Tooltip text={t('voicedict.open')}>
               <button
@@ -914,15 +910,6 @@ export const Composer = memo(function Composer({
             );
           })()}
           <SlashMenu t={t} commands={slashCommands} meta={slashMeta} busy={slashBusy} onPick={pickSlash} />
-          <Tooltip text={allExpanded ? t('composer.collapseAll') : t('composer.expandAll')}>
-            <button
-              type="button"
-              className={`composer-side-btn ${allExpanded ? 'on' : ''}`}
-              onClick={onToggleExpandAll}
-            >
-              {allExpanded ? '⏶' : '⏷'}
-            </button>
-          </Tooltip>
           {picks}
           {busy ? (
             <button type="button" className="btn stop send-icon" onClick={onStop} title={t('composer.stop')} aria-label={t('composer.stop')}>

@@ -6182,3 +6182,48 @@ body {
 .composer-side .btn.send.send-icon:disabled {
   opacity: 0.4;
 }
+
+/* The mic sits at the top right of the input; expand/collapse all floats at the bottom right of
+   the conversation, just above the prompt box. */
+.composer-input-wrap {
+  --mic-room: 38px;
+}
+.composer-input-wrap .composer-highlight,
+.composer-input-wrap .composer-input {
+  padding-right: var(--mic-room);
+}
+.composer-input-wrap .composer-side-btn.voice {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 13px;
+  background: transparent;
+  z-index: 2;
+}
+.composer-input-wrap .composer-side-btn.voice:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.15));
+}
+.expand-all {
+  position: absolute;
+  right: 22px;
+  bottom: 10px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--vscode-widget-border, rgba(127, 127, 127, 0.35));
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  color: var(--vscode-foreground);
+  opacity: 0.8;
+  cursor: pointer;
+  z-index: 8;
+  font-size: 13px;
+  line-height: 1;
+}
+.expand-all:hover,
+.expand-all[aria-pressed='true'] {
+  opacity: 1;
+  border-color: var(--vscode-focusBorder, #3794ff);
+}
