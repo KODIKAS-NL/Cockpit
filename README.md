@@ -1,15 +1,57 @@
-# Tootega Cockpit for Claude Code
+# Cockpit for Claude Code Daemon
 
 > **Unofficial.** Not affiliated with, endorsed by, or sponsored by Anthropic.
 > "Claude", "Claude Code" and "Anthropic" are trademarks of Anthropic, PBC, used here
 > only to describe interoperability. This project talks to the official Claude Code CLI;
 > it does not bundle or redistribute it.
 
-> A rich GUI for **Claude Code**, packaged as a native VS Code extension.
-> The interface is **only a presentation and control layer over the Claude Code CLI** —
-> all orchestration (the agent loop, tools, subagents, context, cache, compaction,
-> permissions, MCP, hooks, skills) **lives in the CLI**. The extension renders the event
-> stream the CLI emits and implements the client side of the interactive protocols.
+**Cockpit for Claude Code Daemon is a fork of [Tootega Cockpit for Claude Code](https://github.com/HermesSilva/Cockpit)**
+by Tootega Pesquisa e Inovação (HermesSilva). Everything good in this extension starts with their
+work, and I am grateful for it: a serious, well-thought-out GUI for Claude Code, with
+consumption transparency and fine-grained control. Thank you for building
+it in the open under the MIT license, which is what makes this fork possible.
+
+## What this fork changes, and who it is for
+
+**The use case.** You keep your code, and Claude Code, on one machine that is always on (a Mac
+mini, a home server), and you reach it from other devices over Remote-SSH or code-server. A Claude
+conversation should not die when you close the laptop lid or the connection drops. Start a task
+from one device, come back an hour later from another, and the conversation is still running, with
+its output and any permission prompt waiting for you.
+
+What is different from upstream:
+
+- **Daemon mode (the point of the fork).** Claude runs in **cockpit-daemon**, a small background
+  service on the machine that holds the code, instead of as a child of the VS Code window. Any
+  window on that machine can attach to a running conversation (history, the message being written,
+  prompts waiting); the first answer to a permission prompt wins and closes it everywhere; a
+  second device sending while a turn runs is told it is busy. Run it as a launchd agent or from the
+  included **macOS menu bar app** (status, live log, start/stop/restart, sessions list). The
+  dashboard shows whether it is connected. Commands: install, restart, stop, uninstall, show log.
+  See [Docs/daemon-mode.md](Docs/daemon-mode.md).
+- **Chat in the side bar.** The conversation can live in a side bar next to the code, like the
+  official Claude Code extension, with a strip of conversation tabs. A conversation is in the side
+  bar or in an editor tab, one place at a time (`tootega.preferredLocation`).
+- **Everything about a chat stays with the chat.** Model, effort and permission mode are chips in
+  the prompt box; a cog menu holds Agents & workflows, the engine, a custom model id and a new
+  **per-conversation auto-compact** option (`auto`, `off`, or a 100K to 1M token window). The
+  dashboard keeps what is global: status, usage and settings. The model list comes from the
+  Claude Code CLI itself, so it is complete without an API key.
+- **Its own Claude Code CLI.** If `claude` is not found, the extension offers to download its own
+  copy from Anthropic's release server (checksum-verified) into `~/.cockpit/claude`, and keeps
+  it up to date.
+- **A calmer look, closer to the official panel.** Quieter popovers and markers, a prompt box with
+  an icon toolbar, status dots on tool calls, a download icon for export.
+- **Fixes along the way:** the startup check no longer offers to install a CLI that is installed,
+  deleting a conversation that is still running no longer brings it back as an empty one, and a
+  few layout and contrast problems are gone.
+
+Everything else is Tootega Cockpit, described below. The founding principle is unchanged: the UI is
+only a presentation and control layer, and all orchestration stays in the Claude Code CLI.
+
+---
+
+## About Tootega Cockpit (the project this fork is based on)
 
 [![Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/HermesSilva.tootega-cockpit?label=Marketplace&color=007ACC)](https://marketplace.visualstudio.com/items?itemName=HermesSilva.tootega-cockpit)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/HermesSilva.tootega-cockpit?color=1f883d)](https://marketplace.visualstudio.com/items?itemName=HermesSilva.tootega-cockpit)
@@ -21,7 +63,8 @@
 
 | | |
 |---|---|
-| **Author** | Tootega Pesquisa e Inovação |
+| **Original author** | Tootega Pesquisa e Inovação ([HermesSilva/Cockpit](https://github.com/HermesSilva/Cockpit)) |
+| **This fork** | Cockpit for Claude Code Daemon ([KODIKAS-NL/Cockpit](https://github.com/KODIKAS-NL/Cockpit)) |
 | **License** | MIT (open source) |
 | **Type** | Visual Studio Code extension (React webview + TypeScript host) |
 | **Extension version** | `1.0.264` |
@@ -237,6 +280,8 @@ terminal mode.
 
 ## Table of contents
 
+- [What this fork changes, and who it is for](#what-this-fork-changes-and-who-it-is-for)
+- [About Tootega Cockpit](#about-tootega-cockpit-the-project-this-fork-is-based-on)
 - [Overview](#overview)
 - [Architecture](#architecture)
 - [Prerequisites](#prerequisites)
