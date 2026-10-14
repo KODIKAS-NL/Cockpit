@@ -6041,3 +6041,36 @@ body {
   min-width: 0;
   max-height: 260px;
 }
+
+/* Prompt markers beside the scrollbar, quieter: a thin muted tick like the editor's overview
+   ruler (no orange, no glow), the accent only on hover; the preview follows the popover look. */
+.marker {
+  width: 10px;
+  height: 3px;
+  background: color-mix(in srgb, var(--vscode-foreground) 45%, transparent);
+  box-shadow: none;
+  opacity: 0.9;
+}
+.marker:hover {
+  width: 14px;
+  background: var(--vscode-textLink-foreground, var(--vscode-foreground));
+  opacity: 1;
+}
+.marker:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #3794ff);
+  outline-offset: 1px;
+}
+.marker-tip {
+  background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background, var(--vscode-editor-background)));
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-widget-border, rgba(127, 127, 127, 0.35)));
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  font-size: 12px;
+}
+.marker-tip-n {
+  color: var(--vscode-descriptionForeground, var(--vscode-foreground));
+  font-weight: 600;
+}
+.marker-tip-thumb {
+  border-color: var(--vscode-widget-border, rgba(127, 127, 127, 0.35));
+}
