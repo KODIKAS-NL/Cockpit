@@ -193,8 +193,11 @@ launchctl bootout gui/$(id -u)/local.cockpit.daemon        # stop until next log
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.cockpit.daemon.plist   # start again
 ```
 
-To uninstall: `bootout` as above, delete the plist and `~/.cockpit/`, and turn off
-`tootega.daemon.enabled`.
+From the command palette: **Tootega: Stop daemon** (the launchd agent is unloaded until the
+next login; a daemon without one gets a SIGTERM) and **Tootega: Uninstall daemon** (stops it,
+removes the launchd agent and `~/.cockpit/`, and turns off `tootega.daemon.enabled`; asks first).
+By hand: `bootout` as above, delete the plist and `~/.cockpit/`, and turn off
+`tootega.daemon.enabled`. Conversations are the CLI's transcripts and stay either way.
 
 ### Run it by hand
 

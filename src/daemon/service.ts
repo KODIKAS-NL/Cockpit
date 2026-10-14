@@ -138,6 +138,52 @@ export function restartLaunchAgent(): InstallResult {
   return { ok: true, message: 'cockpit-daemon restarted' };
 }
 
+/**
+ * Stops the daemon. With the launchd agent it is unloaded (it starts again at the next login);
+ * a daemon without one (started by hand or by the menu bar app) gets a SIGTERM, which stops
+ * every CLI it runs. The menu bar app starts it again by itself: quit the app to keep it off.
+ */
+export async function stopDaemon(socketPath: string): Promise<InstallResult> {
+  if (launchAgentInstalled()) {
+    const res = spawnSync('launchctl', ['bootout', `gui/${process.getuid?.() ?? ''}/${SERVICE_LABEL}`], {
+      encoding: 'utf8',
+    });
+    const out = (res.stderr || res.stdout || '').trim();
+    // Not loaded (already stopped) is not a failure; launchctl words it differently by version.
+    const notLoaded = /could not find service|no such process|not found/i.test(out);
+    if (res.status !== 0 && !notLoaded) {
+      return { ok: false, message: out || `launchctl exited ${res.status}` };
+    }
+    return { ok: true, message: 'cockpit-daemon stopped (it starts again at the next login)' };
+  }
+  const pid = await probeDaemon(socketPath);
+  if (pid === undefined) return { ok: true, message: 'cockpit-daemon was not running' };
+  try {
+    process.kill(pid, 'SIGTERM');
+  } catch (e) {
+    return { ok: false, message: String(e) };
+  }
+  return { ok: true, message: `cockpit-daemon (pid ${pid}) stopped` };
+}
+
+/**
+ * Stops the daemon and removes what the install put on the machine: the launchd agent and
+ * ~/.cockpit (the daemon copy, socket, log and its list of sessions). The conversations
+ * themselves are the CLI's transcripts and stay.
+ */
+export async function uninstallDaemon(socketPath: string): Promise<InstallResult> {
+  const stopped = await stopDaemon(socketPath);
+  if (!stopped.ok) return stopped;
+  try {
+    fs.rmSync(plistPath(), { force: true });
+    fs.rmSync(socketPath, { force: true });
+    fs.rmSync(daemonHome(), { recursive: true, force: true });
+  } catch (e) {
+    return { ok: false, message: String(e) };
+  }
+  return { ok: true, message: 'cockpit-daemon uninstalled' };
+}
+
 export function launchAgentInstalled(): boolean {
   return process.platform === 'darwin' && fs.existsSync(plistPath());
 }

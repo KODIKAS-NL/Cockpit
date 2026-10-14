@@ -50,6 +50,8 @@
   "cfg.autosave": "Salva automaticamente um arquivo aberto antes do Claude ler ou escrever nele, para o agente trabalhar com o conteúdo atual.",
   "cmd.daemonInstall": "Instalar daemon (manter o Claude rodando entre janelas)",
   "cmd.daemonRestart": "Reiniciar daemon",
+  "cmd.daemonStop": "Parar daemon",
+  "cmd.daemonUninstall": "Desinstalar daemon",
   "cmd.daemonShowLog": "Mostrar log do daemon",
   "cmd.daemonStopSession": "Parar o processo desta sessão no daemon",
   "cfg.daemonEnabled": "Roda o Claude no cockpit-daemon em vez de nesta janela. As conversas continuam quando a janela fecha ou o notebook dorme, e qualquer janela desta máquina (Remote-SSH, code-server) pode se conectar a elas. Requer o daemon: rode \"Tootega: Instalar daemon\".",

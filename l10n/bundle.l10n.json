@@ -27,5 +27,12 @@
   "No daemon log yet ({0}).": "No daemon log yet ({0}).",
   "The active tab is not running in cockpit-daemon.": "The active tab is not running in cockpit-daemon.",
   "Session stopped in cockpit-daemon.": "Session stopped in cockpit-daemon.",
-  "cockpit-daemon is already running (pid {0}), for example from the Cockpit Daemon app. Daemon mode is on; nothing was installed.": "cockpit-daemon is already running (pid {0}), for example from the Cockpit Daemon app. Daemon mode is on; nothing was installed."
+  "cockpit-daemon is already running (pid {0}), for example from the Cockpit Daemon app. Daemon mode is on; nothing was installed.": "cockpit-daemon is already running (pid {0}), for example from the Cockpit Daemon app. Daemon mode is on; nothing was installed.",
+  "Could not stop cockpit-daemon: {0}": "Could not stop cockpit-daemon: {0}",
+  "cockpit-daemon stopped. Running turns ended; conversations resume on the next message once it runs again.": "cockpit-daemon stopped. Running turns ended; conversations resume on the next message once it runs again.",
+  "Uninstall": "Uninstall",
+  "Uninstall cockpit-daemon?": "Uninstall cockpit-daemon?",
+  "It stops the daemon and the Claude processes it runs, removes the launchd agent and deletes ~/.cockpit (including its list of sessions) and turns daemon mode off. Your conversations stay on disk.": "It stops the daemon and the Claude processes it runs, removes the launchd agent and deletes ~/.cockpit (including its list of sessions) and turns daemon mode off. Your conversations stay on disk.",
+  "Could not uninstall cockpit-daemon: {0}": "Could not uninstall cockpit-daemon: {0}",
+  "cockpit-daemon uninstalled and daemon mode turned off.": "cockpit-daemon uninstalled and daemon mode turned off."
 }

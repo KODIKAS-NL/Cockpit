@@ -18,6 +18,8 @@ import {
   probeDaemon,
   restartLaunchAgent,
   startDetached,
+  stopDaemon,
+  uninstallDaemon,
 } from './daemon/service';
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -117,6 +119,39 @@ export function activate(context: vscode.ExtensionContext): void {
       const r = restartLaunchAgent();
       if (r.ok) void vscode.window.showInformationMessage(vscode.l10n.t('cockpit-daemon restarted. Running turns were stopped; conversations resume on the next message.'));
       else void vscode.window.showErrorMessage(vscode.l10n.t('Could not restart cockpit-daemon: {0}', r.message));
+    }),
+    vscode.commands.registerCommand('tootega.daemon.stop', async () => {
+      const r = await stopDaemon(provider.daemonSocketPath());
+      log(`[daemon] stop: ${r.message}`);
+      if (!r.ok) {
+        void vscode.window.showErrorMessage(vscode.l10n.t('Could not stop cockpit-daemon: {0}', r.message));
+        return;
+      }
+      void vscode.window.showInformationMessage(
+        vscode.l10n.t('cockpit-daemon stopped. Running turns ended; conversations resume on the next message once it runs again.'),
+      );
+    }),
+    vscode.commands.registerCommand('tootega.daemon.uninstall', async () => {
+      const remove = vscode.l10n.t('Uninstall');
+      const pick = await vscode.window.showWarningMessage(
+        vscode.l10n.t('Uninstall cockpit-daemon?'),
+        {
+          modal: true,
+          detail: vscode.l10n.t(
+            'It stops the daemon and the Claude processes it runs, removes the launchd agent and deletes ~/.cockpit (including its list of sessions) and turns daemon mode off. Your conversations stay on disk.',
+          ),
+        },
+        remove,
+      );
+      if (pick !== remove) return;
+      const r = await uninstallDaemon(provider.daemonSocketPath());
+      log(`[daemon] uninstall: ${r.message}`);
+      if (!r.ok) {
+        void vscode.window.showErrorMessage(vscode.l10n.t('Could not uninstall cockpit-daemon: {0}', r.message));
+        return;
+      }
+      await vscode.workspace.getConfiguration('tootega').update('daemon.enabled', false, vscode.ConfigurationTarget.Global);
+      void vscode.window.showInformationMessage(vscode.l10n.t('cockpit-daemon uninstalled and daemon mode turned off.'));
     }),
     vscode.commands.registerCommand('tootega.daemon.showLog', async () => {
       const file = daemonLogPath();

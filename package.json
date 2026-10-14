@@ -148,6 +148,16 @@
         "category": "Tootega"
       },
       {
+        "command": "tootega.daemon.stop",
+        "title": "%cmd.daemonStop%",
+        "category": "Tootega"
+      },
+      {
+        "command": "tootega.daemon.uninstall",
+        "title": "%cmd.daemonUninstall%",
+        "category": "Tootega"
+      },
+      {
         "command": "tootega.daemon.showLog",
         "title": "%cmd.daemonShowLog%",
         "category": "Tootega"
