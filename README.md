@@ -36,7 +36,7 @@ What is different from upstream:
   See [Docs/daemon-mode.md](Docs/daemon-mode.md).
 - **Chat in the side bar.** The conversation can live in a side bar next to the code, like the
   official Claude Code extension, with a strip of conversation tabs. A conversation is in the side
-  bar or in an editor tab, one place at a time (`tootega.preferredLocation`).
+  bar or in an editor tab, one place at a time (`cockpitDaemon.preferredLocation`).
 - **Everything about a chat stays with the chat.** Model, effort and permission mode are chips in
   the prompt box; a cog menu holds Agents & workflows, the engine, a custom model id and a new
   **per-conversation auto-compact** option (`auto`, `off`, or a 100K to 1M token window). The
@@ -50,6 +50,9 @@ What is different from upstream:
 - **Fixes along the way:** the startup check no longer offers to install a CLI that is installed,
   deleting a conversation that is still running no longer brings it back as an empty one, and a
   few layout and contrast problems are gone.
+
+This fork is its own extension and can be installed next to the original: its commands and settings live under
+`cockpitDaemon.*` (the original's are `tootega.*`), so rename any settings you carry over.
 
 Everything else is Tootega Cockpit, described below. The founding principle is unchanged: the UI is
 only a presentation and control layer, and all orchestration stays in the Claude Code CLI.
@@ -121,7 +124,7 @@ Legend: ✅ has it · 🟡 partial · ❌ doesn't have it · ➖ not applicable.
 | **Inline spell-checker PT-BR + EN** | ✅ | ❌ | Hunspell (WASM) in the host; only flags words wrong in **both** languages. **Marks only — never auto-corrects** |
 | **Spell suggestions dropdown** | ✅ | ❌ | grouped per language; click the underlined word → fixes |
 | **Voice dictation (speech-to-text)** | ✅ | ❌ | Claude STT WebSocket; live partials |
-| **Post-dictation AI correction** | ✅ | ❌ | **opt-in** (`tootega.voiceCorrect`, default off); clean isolated one-shot |
+| **Post-dictation AI correction** | ✅ | ❌ | **opt-in** (`cockpitDaemon.voiceCorrect`, default off); clean isolated one-shot |
 | **Editable dictionaries modal (tabs)** | ✅ | ❌ | dictation terms/replacements + spell words; per-machine in `~/.claude/tootega` |
 
 **Statistics, context & consumption** *(the heart of the product)*
@@ -183,7 +186,7 @@ Legend: ✅ has it · 🟡 partial · ❌ doesn't have it · ➖ not applicable.
 | Drag-to-attach files | ✅ | ✅ | drop files on the composer (reuses the path resolver) |
 | Status-bar entry + spinner | ✅ | ✅ | Cockpit: idle/busy dot + model chip |
 | Editor-toolbar entry point | ✅ | ✅ | ✦ icon opens the Cockpit from the editor title bar |
-| Auto-save before read/write | ✅ | ✅ | flushes a dirty buffer before the agent touches the file (`tootega.autosave`) |
+| Auto-save before read/write | ✅ | ✅ | flushes a dirty buffer before the agent touches the file (`cockpitDaemon.autosave`) |
 | Keyboard shortcuts | ✅ | ✅ | open / new / interrupt / **Ctrl+F** |
 | URI handler (`vscode://…/open`) | ✅ | ✅ | both |
 | **Release-notes link for the active CLI** | ✅ | ❌ | clicking the CLI version opens GitHub releases |
@@ -336,7 +339,7 @@ The Cockpit gives Claude Code users a complete GUI inside VS Code, focused on
   [Cockpit-exclusive features](#cockpit-exclusive-features)).
 
 It runs as an **editor tab** (resizable panel) and/or as a **view in the Activity Bar**
-(the *Tootega Cockpit* container, view id `tootega.hub`).
+(the *Tootega Cockpit* container, view id `cockpitDaemon.hub`).
 
 | Main panel | Session statistics |
 |---|---|
@@ -426,13 +429,13 @@ first.
 3. **Authenticate** (once), by subscription or API key:
    ```bash
    claude            # starts an interactive session; log in when prompted
-   # or, inside the Cockpit: the "Tootega: Sign in to Claude (CLI)" command
+   # or, inside the Cockpit: the "Cockpit Daemon: Sign in to Claude (CLI)" command
    ```
 4. *(Optional)* Adjust CLI defaults in `~/.claude/settings.json` — for example
    `effortLevel`. The Cockpit honors these defaults when you leave the selector on
    *"CLI default"*.
 
-If `claude` is not on the PATH, set the full path in **Settings → `tootega.claudePath`**.
+If `claude` is not on the PATH, set the full path in **Settings → `cockpitDaemon.claudePath`**.
 On activation, if the CLI is missing, the extension offers to help.
 
 ---
@@ -484,7 +487,7 @@ run-dev.cmd C:\path\to\project
 in [`.vscode/launch.json`](.vscode/launch.json)).
 
 In the test window, open the Cockpit with **Ctrl+Alt+C**, the **Cockpit** item in the
-status bar, or the palette (`Ctrl+Shift+P` → *"Tootega: Open Cockpit"*).
+status bar, or the palette (`Ctrl+Shift+P` → *"Cockpit Daemon: Open Cockpit"*).
 
 ---
 
@@ -528,7 +531,7 @@ Packaging boundaries are controlled by [`.vscodeignore`](.vscodeignore) — only
 5. Choose **Model**, **Effort**, and **Permission** (or keep the defaults).
 6. Type in the composer and send (**Enter** sends, **Shift+Enter** inserts a line break).
 
-With `tootega.autoResumeLastSession` enabled (the default), opening the folder
+With `cockpitDaemon.autoResumeLastSession` enabled (the default), opening the folder
 automatically resumes the most recent session for that directory.
 
 ---
@@ -544,8 +547,8 @@ automatically resumes the most recent session for that directory.
 | Feature | Status | How to use | Limitations |
 |---|---|---|---|
 | Token-by-token streaming chat | ✅ | Type and send; the answer appears incrementally | — |
-| *Thinking* blocks with toggle | ✅ | Expand in the chat; default controlled by `tootega.showThinking` | Only appears if the model/effort emits thinking |
-| Tool-call timeline (expandable cards) | ✅ | Click a card for input/output; default via `tootega.expandToolCards` | Inline diff in the editor not yet (rendered in the webview) |
+| *Thinking* blocks with toggle | ✅ | Expand in the chat; default controlled by `cockpitDaemon.showThinking` | Only appears if the model/effort emits thinking |
+| Tool-call timeline (expandable cards) | ✅ | Click a card for input/output; default via `cockpitDaemon.expandToolCards` | Inline diff in the editor not yet (rendered in the webview) |
 | **Sandbox denials on the Bash card** | ✅ | An access the sandbox refused shows in an amber band above the output — the cause of the failure, not just its effect | The CLI only annotates the result with them from 2.1.224; recognised by shape, so a line we don't recognise stays in the output where it always was |
 | Interrupt the agent (Stop) | ✅ | **Stop** button or **Ctrl+Alt+.** | Stops by ending the CLI process; it respawns on the next send |
 | Session history: list, resume, rename | ✅ | **Saved contexts** drawer; click to resume; **rename** button on the context card (updates the open webview title) | Advanced search partial |
@@ -570,7 +573,7 @@ automatically resumes the most recent session for that directory.
 | Side-by-side diff in the native editor | ✅ | **Open diff in editor** button on the edit-permission modal → VS Code `vscode.diff` | Editing inside the native diff to change the proposal is still in the webview path |
 | **@-mention file autocomplete** | ✅ | Type `@` to pick a workspace file (fuzzy) | No `Alt+K` line-range shortcut |
 | **Share editor selection** | ✅ | Composer chip (`@file#a-b`) with an eye toggle to include/exclude | — |
-| **Auto-save before read/write** | ✅ | Flushes a dirty buffer before the agent reads/writes (`tootega.autosave`) | — |
+| **Auto-save before read/write** | ✅ | Flushes a dirty buffer before the agent reads/writes (`cockpitDaemon.autosave`) | — |
 | Accept/reject per file and per hunk | ⏳ | — | — |
 | Agent Todos panel | 🟡 | The **Tasks** tab shows the live task list | Depends on the CLI emitting todos |
 
@@ -706,7 +709,7 @@ context, and **never** write or log credentials.
 | Feature | What it does | Channel |
 |---|---|---|
 | 🎙️ **Voice dictation** (speech-to-text) | Dictate straight into the composer — see [Voice dictation](#voice-dictation) | OAuth STT WebSocket (same service as the CLI's `/voice`); **no** token spend |
-| ✍️ **Dictation correction** | **Opt-in** (default off) spelling/grammar pass after you stop dictating; a clean one-shot (instruction + text only, ~1.7 s) | Anthropic Messages API with the internal model (`tootega.internalModel`, default Haiku) |
+| ✍️ **Dictation correction** | **Opt-in** (default off) spelling/grammar pass after you stop dictating; a clean one-shot (instruction + text only, ~1.7 s) | Anthropic Messages API with the internal model (`cockpitDaemon.internalModel`, default Haiku) |
 | 🧠 **Internal AI utility helper** ([`AiClient`](src/cli/AiClient.ts)) | Shared, clean one-shot helper for the Cockpit's own utility calls (dictation correction, slash-command research). Avoids the CLI one-shot's ~5 s cold start + full system prompt/tools | Anthropic Messages API (OAuth), isolated |
 | 🏷️ **Slash-command auto-research** ([`SlashCommandResearch`](src/cli/SlashCommandResearch.ts)) | Categorizes/labels **unknown** slash commands (category, short hint, detail) in the UI language; results cached globally in `~/.claude/tootega/` so each command is researched only once | Internal AI helper |
 | 🧩 **Plugins manager** ([`PluginManager`](src/cli/PluginManager.ts)) | Browse/install/remove/enable/disable/update plugins + marketplaces; canonical URL and kind badge per plugin resolved once by the internal helper and cached — see [Plugins](#plugins) | CLI (`claude plugin …`) + internal AI helper for URL/kind |
@@ -737,7 +740,7 @@ context, and **never** write or log credentials.
   `max_input_tokens` (the context column, and what decides the `[1m]` suffix) and
   `created_at` (newest first). A model released to your account appears on its own, with no
   extension update.
-  - The credential is the API key set via **Tootega: Set Anthropic API key** (OS keychain),
+  - The credential is the API key set via **Cockpit Daemon: Set Anthropic API key** (OS keychain),
     `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN`, or — on **subscription** accounts with no
     API key — the CLI's own OAuth token. `GET /v1/models` spends no tokens.
   - The last successful answer is cached (globalState) and is what the picker shows while
@@ -749,12 +752,12 @@ context, and **never** write or log credentials.
   `/config` shows up without reloading the window), or the default observed in the `init` of a
   session with no per-tab override.
 - **Effort** is a fixed CLI enum: `low / medium / high / xhigh / max`.
-- **Engine** — `tootega.tootegaEnabled` is the master switch for the local **Tootega Code**
+- **Engine** — `cockpitDaemon.tootegaEnabled` is the master switch for the local **Tootega Code**
   engine, **off by default**. Off, the Cockpit runs on Claude Code alone: nothing spawns
-  `agent.exe`, `tootega.engine` is ignored and the Engine combo is not rendered (the host
+  `agent.exe`, `cockpitDaemon.engine` is ignored and the Engine combo is not rendered (the host
   offers a single engine, and a one-option picker is noise). On, the combo returns and each tab
   can be pinned — N Claude tabs plus one Tootega tab, which needs the TootegaEngine server up
-  (`serve.cmd`; `tootega.tootegaServer` says where).
+  (`serve.cmd`; `cockpitDaemon.tootegaServer` says where).
 
 ---
 
@@ -769,7 +772,7 @@ connected.
 
 Set it up once on the machine that runs your code:
 
-1. Run **Tootega: Install daemon** from the command palette. On macOS it installs a launchd
+1. Run **Cockpit Daemon: Install daemon** from the command palette. On macOS it installs a launchd
    agent (`~/Library/LaunchAgents/local.cockpit.daemon.plist`) that starts at login and is
    restarted if it dies; elsewhere it starts a background process.
 2. Install this extension in every VS Code server that should use it (the Remote-SSH server
@@ -790,7 +793,7 @@ How it behaves:
 - **One turn at a time.** A message sent while a turn is running (started from another
   device) is not queued: you get a notice and the text goes back to the input box.
 - **Closing is not stopping.** Closing a tab or window leaves the conversation running. To
-  end its process, use **Tootega: Stop this session's process in the daemon**; the
+  end its process, use **Cockpit Daemon: Stop this session's process in the daemon**; the
   conversation stays on disk and resumes on the next message.
 - **Restarts.** The daemon remembers its sessions. After a restart (or a reboot) they are
   listed as idle and resume with `--resume` on the next message; turns that were running
@@ -798,21 +801,21 @@ How it behaves:
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `tootega.daemon.socketPath` | `~/.cockpit/daemon.sock` | The daemon's Unix socket. |
-| `tootega.daemon.idleStopHours` | `0` (never) | Stop a process idle this long with no window attached and no prompt waiting. Applied on (re)install. |
+| `cockpitDaemon.daemon.socketPath` | `~/.cockpit/daemon.sock` | The daemon's Unix socket. |
+| `cockpitDaemon.daemon.idleStopHours` | `0` (never) | Stop a process idle this long with no window attached and no prompt waiting. Applied on (re)install. |
 
 Architecture, operations and troubleshooting: [Docs/daemon-mode.md](Docs/daemon-mode.md).
 On a Mac you can run the daemon from a menu bar app instead of the launchd agent, with a
 live log and Start/Stop/Restart: see [mac/CockpitDaemon](mac/CockpitDaemon/README.md).
 
 Where the chat runs: by default in the **side bar** (the secondary side bar on the right, like the
-official extension), with a strip of conversation tabs. Set `tootega.preferredLocation` to `editor`
+official extension), with a strip of conversation tabs. Set `cockpitDaemon.preferredLocation` to `editor`
 to open new conversations in editor tabs instead. A conversation is in one place at a time:
 **Open in editor** and **Move to the side bar chat** move it.
 
 Your own Claude CLI: if `claude` is not found, Cockpit offers to download its own copy into
 `~/.cockpit/claude` (verified against Anthropic's published checksum). A path you set in
-`tootega.claudePath` always wins; then that copy, `PATH` and `~/.local/bin`.
+`cockpitDaemon.claudePath` always wins; then that copy, `PATH` and `~/.local/bin`.
 
 Commands: **Install daemon**, **Restart daemon** (stops running turns), **Show daemon log**
 (`~/.cockpit/daemon.log`), **Stop this session's process in the daemon**.
@@ -989,7 +992,7 @@ CLI's system prompt.
 
 ## Timeline verbosity
 
-`tootega.verbosity` controls **how much of the timeline is shown — display only; it does not
+`cockpitDaemon.verbosity` controls **how much of the timeline is shown — display only; it does not
 change the agent or what the CLI does.** Modes:
 
 | Mode | Shows |
@@ -1013,12 +1016,12 @@ and stops capture.
   (`/api/ws/speech_to_text/voice_stream`) — the same service the CLI's `/voice` uses
   (`deepgram-nova3`, live interim results, endpointing). It spends **no** tokens.
 - **Mic capture happens on the host** via **ffmpeg** (the webview blocks `getUserMedia`).
-  Point `tootega.ffmpegPath` at your ffmpeg binary, or leave it empty to use `ffmpeg` from
+  Point `cockpitDaemon.ffmpegPath` at your ffmpeg binary, or leave it empty to use `ffmpeg` from
   the `PATH`.
-- **Optional correction (opt-in, default off):** turn on `tootega.voiceCorrect` and, when you
-  stop, the text is sent to the **internal model** (`tootega.internalModel`, default Haiku) for a
+- **Optional correction (opt-in, default off):** turn on `cockpitDaemon.voiceCorrect` and, when you
+  stop, the text is sent to the **internal model** (`cockpitDaemon.internalModel`, default Haiku) for a
   quick spelling/grammar pass — a clean, isolated one-shot (instruction + text only, ~1.7 s).
-- **Language:** `tootega.voiceLanguage` sets the dictation language; empty follows the
+- **Language:** `cockpitDaemon.voiceLanguage` sets the dictation language; empty follows the
   Cockpit UI language.
 - **UX:** the input gets focus when dictation starts; on stop it goes read-only with a
   spinner while correcting; typing ends the dictation.
@@ -1044,7 +1047,7 @@ and stops capture.
 
 ## Settings reference
 
-All under **Settings → Extensions → Tootega Cockpit** (prefix `tootega.`):
+All under **Settings → Extensions → Tootega Cockpit** (prefix `cockpitDaemon.`):
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -1082,19 +1085,19 @@ Commands (palette, **Tootega** category):
 
 | Command | ID | Shortcut |
 |---|---|---|
-| Open Cockpit | `tootega.open` | **Ctrl+Alt+C** (mac: Cmd+Alt+C) · also ✦ in the editor toolbar |
-| New session | `tootega.newSession` | **Ctrl+Alt+N** (in the panel) |
-| Interrupt agent | `tootega.interrupt` | **Ctrl+Alt+.** |
-| **Reopen closed session** | `tootega.reopenClosed` | **Ctrl+Shift+T** (when the Cockpit is focused) |
-| **Reload view** (fix gray/blank panel) | `tootega.reloadView` | ↻ in the editor title bar + status bar |
-| Sessions | `tootega.openSessions` | — |
-| Settings | `tootega.settings` | — |
-| Open in editor (resizable) | `tootega.openInEditor` | — |
-| Sign in / Sign out to Claude (CLI) | `tootega.login` / `tootega.logout` | — |
-| Toggle language (pt-BR / English) | `tootega.toggleLanguage` | — |
-| **Set / Remove Anthropic API key** (model discovery, stored in the OS keychain) | `tootega.setApiKey` / `tootega.clearApiKey` | — |
-| Enable / Disable real usage tracking | `tootega.enableUsageTracking` / `...disableUsageTracking` | — |
-| **Fix accents in PowerShell output** (install / remove the UTF-8 hook, Windows) | `tootega.enableUtf8Fix` / `tootega.disableUtf8Fix` | — |
+| Open Cockpit | `cockpitDaemon.open` | **Ctrl+Alt+C** (mac: Cmd+Alt+C) · also ✦ in the editor toolbar |
+| New session | `cockpitDaemon.newSession` | **Ctrl+Alt+N** (in the panel) |
+| Interrupt agent | `cockpitDaemon.interrupt` | **Ctrl+Alt+.** |
+| **Reopen closed session** | `cockpitDaemon.reopenClosed` | **Ctrl+Shift+T** (when the Cockpit is focused) |
+| **Reload view** (fix gray/blank panel) | `cockpitDaemon.reloadView` | ↻ in the editor title bar + status bar |
+| Sessions | `cockpitDaemon.openSessions` | — |
+| Settings | `cockpitDaemon.settings` | — |
+| Open in editor (resizable) | `cockpitDaemon.openInEditor` | — |
+| Sign in / Sign out to Claude (CLI) | `cockpitDaemon.login` / `cockpitDaemon.logout` | — |
+| Toggle language (pt-BR / English) | `cockpitDaemon.toggleLanguage` | — |
+| **Set / Remove Anthropic API key** (model discovery, stored in the OS keychain) | `cockpitDaemon.setApiKey` / `cockpitDaemon.clearApiKey` | — |
+| Enable / Disable real usage tracking | `cockpitDaemon.enableUsageTracking` / `...disableUsageTracking` | — |
+| **Fix accents in PowerShell output** (install / remove the UTF-8 hook, Windows) | `cockpitDaemon.enableUtf8Fix` / `cockpitDaemon.disableUtf8Fix` | — |
 
 ### Accented characters in PowerShell output (Windows)
 
@@ -1105,7 +1108,7 @@ you get mojibake. Characters outside that code page (`ã` in CP 437) are *lost a
 so no decoding fix on our side can recover them. In a terminal the problem is invisible
 because the console is already at `chcp 65001`.
 
-`Tootega: Fix accents in PowerShell output` installs a `PreToolUse` hook in
+`Cockpit Daemon: Fix accents in PowerShell output` installs a `PreToolUse` hook in
 `~/.claude/settings.json` (script at `~/.claude/.tootega/utf8-hook.ps1`) that prefixes every
 **PowerShell** tool command with the UTF-8 encoding setup. It is idempotent, never blocks or
 denies a command (any failure is a silent no-op), and is removed by the *Remove* command. No
@@ -1188,7 +1191,7 @@ enabling, run an interactive `claude` session once to populate the cache.
 - **Every** visible string goes through i18n — no hardcoded text.
 - Locales: **pt-BR** and **en** (international English, neutral).
 - Default: follows `vscode.env.language`; falls back to `en` when the locale is not
-  supported. Manual override in `tootega.language`. **Runtime switching** (no extension
+  supported. Manual override in `cockpitDaemon.language`. **Runtime switching** (no extension
   reload).
 - Catalogs:
   - **Manifest:** `package.nls.json` (en base) + `package.nls.pt-br.json`.
@@ -1277,7 +1280,7 @@ encoded by mapping `:` `\` `/` → `-`).
 
 | Symptom | Likely cause | Action |
 |---|---|---|
-| "CLI not found" on activation | `claude` not on the PATH | Set `tootega.claudePath`; confirm `claude --version` |
+| "CLI not found" on activation | `claude` not on the PATH | Set `cockpitDaemon.claudePath`; confirm `claude --version` |
 | Chat does not respond / auth error | CLI not authenticated | Run **Sign in** or `claude` in a terminal and log in |
 | Model selector shows only aliases | Subscription account (no API key) | Expected — use an alias, the active model, or **Custom…** |
 | Limit meters empty | No real usage source | Enable **Real usage tracking** and run a `claude` session |
@@ -1333,7 +1336,7 @@ See the detailed status in
 - Credential content is **never** logged.
 - The CLI's permission model is honored; approvals are not bypassed by the UI.
 - The optional API key (stored **encrypted in the OS keychain** via SecretStorage, set
-  through the **Tootega: Set Anthropic API key** command) is used **only** to list models
+  through the **Cockpit Daemon: Set Anthropic API key** command) is used **only** to list models
   (`/v1/models`), never in chat.
 - The local OAuth token (`~/.claude/.credentials.json`) is read **read-only** for the clean
   utility calls (real usage, voice STT, dictation correction); it is **never** written or

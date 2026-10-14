@@ -11,7 +11,7 @@ export function log(msg: string): void {
   getLogger().appendLine(`[${new Date().toISOString()}] ${msg}`);
 }
 
-// Detailed diagnostic log: only writes when the flag is on (tootega.debugLog).
+// Detailed diagnostic log: only writes when the flag is on (cockpitDaemon.debugLog).
 // The flag lives in memory (set in activate and in onDidChangeConfiguration) so
 // dlog doesn't hit the VSCode API on every call — and doesn't break tests.
 let debugEnabled = false;

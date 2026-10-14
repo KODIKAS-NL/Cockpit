@@ -50,10 +50,10 @@ This UI is **only a presentation and control layer**. All orchestration — the 
 
 ### Two engines, one protocol
 
-**`tootega.tootegaEnabled` is the master switch** (off by default). Off, the local engine does
-not exist for the installation: nothing spawns `agent.exe`, `tootega.engine` is ignored and the
+**`cockpitDaemon.tootegaEnabled` is the master switch** (off by default). Off, the local engine does
+not exist for the installation: nothing spawns `agent.exe`, `cockpitDaemon.engine` is ignored and the
 Engine picker hides itself (the host offers a single engine, and the UI renders the combo only
-when there is a choice). On, `tootega.engine` chooses the default binary and the per-tab
+when there is a choice). On, `cockpitDaemon.engine` chooses the default binary and the per-tab
 override comes back. `availableEngines()` / `tootegaEnabled()` in `src/cli/Engine.ts` are the
 single source for both — do not read the setting directly elsewhere.
 
@@ -72,7 +72,7 @@ extensions and no cost, so those panels stay empty instead of failing. Cost
 showing zero is not a gap — running locally costs nothing.
 
 The Tootega engine needs its server up (`serve.cmd` in the TootegaEngine repo);
-`tootega.tootegaServer` says where it is.
+`cockpitDaemon.tootegaServer` says where it is.
 
 **Primary channel with the engine:** `claude` in headless/streaming mode:
 

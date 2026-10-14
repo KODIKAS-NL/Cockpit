@@ -5,7 +5,7 @@
 export type Surface = 'sidebar' | 'editor';
 
 export interface LocationInput {
-  /** The `tootega.preferredLocation` setting: where a conversation with no place yet goes. */
+  /** The `cockpitDaemon.preferredLocation` setting: where a conversation with no place yet goes. */
   preferred: Surface;
   /** An explicit request ("open in editor tab", "move to side bar") overrides everything. */
   explicit?: Surface;

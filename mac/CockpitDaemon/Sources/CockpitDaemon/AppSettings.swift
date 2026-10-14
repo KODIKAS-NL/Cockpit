@@ -30,7 +30,7 @@ enum AppSettings {
     static var startOnLaunch: Bool { defaults.bool(forKey: SettingKey.startOnLaunch) }
     static var autoRestart: Bool { defaults.bool(forKey: SettingKey.autoRestart) }
 
-    /// Must match the extension's `tootega.daemon.socketPath` (both default to ~/.cockpit/daemon.sock).
+    /// Must match the extension's `cockpitDaemon.daemon.socketPath` (both default to ~/.cockpit/daemon.sock).
     static var socketPath: String {
         let configured = (defaults.string(forKey: SettingKey.socketPath) ?? "")
             .trimmingCharacters(in: .whitespaces)

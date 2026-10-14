@@ -2,7 +2,7 @@
 
 A menu bar app that runs cockpit-daemon for you: starts it when you log in, shows its output
 live, and gives you Start / Stop / Restart buttons and a list of the conversations it is
-running. It replaces the launchd agent that **Tootega: Install daemon** creates; use one or
+running. It replaces the launchd agent that **Cockpit Daemon: Install daemon** creates; use one or
 the other. See [Docs/daemon-mode.md](../../Docs/daemon-mode.md) for what the daemon does.
 
 ## Build and install
@@ -54,12 +54,12 @@ leave out `NOTARY_PROFILE` then, since only Developer ID can be notarized.
 
 Then, once:
 
-1. If you used **Tootega: Install daemon** before, the app shows a banner: press **Remove
+1. If you used **Cockpit Daemon: Install daemon** before, the app shows a banner: press **Remove
    launchd agent**. Only one daemon can own the socket.
 2. In the app's Settings, turn on **Open at login** (approve it in System Settings › General ›
    Login Items if macOS asks).
 3. In VS Code nothing needs switching on: the dashboard header shows **Daemon: connected**.
-   (**Tootega: Install daemon** detects the running app and installs nothing.)
+   (**Cockpit Daemon: Install daemon** detects the running app and installs nothing.)
 
 ## What you get
 
@@ -88,7 +88,7 @@ the next message).
 | Stop idle Claude processes | never | The daemon's `--idle-stop-hours`. |
 | Node.js | from your login shell | The `node` that runs the daemon. |
 | daemon.js | bundled in the app | Falls back to `~/.cockpit/daemon.js`. |
-| Socket | `~/.cockpit/daemon.sock` | Must match `tootega.daemon.socketPath`. |
+| Socket | `~/.cockpit/daemon.sock` | Must match `cockpitDaemon.daemon.socketPath`. |
 
 The app runs the daemon with the `PATH` of your login shell (plus `~/.local/bin` and the
 Homebrew prefixes), so the daemon finds `claude` the way your terminal does. Apps started from

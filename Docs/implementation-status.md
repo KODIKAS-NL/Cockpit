@@ -34,7 +34,7 @@ Updated per the first build cycle. Tracks the [execution plan](execution-plan.md
 - **Models: discovery is the only source** (the CLI has no `models` subcommand):
   1. **`/v1/models`** builds the whole picker — `id`, `display_name` (label), `max_input_tokens`
      (context column + the `[1m]` suffix rule) and `created_at` (ordering). Credential: API key
-     (`tootega.apiKey`), `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN`, or the CLI's OAuth token —
+     (`cockpitDaemon.apiKey`), `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN`, or the CLI's OAuth token —
      so **subscription** accounts (`apiKeySource: none`) are covered too;
   2. the last successful answer, cached in globalState (offline / pre-discovery fallback);
   3. **active model** captured live from the `init` event, when discovery hasn't seen it;

@@ -45,7 +45,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // The Cockpit lives as an editor tab (WebviewPanel). No sidebar view.
   // The status bar item (created by the provider) and the command/shortcut open the editor.
 
-  // One-off migration: drops the old `tootega.apiKey` setting (plain text) and moves it
+  // One-off migration: drops the old `cockpitDaemon.apiKey` setting (plain text) and moves it
   // p/ o SecretStorage (keychain do SO). Best-effort, silencioso.
   void provider.migrateApiKeyFromSettings();
 
@@ -67,19 +67,19 @@ export function activate(context: vscode.ExtensionContext): void {
   {
     const [major, minor] = vscode.version.split('.').map((n) => parseInt(n, 10));
     const noSecondary = major < 1 || (major === 1 && minor < 106);
-    void vscode.commands.executeCommand('setContext', 'tootega.noSecondarySidebar', noSecondary);
+    void vscode.commands.executeCommand('setContext', 'cockpitDaemon.noSecondarySidebar', noSecondary);
   }
 
   context.subscriptions.push(
-    // Opens Cockpit where the user prefers it (tootega.preferredLocation: side bar or editor tab).
-    vscode.commands.registerCommand('tootega.open', () => {
+    // Opens Cockpit where the user prefers it (cockpitDaemon.preferredLocation: side bar or editor tab).
+    vscode.commands.registerCommand('cockpitDaemon.open', () => {
       provider.openPreferred();
     }),
-    vscode.commands.registerCommand('tootega.openInSidebar', () => {
+    vscode.commands.registerCommand('cockpitDaemon.openInSidebar', () => {
       provider.moveToSidebar();
     }),
     // ---- Daemon mode (cockpit-daemon keeps Claude running across windows/devices) ----
-    vscode.commands.registerCommand('tootega.daemon.install', async () => {
+    vscode.commands.registerCommand('cockpitDaemon.daemon.install', async () => {
       const cfg = vscode.workspace.getConfiguration('tootega');
       const bundledScript = path.join(context.extensionPath, 'dist', 'daemon.js');
       const idleStopHours = cfg.get<number>('daemon.idleStopHours', 0) ?? 0;
@@ -116,7 +116,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.l10n.t('cockpit-daemon is running. Claude keeps running when this window closes.'),
       );
     }),
-    vscode.commands.registerCommand('tootega.daemon.restart', () => {
+    vscode.commands.registerCommand('cockpitDaemon.daemon.restart', () => {
       if (!launchAgentInstalled()) {
         void vscode.window.showWarningMessage(vscode.l10n.t('cockpit-daemon is not installed as a service. Run "Install daemon" first.'));
         return;
@@ -125,7 +125,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (r.ok) void vscode.window.showInformationMessage(vscode.l10n.t('cockpit-daemon restarted. Running turns were stopped; conversations resume on the next message.'));
       else void vscode.window.showErrorMessage(vscode.l10n.t('Could not restart cockpit-daemon: {0}', r.message));
     }),
-    vscode.commands.registerCommand('tootega.daemon.stop', async () => {
+    vscode.commands.registerCommand('cockpitDaemon.daemon.stop', async () => {
       const r = await stopDaemon(provider.daemonSocketPath());
       log(`[daemon] stop: ${r.message}`);
       if (!r.ok) {
@@ -136,7 +136,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.l10n.t('cockpit-daemon stopped. Running turns ended; conversations resume on the next message once it runs again.'),
       );
     }),
-    vscode.commands.registerCommand('tootega.daemon.uninstall', async () => {
+    vscode.commands.registerCommand('cockpitDaemon.daemon.uninstall', async () => {
       const remove = vscode.l10n.t('Uninstall');
       const pick = await vscode.window.showWarningMessage(
         vscode.l10n.t('Uninstall cockpit-daemon?'),
@@ -157,7 +157,7 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       void vscode.window.showInformationMessage(vscode.l10n.t('cockpit-daemon uninstalled. Claude cannot run until it is installed again.'));
     }),
-    vscode.commands.registerCommand('tootega.daemon.showLog', async () => {
+    vscode.commands.registerCommand('cockpitDaemon.daemon.showLog', async () => {
       const file = daemonLogPath();
       if (!fs.existsSync(file)) {
         void vscode.window.showInformationMessage(vscode.l10n.t('No daemon log yet ({0}).', file));
@@ -165,26 +165,26 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: true });
     }),
-    vscode.commands.registerCommand('tootega.daemon.stopSession', () => {
+    vscode.commands.registerCommand('cockpitDaemon.daemon.stopSession', () => {
       if (!provider.stopActiveDaemonSession()) {
         void vscode.window.showInformationMessage(vscode.l10n.t('The active tab is not running in cockpit-daemon.'));
         return;
       }
       vscode.window.setStatusBarMessage(vscode.l10n.t('Session stopped in cockpit-daemon.'), 3000);
     }),
-    vscode.commands.registerCommand('tootega.newSession', () => {
+    vscode.commands.registerCommand('cockpitDaemon.newSession', () => {
       provider.newSession();
       vscode.window.setStatusBarMessage(vscode.l10n.t('Started a new session.'), 3000);
     }),
-    vscode.commands.registerCommand('tootega.interrupt', () => {
+    vscode.commands.registerCommand('cockpitDaemon.interrupt', () => {
       provider.interrupt();
       vscode.window.setStatusBarMessage(vscode.l10n.t('Agent interrupted.'), 3000);
     }),
-    vscode.commands.registerCommand('tootega.openSessions', async () => {
-      await vscode.commands.executeCommand('workbench.view.extension.tootega');
+    vscode.commands.registerCommand('cockpitDaemon.openSessions', async () => {
+      await vscode.commands.executeCommand('workbench.view.extension.cockpitDaemon');
       provider.openSessions();
     }),
-    vscode.commands.registerCommand('tootega.settings', () => {
+    vscode.commands.registerCommand('cockpitDaemon.settings', () => {
       // The id comes from the manifest (publisher.name): hardcoding it breaks the
       // filter whenever the extension is republished under another publisher.
       void vscode.commands.executeCommand(
@@ -192,44 +192,44 @@ export function activate(context: vscode.ExtensionContext): void {
         `@ext:${context.extension.id}`,
       );
     }),
-    vscode.commands.registerCommand('tootega.openInEditor', () => {
+    vscode.commands.registerCommand('cockpitDaemon.openInEditor', () => {
       provider.openInEditor();
     }),
-    vscode.commands.registerCommand('tootega.reloadView', () => {
+    vscode.commands.registerCommand('cockpitDaemon.reloadView', () => {
       provider.reloadActivePanel();
     }),
-    vscode.commands.registerCommand('tootega.reopenClosed', () => {
+    vscode.commands.registerCommand('cockpitDaemon.reopenClosed', () => {
       provider.reopenClosed();
     }),
-    vscode.commands.registerCommand('tootega.login', () => {
+    vscode.commands.registerCommand('cockpitDaemon.login', () => {
       provider.loginCli();
     }),
-    vscode.commands.registerCommand('tootega.logout', () => {
+    vscode.commands.registerCommand('cockpitDaemon.logout', () => {
       provider.logoutCli();
     }),
-    vscode.commands.registerCommand('tootega.setApiKey', () => {
+    vscode.commands.registerCommand('cockpitDaemon.setApiKey', () => {
       void provider.setApiKeyInteractive();
     }),
-    vscode.commands.registerCommand('tootega.clearApiKey', () => {
+    vscode.commands.registerCommand('cockpitDaemon.clearApiKey', () => {
       void provider.clearApiKey();
     }),
     // The chat in the side bar (secondary side bar; the Activity Bar on VS Code older than 1.106).
     vscode.window.registerWebviewViewProvider(
-      'tootega.chat',
+      'cockpitDaemon.chat',
       { resolveWebviewView: (view) => provider.resolveChatView(view) },
       { webviewOptions: { retainContextWhenHidden: true } },
     ),
     // Hub na Activity Bar (WebviewView). Mesma bundle, modo 'hub'.
-    vscode.window.registerWebviewViewProvider('tootega.hub', provider, {
+    vscode.window.registerWebviewViewProvider('cockpitDaemon.hub', provider, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     // Restores the editor panel (and its width/position) when the window reloads.
-    vscode.window.registerWebviewPanelSerializer('tootega.cockpit.editor', {
+    vscode.window.registerWebviewPanelSerializer('cockpitDaemon.cockpit.editor', {
       deserializeWebviewPanel: async (panel) => {
         provider.attachPanel(panel);
       },
     }),
-    vscode.commands.registerCommand('tootega.enableUsageTracking', () => {
+    vscode.commands.registerCommand('cockpitDaemon.enableUsageTracking', () => {
       const r = enableUsageTracking(context.globalState);
       if (r === 'ok') {
         void vscode.window.showInformationMessage(
@@ -250,7 +250,7 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       provider.refreshUsageNow();
     }),
-    vscode.commands.registerCommand('tootega.disableUsageTracking', () => {
+    vscode.commands.registerCommand('cockpitDaemon.disableUsageTracking', () => {
       const r = disableUsageTracking(context.globalState);
       void vscode.window.showInformationMessage(
         r === 'ok'
@@ -259,7 +259,7 @@ export function activate(context: vscode.ExtensionContext): void {
       );
       provider.refreshUsageNow();
     }),
-    vscode.commands.registerCommand('tootega.enableUtf8Fix', () => {
+    vscode.commands.registerCommand('cockpitDaemon.enableUtf8Fix', () => {
       const r = enableUtf8Fix();
       if (r === 'ok') {
         void vscode.window.showInformationMessage(
@@ -275,7 +275,7 @@ export function activate(context: vscode.ExtensionContext): void {
         );
       }
     }),
-    vscode.commands.registerCommand('tootega.disableUtf8Fix', () => {
+    vscode.commands.registerCommand('cockpitDaemon.disableUtf8Fix', () => {
       const r = disableUtf8Fix();
       void vscode.window.showInformationMessage(
         r === 'ok'
@@ -283,7 +283,7 @@ export function activate(context: vscode.ExtensionContext): void {
           : vscode.l10n.t('Could not update ~/.claude/settings.json (does it have comments?). Edit it manually.'),
       );
     }),
-    vscode.commands.registerCommand('tootega.toggleLanguage', async () => {
+    vscode.commands.registerCommand('cockpitDaemon.toggleLanguage', async () => {
       const cfg = vscode.workspace.getConfiguration('tootega');
       const current = cfg.get<string>('language', 'auto');
       const next = current === 'pt-BR' ? 'en' : 'pt-BR';
@@ -294,39 +294,39 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('tootega.language')) provider.pushLocale();
+      if (e.affectsConfiguration('cockpitDaemon.language')) provider.pushLocale();
       // Switching engine changes which binary is spawned: the running process
       // has to go, or the next turn would still be answered by the old one.
       if (
-        e.affectsConfiguration('tootega.tootegaEnabled') ||
-        e.affectsConfiguration('tootega.engine') ||
-        e.affectsConfiguration('tootega.claudePath') ||
-        e.affectsConfiguration('tootega.tootegaPath') ||
-        e.affectsConfiguration('tootega.tootegaServer')
+        e.affectsConfiguration('cockpitDaemon.tootegaEnabled') ||
+        e.affectsConfiguration('cockpitDaemon.engine') ||
+        e.affectsConfiguration('cockpitDaemon.claudePath') ||
+        e.affectsConfiguration('cockpitDaemon.tootegaPath') ||
+        e.affectsConfiguration('cockpitDaemon.tootegaServer')
       ) {
         provider.applyEngineChange();
       }
-      if (e.affectsConfiguration('tootega.daemon') || e.affectsConfiguration('tootega.engine')) void provider.reportDaemonStatus();
-      if (e.affectsConfiguration('tootega.internalModel')) provider.applyInternalModel();
-      if (e.affectsConfiguration('tootega.enableTodoTools')) provider.applyTodoToolsChange();
-      if (e.affectsConfiguration('tootega.debugLog')) {
+      if (e.affectsConfiguration('cockpitDaemon.daemon') || e.affectsConfiguration('cockpitDaemon.engine')) void provider.reportDaemonStatus();
+      if (e.affectsConfiguration('cockpitDaemon.internalModel')) provider.applyInternalModel();
+      if (e.affectsConfiguration('cockpitDaemon.enableTodoTools')) provider.applyTodoToolsChange();
+      if (e.affectsConfiguration('cockpitDaemon.debugLog')) {
         setDebugLogging(vscode.workspace.getConfiguration('tootega').get<boolean>('debugLog', false));
       }
       // Model/effort/permission change: resets overrides + reflects them in the dropdowns.
       if (
-        e.affectsConfiguration('tootega.model') ||
-        e.affectsConfiguration('tootega.effort') ||
-        e.affectsConfiguration('tootega.permissionMode') ||
-        e.affectsConfiguration('tootega.allowAgents')
+        e.affectsConfiguration('cockpitDaemon.model') ||
+        e.affectsConfiguration('cockpitDaemon.effort') ||
+        e.affectsConfiguration('cockpitDaemon.permissionMode') ||
+        e.affectsConfiguration('cockpitDaemon.allowAgents')
       ) {
         provider.applyDefaultsFromSettings();
       }
       // UI-only prefs: re-push the config without restarting the session.
       if (
-        e.affectsConfiguration('tootega.showThinking') ||
-        e.affectsConfiguration('tootega.expandToolCards') ||
-        e.affectsConfiguration('tootega.userName') ||
-        e.affectsConfiguration('tootega.verbosity')
+        e.affectsConfiguration('cockpitDaemon.showThinking') ||
+        e.affectsConfiguration('cockpitDaemon.expandToolCards') ||
+        e.affectsConfiguration('cockpitDaemon.userName') ||
+        e.affectsConfiguration('cockpitDaemon.verbosity')
       ) {
         provider.pushConfig();
       }
@@ -338,7 +338,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerUriHandler({
       handleUri: (uri) => {
         if (uri.path === '/open' || uri.path === '') {
-          void vscode.commands.executeCommand('tootega.open');
+          void vscode.commands.executeCommand('cockpitDaemon.open');
         }
       },
     }),
@@ -352,7 +352,7 @@ export function deactivate(): void {
   log('Tootega Cockpit deactivated.');
 }
 
-/** Closes the Cockpit webview tabs (viewType tootega.cockpit.editor) that VSCode
+/** Closes the Cockpit webview tabs (viewType cockpitDaemon.cockpit.editor) that VSCode
  *  tried to restore without state after a reload/restart. */
 function closeStaleCockpitTabs(): void {
   try {
@@ -361,7 +361,7 @@ function closeStaleCockpitTabs(): void {
         const input = tab.input;
         if (
           input instanceof vscode.TabInputWebview &&
-          input.viewType.includes('tootega.cockpit.editor')
+          input.viewType.includes('cockpitDaemon.cockpit.editor')
         ) {
           void vscode.window.tabGroups.close(tab);
         }

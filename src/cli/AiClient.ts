@@ -18,7 +18,7 @@ const DEFAULT_MAX_TOKENS = 4096;
 const DEFAULT_TIMEOUT_MS = 20_000;
 
 // Model for internal calls (correction, command research…). The host injects it
-// from the config (tootega.internalModel); empty = Haiku. A per-call override via
+// from the config (cockpitDaemon.internalModel); empty = Haiku. A per-call override via
 // opts.model still wins.
 let internalModel = DEFAULT_MODEL;
 

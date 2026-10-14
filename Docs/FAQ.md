@@ -44,11 +44,11 @@ Yes — **MIT**. Source and issues live in the
 Yes. The Cockpit **pilots** the CLI; it does not bundle or replace it. Install and
 authenticate the CLI first (`claude --version` to verify, `claude` once to log in). On
 activation, if the CLI is missing, the extension offers to help. If `claude` is not on the
-`PATH`, set the full path in **Settings → `tootega.claudePath`**.
+`PATH`, set the full path in **Settings → `cockpitDaemon.claudePath`**.
 
 ### How do I sign in?
 Authenticate the CLI once — run `claude` in a terminal and log in when prompted, or use the
-**"Tootega: Sign in to Claude (CLI)"** command from inside the Cockpit. The Cockpit uses the
+**"Cockpit Daemon: Sign in to Claude (CLI)"** command from inside the Cockpit. The Cockpit uses the
 CLI's own login; it never asks for or stores your password.
 
 ### Which platforms are supported?
@@ -145,7 +145,7 @@ locale by default.
 
 ### The extension says the CLI is missing / not found.
 Confirm `claude --version` works in a terminal. If it does but the extension can't find it,
-set the absolute path in **Settings → `tootega.claudePath`**. On Windows, the native
+set the absolute path in **Settings → `cockpitDaemon.claudePath`**. On Windows, the native
 installer may put `claude` in `~/.local/bin`, which isn't always on the `PATH`.
 
 ### Some numbers look off after a CLI update.
@@ -158,7 +158,7 @@ the rendering. Update the extension and report a mismatch on GitHub with your `c
 The picker only offers models your account has, per `/v1/models` — there is no hardcoded list
 to be out of date. If discovery is unavailable (offline / no credentials), it falls back to the
 last answer it cached, and **Custom…** still accepts any id. Make sure you're signed in
-(`claude --version`); setting the API key (**Tootega: Set Anthropic API key**) re-runs
+(`claude --version`); setting the API key (**Cockpit Daemon: Set Anthropic API key**) re-runs
 discovery right away.
 
 ### Where do I report bugs or ask questions?

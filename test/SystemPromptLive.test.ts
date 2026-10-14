@@ -20,7 +20,7 @@ function report(line: string): void {
 /** Template default publicado nas settings da extensão. */
 function defaultTemplate(): string {
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
-  return pkg.contributes.configuration.properties['tootega.systemPrompt.text'].default as string;
+  return pkg.contributes.configuration.properties['cockpitDaemon.systemPrompt.text'].default as string;
 }
 
 function ask(text: string, extraSystemPrompt?: string): Promise<string> {

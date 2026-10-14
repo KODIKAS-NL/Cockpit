@@ -128,8 +128,8 @@ turn as running, because the other device's message was echoed to it (`remote_us
 | Close a tab or the window, or the connection drops | Keeps running. The window detaches. |
 | Open another conversation in the same tab | The previous one keeps running. |
 | Change model, effort, permission mode or agents | Process ends; on the next message it restarts with the new flags, same conversation (`--resume`). |
-| **Tootega: Stop this session's process in the daemon** | Process ends; the conversation stays on disk and resumes on the next message. |
-| **Tootega: Restart daemon** | Every process ends; running turns are lost; conversations resume on the next message. |
+| **Cockpit Daemon: Stop this session's process in the daemon** | Process ends; the conversation stays on disk and resumes on the next message. |
+| **Cockpit Daemon: Restart daemon** | Every process ends; running turns are lost; conversations resume on the next message. |
 
 ## Starting and managing the daemon
 
@@ -141,11 +141,11 @@ There are two ways to run the daemon on a Mac. Pick one: only one daemon can own
 | Starts at login | Yes (login item) | Yes |
 | Restarted if it dies | Yes (with back-off) | Yes |
 | Live log, sessions list, Start/Stop/Restart | Yes | Log file and `launchctl` only |
-| Set up with | `mac/CockpitDaemon/scripts/build-app.sh --install` | **Tootega: Install daemon** |
+| Set up with | `mac/CockpitDaemon/scripts/build-app.sh --install` | **Cockpit Daemon: Install daemon** |
 | Quitting it | Stops the daemon and its Claude processes | Not applicable |
 
 The app is described in [mac/CockpitDaemon/README.md](../mac/CockpitDaemon/README.md). The
-rest of this section covers the launchd agent. With the app running, **Tootega: Install
+rest of this section covers the launchd agent. With the app running, **Cockpit Daemon: Install
 daemon** detects it and installs nothing.
 
 ### Install the launchd agent
@@ -154,7 +154,7 @@ On the machine that holds the code (the Mac mini):
 
 1. Install the Cockpit `.vsix` in every VS Code server that should use daemon mode. The
    Remote-SSH server and code-server keep separate extension folders.
-2. Open any window there and run **Tootega: Install daemon** from the command palette.
+2. Open any window there and run **Cockpit Daemon: Install daemon** from the command palette.
 
 What the install command does:
 
@@ -168,7 +168,7 @@ What the install command does:
 - Loads it (`launchctl bootout` of any previous version, then `launchctl bootstrap`).
 
 Re-run it after updating the extension (to copy the new daemon), after moving `node` or
-`claude`, or after changing `tootega.daemon.idleStopHours`.
+`claude`, or after changing `cockpitDaemon.daemon.idleStopHours`.
 
 On Linux the command starts the daemon as a detached background process instead. That lasts
 until reboot; use a systemd user unit for anything permanent (see [Run it by hand](#run-it-by-hand)).
@@ -178,7 +178,7 @@ until reboot; use a systemd user unit for anything permanent (see [Run it by han
 ```sh
 launchctl print gui/$(id -u)/local.cockpit.daemon | head -20   # state, pid, last exit
 ls -l ~/.cockpit/daemon.sock                                   # srw------- = listening
-tail -f ~/.cockpit/daemon.log                                  # or: Tootega: Show daemon log
+tail -f ~/.cockpit/daemon.log                                  # or: Cockpit Daemon: Show daemon log
 ```
 
 A healthy log starts with `listening on …/daemon.sock (N sessions known)` and has one
@@ -187,13 +187,13 @@ A healthy log starts with `listening on …/daemon.sock (N sessions known)` and 
 ### Stop, restart, uninstall
 
 ```sh
-launchctl kickstart -k gui/$(id -u)/local.cockpit.daemon   # restart (= Tootega: Restart daemon)
+launchctl kickstart -k gui/$(id -u)/local.cockpit.daemon   # restart (= Cockpit Daemon: Restart daemon)
 launchctl bootout gui/$(id -u)/local.cockpit.daemon        # stop until next login
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.cockpit.daemon.plist   # start again
 ```
 
-From the command palette: **Tootega: Stop daemon** (the launchd agent is unloaded until the
-next login; a daemon without one gets a SIGTERM) and **Tootega: Uninstall daemon** (stops it,
+From the command palette: **Cockpit Daemon: Stop daemon** (the launchd agent is unloaded until the
+next login; a daemon without one gets a SIGTERM) and **Cockpit Daemon: Uninstall daemon** (stops it,
 removes the launchd agent and `~/.cockpit/`; asks first).
 By hand: `bootout` as above, then delete the plist and `~/.cockpit/`. Conversations are the CLI's transcripts and stay either way.
 
@@ -207,7 +207,7 @@ node ~/.cockpit/daemon.js [--socket <path>] [--state <file>] [--idle-stop-hours 
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--socket` | `~/.cockpit/daemon.sock` | Where to listen. Must match `tootega.daemon.socketPath`. |
+| `--socket` | `~/.cockpit/daemon.sock` | Where to listen. Must match `cockpitDaemon.daemon.socketPath`. |
 | `--state` | `~/.cockpit/sessions.json` | Where sessions are remembered. |
 | `--idle-stop-hours` | `0` (never) | Stop a process idle this long with no window and no prompt waiting. |
 
@@ -218,8 +218,8 @@ left from a crash, it is removed at start; if another daemon is listening, it re
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `tootega.daemon.socketPath` | `~/.cockpit/daemon.sock` | The daemon's socket. |
-| `tootega.daemon.idleStopHours` | `0` | Passed to the daemon on install. |
+| `cockpitDaemon.daemon.socketPath` | `~/.cockpit/daemon.sock` | The daemon's socket. |
+| `cockpitDaemon.daemon.idleStopHours` | `0` | Passed to the daemon on install. |
 
 The daemon is required for the Claude engine. If the socket is missing, the window warns once
 (with an **Install daemon** button), the dashboard shows it as disconnected and Claude cannot
@@ -239,12 +239,12 @@ run until it is up; there is no local fallback. The Tootega engine is not affect
 
 ## Side bar chat and where a conversation lives
 
-The chat can run in a side bar (view `tootega.chat`, in the secondary side bar from VS Code 1.106,
-else in the Activity Bar) next to the dashboard (`tootega.hub`). Both are windows onto the same
+The chat can run in a side bar (view `cockpitDaemon.chat`, in the secondary side bar from VS Code 1.106,
+else in the Activity Bar) next to the dashboard (`cockpitDaemon.hub`). Both are windows onto the same
 host state; the daemon is what keeps the Claude processes alive regardless of which surface shows
 them. A conversation lives in **one** place, the side bar chat or an editor tab: opening one that
 already has an editor tab reveals that tab, and only the explicit commands (**Open in editor**,
-**Move to the side bar chat**) move it. `tootega.preferredLocation` decides where a conversation
+**Move to the side bar chat**) move it. `cockpitDaemon.preferredLocation` decides where a conversation
 with no place yet opens. The rule is `src/panel/location.ts`.
 
 ## Roadmap

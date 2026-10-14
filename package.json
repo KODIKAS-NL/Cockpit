@@ -42,9 +42,9 @@
   "l10n": "./l10n",
   "activationEvents": [
     "onStartupFinished",
-    "onWebviewPanel:tootega.cockpit.editor",
-    "onView:tootega.hub",
-    "onView:tootega.chat"
+    "onWebviewPanel:cockpitDaemon.cockpit.editor",
+    "onView:cockpitDaemon.hub",
+    "onView:cockpitDaemon.chat"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -54,230 +54,230 @@
   "contributes": {
     "commands": [
       {
-        "command": "tootega.open",
+        "command": "cockpitDaemon.open",
         "title": "%cmd.open%",
-        "category": "Tootega",
+        "category": "Cockpit Daemon",
         "icon": "$(sparkle)"
       },
       {
-        "command": "tootega.newSession",
+        "command": "cockpitDaemon.newSession",
         "title": "%cmd.newSession%",
-        "category": "Tootega",
+        "category": "Cockpit Daemon",
         "icon": "$(add)"
       },
       {
-        "command": "tootega.interrupt",
+        "command": "cockpitDaemon.interrupt",
         "title": "%cmd.interrupt%",
-        "category": "Tootega",
+        "category": "Cockpit Daemon",
         "icon": "$(debug-stop)"
       },
       {
-        "command": "tootega.openSessions",
+        "command": "cockpitDaemon.openSessions",
         "title": "%cmd.openSessions%",
-        "category": "Tootega",
+        "category": "Cockpit Daemon",
         "icon": "$(history)"
       },
       {
-        "command": "tootega.settings",
+        "command": "cockpitDaemon.settings",
         "title": "%cmd.settings%",
-        "category": "Tootega",
+        "category": "Cockpit Daemon",
         "icon": "$(gear)"
       },
       {
-        "command": "tootega.openInEditor",
+        "command": "cockpitDaemon.openInEditor",
         "title": "%cmd.openInEditor%",
-        "category": "Tootega",
+        "category": "Cockpit Daemon",
         "icon": "$(split-horizontal)"
       },
       {
-        "command": "tootega.reloadView",
+        "command": "cockpitDaemon.reloadView",
         "title": "%cmd.reloadView%",
-        "category": "Tootega",
+        "category": "Cockpit Daemon",
         "icon": "$(refresh)"
       },
       {
-        "command": "tootega.reopenClosed",
+        "command": "cockpitDaemon.reopenClosed",
         "title": "%cmd.reopenClosed%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.login",
+        "command": "cockpitDaemon.login",
         "title": "%cmd.login%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.logout",
+        "command": "cockpitDaemon.logout",
         "title": "%cmd.logout%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.toggleLanguage",
+        "command": "cockpitDaemon.toggleLanguage",
         "title": "%cmd.toggleLanguage%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.setApiKey",
+        "command": "cockpitDaemon.setApiKey",
         "title": "%cmd.setApiKey%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.clearApiKey",
+        "command": "cockpitDaemon.clearApiKey",
         "title": "%cmd.clearApiKey%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.enableUsageTracking",
+        "command": "cockpitDaemon.enableUsageTracking",
         "title": "%cmd.enableUsageTracking%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.disableUsageTracking",
+        "command": "cockpitDaemon.disableUsageTracking",
         "title": "%cmd.disableUsageTracking%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.enableUtf8Fix",
+        "command": "cockpitDaemon.enableUtf8Fix",
         "title": "%cmd.enableUtf8Fix%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.disableUtf8Fix",
+        "command": "cockpitDaemon.disableUtf8Fix",
         "title": "%cmd.disableUtf8Fix%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.daemon.install",
+        "command": "cockpitDaemon.daemon.install",
         "title": "%cmd.daemonInstall%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.daemon.restart",
+        "command": "cockpitDaemon.daemon.restart",
         "title": "%cmd.daemonRestart%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.daemon.stop",
+        "command": "cockpitDaemon.daemon.stop",
         "title": "%cmd.daemonStop%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.daemon.uninstall",
+        "command": "cockpitDaemon.daemon.uninstall",
         "title": "%cmd.daemonUninstall%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.daemon.showLog",
+        "command": "cockpitDaemon.daemon.showLog",
         "title": "%cmd.daemonShowLog%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.daemon.stopSession",
+        "command": "cockpitDaemon.daemon.stopSession",
         "title": "%cmd.daemonStopSession%",
-        "category": "Tootega"
+        "category": "Cockpit Daemon"
       },
       {
-        "command": "tootega.openInSidebar",
+        "command": "cockpitDaemon.openInSidebar",
         "title": "%cmd.openInSidebar%",
-        "category": "Tootega",
+        "category": "Cockpit Daemon",
         "icon": "$(layout-sidebar-right)"
       }
     ],
     "menus": {
       "editor/title": [
         {
-          "command": "tootega.open",
+          "command": "cockpitDaemon.open",
           "group": "navigation@0",
-          "when": "!tootega.cockpitActive"
+          "when": "!cockpitDaemon.cockpitActive"
         },
         {
-          "command": "tootega.reloadView",
+          "command": "cockpitDaemon.reloadView",
           "group": "navigation@1"
         }
       ],
       "view/title": [
         {
-          "command": "tootega.newSession",
+          "command": "cockpitDaemon.newSession",
           "group": "navigation@0",
-          "when": "view == tootega.chat"
+          "when": "view == cockpitDaemon.chat"
         },
         {
-          "command": "tootega.openInEditor",
+          "command": "cockpitDaemon.openInEditor",
           "group": "navigation@1",
-          "when": "view == tootega.chat"
+          "when": "view == cockpitDaemon.chat"
         },
         {
-          "command": "tootega.settings",
+          "command": "cockpitDaemon.settings",
           "group": "navigation@2",
-          "when": "view == tootega.chat"
+          "when": "view == cockpitDaemon.chat"
         }
       ]
     },
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "tootega",
+          "id": "cockpitDaemon",
           "title": "Cockpit for Claude Code Daemon",
           "icon": "media/icon.svg"
         },
         {
-          "id": "tootega-chat-fallback",
+          "id": "cockpitDaemon-chat-fallback",
           "title": "Cockpit for Claude Code Daemon",
           "icon": "media/icon.svg"
         }
       ],
       "secondarySidebar": [
         {
-          "id": "tootega-chat",
+          "id": "cockpitDaemon-chat",
           "title": "Cockpit for Claude Code Daemon",
           "icon": "media/icon.svg"
         }
       ]
     },
     "views": {
-      "tootega": [
+      "cockpitDaemon": [
         {
-          "id": "tootega.hub",
+          "id": "cockpitDaemon.hub",
           "name": "%view.cockpit.name%",
           "type": "webview"
         }
       ],
-      "tootega-chat": [
+      "cockpitDaemon-chat": [
         {
-          "id": "tootega.chat",
+          "id": "cockpitDaemon.chat",
           "name": "Cockpit for Claude Code Daemon",
           "type": "webview",
-          "when": "!tootega.noSecondarySidebar"
+          "when": "!cockpitDaemon.noSecondarySidebar"
         }
       ],
-      "tootega-chat-fallback": [
+      "cockpitDaemon-chat-fallback": [
         {
-          "id": "tootega.chat",
+          "id": "cockpitDaemon.chat",
           "name": "Cockpit for Claude Code Daemon",
           "type": "webview",
-          "when": "tootega.noSecondarySidebar"
+          "when": "cockpitDaemon.noSecondarySidebar"
         }
       ]
     },
     "keybindings": [
       {
-        "command": "tootega.open",
+        "command": "cockpitDaemon.open",
         "key": "ctrl+alt+c",
         "mac": "cmd+alt+c"
       },
       {
-        "command": "tootega.newSession",
+        "command": "cockpitDaemon.newSession",
         "key": "ctrl+alt+n",
         "mac": "cmd+alt+n",
-        "when": "activeWebviewPanelId == tootega.cockpit.editor || tootega.sideBarActive"
+        "when": "activeWebviewPanelId == cockpitDaemon.cockpit.editor || cockpitDaemon.sideBarActive"
       },
       {
-        "command": "tootega.reopenClosed",
+        "command": "cockpitDaemon.reopenClosed",
         "key": "ctrl+shift+t",
         "mac": "cmd+shift+t",
-        "when": "tootega.cockpitActive || tootega.sideBarActive"
+        "when": "cockpitDaemon.cockpitActive || cockpitDaemon.sideBarActive"
       },
       {
-        "command": "tootega.interrupt",
+        "command": "cockpitDaemon.interrupt",
         "key": "ctrl+alt+period",
         "mac": "cmd+alt+period"
       }
@@ -285,12 +285,12 @@
     "configuration": {
       "title": "Cockpit for Claude Code Daemon",
       "properties": {
-        "tootega.tootegaEnabled": {
+        "cockpitDaemon.tootegaEnabled": {
           "type": "boolean",
           "default": false,
           "description": "%cfg.tootegaEnabled%"
         },
-        "tootega.engine": {
+        "cockpitDaemon.engine": {
           "type": "string",
           "enum": [
             "claude",
@@ -303,22 +303,22 @@
           "default": "claude",
           "description": "%cfg.engine%"
         },
-        "tootega.claudePath": {
+        "cockpitDaemon.claudePath": {
           "type": "string",
           "default": "claude",
           "description": "%cfg.claudePath%"
         },
-        "tootega.tootegaPath": {
+        "cockpitDaemon.tootegaPath": {
           "type": "string",
           "default": "agent.exe",
           "description": "%cfg.tootegaPath%"
         },
-        "tootega.tootegaServer": {
+        "cockpitDaemon.tootegaServer": {
           "type": "string",
           "default": "127.0.0.1:8080",
           "description": "%cfg.tootegaServer%"
         },
-        "tootega.language": {
+        "cockpitDaemon.language": {
           "type": "string",
           "enum": [
             "auto",
@@ -328,12 +328,12 @@
           "default": "auto",
           "description": "%cfg.language%"
         },
-        "tootega.model": {
+        "cockpitDaemon.model": {
           "type": "string",
           "default": "default",
           "description": "%cfg.model%"
         },
-        "tootega.effort": {
+        "cockpitDaemon.effort": {
           "type": "string",
           "enum": [
             "default",
@@ -354,17 +354,17 @@
           "default": "default",
           "description": "%cfg.effort%"
         },
-        "tootega.autoResumeLastSession": {
+        "cockpitDaemon.autoResumeLastSession": {
           "type": "boolean",
           "default": true,
           "description": "%cfg.autoResumeLastSession%"
         },
-        "tootega.autosave": {
+        "cockpitDaemon.autosave": {
           "type": "boolean",
           "default": true,
           "description": "%cfg.autosave%"
         },
-        "tootega.permissionMode": {
+        "cockpitDaemon.permissionMode": {
           "type": "string",
           "enum": [
             "default",
@@ -377,37 +377,37 @@
           "default": "default",
           "description": "%cfg.permissionMode%"
         },
-        "tootega.allowAgents": {
+        "cockpitDaemon.allowAgents": {
           "type": "boolean",
           "default": false,
           "description": "%cfg.allowAgents%"
         },
-        "tootega.enableTodoTools": {
+        "cockpitDaemon.enableTodoTools": {
           "type": "boolean",
           "default": false,
           "description": "%cfg.enableTodoTools%"
         },
-        "tootega.notifyOnComplete": {
+        "cockpitDaemon.notifyOnComplete": {
           "type": "boolean",
           "default": true,
           "description": "%cfg.notifyOnComplete%"
         },
-        "tootega.showThinking": {
+        "cockpitDaemon.showThinking": {
           "type": "boolean",
           "default": false,
           "description": "%cfg.showThinking%"
         },
-        "tootega.spellCheck": {
+        "cockpitDaemon.spellCheck": {
           "type": "boolean",
           "default": false,
           "description": "%cfg.spellCheck%"
         },
-        "tootega.expandToolCards": {
+        "cockpitDaemon.expandToolCards": {
           "type": "boolean",
           "default": false,
           "description": "%cfg.expandToolCards%"
         },
-        "tootega.verbosity": {
+        "cockpitDaemon.verbosity": {
           "type": "string",
           "default": "verbose",
           "enum": [
@@ -424,17 +424,17 @@
           ],
           "description": "%cfg.verbosity%"
         },
-        "tootega.userName": {
+        "cockpitDaemon.userName": {
           "type": "string",
           "default": "",
           "description": "%cfg.userName%"
         },
-        "tootega.ffmpegPath": {
+        "cockpitDaemon.ffmpegPath": {
           "type": "string",
           "default": "",
           "description": "%cfg.ffmpegPath%"
         },
-        "tootega.internalModel": {
+        "cockpitDaemon.internalModel": {
           "type": "string",
           "default": "claude-haiku-4-5",
           "enum": [
@@ -455,22 +455,22 @@
           ],
           "description": "%cfg.internalModel%"
         },
-        "tootega.voiceCorrect": {
+        "cockpitDaemon.voiceCorrect": {
           "type": "boolean",
           "default": false,
           "description": "%cfg.voiceCorrect%"
         },
-        "tootega.debugLog": {
+        "cockpitDaemon.debugLog": {
           "type": "boolean",
           "default": false,
           "description": "%cfg.debugLog%"
         },
-        "tootega.otel.enabled": {
+        "cockpitDaemon.otel.enabled": {
           "type": "boolean",
           "default": false,
           "description": "%cfg.otelEnabled%"
         },
-        "tootega.voiceLanguage": {
+        "cockpitDaemon.voiceLanguage": {
           "type": "string",
           "enum": [
             "",
@@ -498,35 +498,35 @@
           "default": "",
           "description": "%cfg.voiceLanguage%"
         },
-        "tootega.systemPrompt.quiet": {
+        "cockpitDaemon.systemPrompt.quiet": {
           "type": "string",
           "editPresentation": "multilineText",
           "default": "IMPORTANT — output discipline (this overrides any default instruction to summarize or explain your work): Work silently. Do not narrate the task while doing it: no preamble, no \"I will now…\", no play-by-play between tool calls, no \"let me…\". When the work is finished, state ONLY that it is finished — a single short sentence such as \"Done.\" Do NOT produce a closing report, a summary, a bulleted list of changes, or a restatement of what the files or edits contain. The user can see the changes; repeating them is exactly what this rule forbids. This rule governs the shape of every response. Answer direct questions normally; this is about narration and closing reports, not about replying to the user.",
           "description": "%cfg.systemPromptQuiet%"
         },
-        "tootega.systemPrompt.enabled": {
+        "cockpitDaemon.systemPrompt.enabled": {
           "type": "boolean",
           "default": false,
           "description": "%cfg.systemPromptEnabled%"
         },
-        "tootega.systemPrompt.text": {
+        "cockpitDaemon.systemPrompt.text": {
           "type": "string",
           "editPresentation": "multilineText",
           "default": "- **SHELL: TRÊS INTERPRETADORES, ESCOLHA BINÁRIA E EXPLÍCITA (diretiva-raiz, binária, soberana\n  sobre execução de comando).** Esta máquina tem os shells abaixo; o mesmo comando pode ser\n  válido em um e lixo em outro. Antes de emitir QUALQUER comando, saiba em QUAL shell ele roda e\n  escreva a sintaxe E o caminho daquele shell.\n\n  | Shell | Quando | Projeto | Temp | Heredoc |\n  |-------|--------|---------|------|---------|\n  | ${defaultShell} (DEFAULT) | tudo, salvo exceção | ${projectPathWin} | $env:TEMP | não |\n  | Git Bash (bash tool) | POSIX pontual | ${projectPathGitBash} | /tmp (pasta do Git) | ok |\n  ${wslRow}\n\n  Default = ${defaultShell}. Sai do default só quando a tarefa EXIGE POSIX (Git Bash) ou Linux\n  real (WSL), e a escolha é declarada, nunca implícita.\n\n  NUNCA CRUZAR sintaxe de um shell com caminho de outro: heredoc e paths POSIX (/tmp, /mnt/...)\n  só em Git Bash/WSL; paths ${winPathStyle} e $env:TEMP só no PowerShell. Foi o defeito a evitar\n  (`<<'EOF'` + /tmp no PowerShell -> C:\\tmp -> quebrou).\n\n  PowerShell ${psVersion}: sem heredoc, sem /tmp; temp = $env:TEMP; script multi-linha grava\n  arquivo (.ps1/.js/.py) e executa o arquivo (funciona igual nos três); UTF-8 explícito (5.1 tem\n  default ANSI e corrompe acento). Na dúvida, assuma o default e declare o shell se precisar de POSIX.",
           "description": "%cfg.systemPromptText%"
         },
-        "tootega.daemon.socketPath": {
+        "cockpitDaemon.daemon.socketPath": {
           "type": "string",
           "default": "",
           "description": "%cfg.daemonSocketPath%"
         },
-        "tootega.daemon.idleStopHours": {
+        "cockpitDaemon.daemon.idleStopHours": {
           "type": "number",
           "default": 0,
           "minimum": 0,
           "description": "%cfg.daemonIdleStopHours%"
         },
-        "tootega.thinking": {
+        "cockpitDaemon.thinking": {
           "type": "string",
           "enum": [
             "cli",
@@ -539,7 +539,7 @@
           ],
           "description": "%cfg.thinking%"
         },
-        "tootega.preferredLocation": {
+        "cockpitDaemon.preferredLocation": {
           "type": "string",
           "enum": [
             "sidebar",
@@ -552,7 +552,7 @@
           "default": "sidebar",
           "description": "%cfg.preferredLocation%"
         },
-        "tootega.autoCompact": {
+        "cockpitDaemon.autoCompact": {
           "type": "string",
           "default": "auto",
           "description": "%cfg.autoCompact%"

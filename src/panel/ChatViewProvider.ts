@@ -253,7 +253,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.reloadBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
     this.reloadBar.text = '$(refresh)';
     this.reloadBar.tooltip = vscode.l10n.t('Reload Cockpit view (fix gray/blank panel)');
-    this.reloadBar.command = 'tootega.reloadView';
+    this.reloadBar.command = 'cockpitDaemon.reloadView';
     this.updateReloadBar();
     setInternalModel(this.cfg().get<string>('internalModel', '')); // model of the internal calls
     // Account-bound extras only exist for the Claude engine; running them
@@ -469,7 +469,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             install,
           )
           .then((pick) => {
-            if (pick === install) void vscode.commands.executeCommand('tootega.daemon.install');
+            if (pick === install) void vscode.commands.executeCommand('cockpitDaemon.daemon.install');
           });
       }
     }
@@ -825,7 +825,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (!this.statusBar) return;
     this.statusBar.text = busy ? '$(loading~spin) Cockpit' : '$(sparkle) Cockpit';
     this.statusBar.tooltip = 'Cockpit for Claude Code Daemon';
-    this.statusBar.command = 'tootega.open';
+    this.statusBar.command = 'cockpitDaemon.open';
     this.statusBar.show();
   }
 
@@ -849,7 +849,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** Shows the side bar chat (focus), for the command and the status bar. */
   focusSidebar(): void {
-    void vscode.commands.executeCommand('tootega.chat.focus');
+    void vscode.commands.executeCommand('cockpitDaemon.chat.focus');
   }
 
   private preferredLocation(): Surface {
@@ -905,7 +905,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
     }
     const panel = vscode.window.createWebviewPanel(
-      'tootega.cockpit.editor',
+      'cockpitDaemon.cockpit.editor',
       this.tabMeta.get(tabId)?.title || 'Cockpit for Claude Code Daemon',
       vscode.ViewColumn.Active,
       {
@@ -948,13 +948,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       if (panel.active) this.setActive(tabId);
       // A dedicated context key for the refresh button in the title bar (more reliable than
       // activeWebviewPanelId for webview panels). True when THIS panel is active.
-      void vscode.commands.executeCommand('setContext', 'tootega.cockpitActive', panel.active);
+      void vscode.commands.executeCommand('setContext', 'cockpitDaemon.cockpitActive', panel.active);
       // Shown again: timers were throttled while hidden — re-arms the clock so
       // the watchdog doesn't mistake the gap for a dead render.
       if (panel.visible) this.lastBeat.set(tabId, Date.now());
     });
     // A freshly created panel is born active: arm the context key right away.
-    void vscode.commands.executeCommand('setContext', 'tootega.cockpitActive', true);
+    void vscode.commands.executeCommand('setContext', 'cockpitDaemon.cockpitActive', true);
     this.lastBeat.set(tabId, Date.now()); // armed now: a freshly created panel hasn't beaten yet
     // Ref captured NOW: reading `panel.webview`/`panel.active` AFTER the dispose
     // throws "Webview is disposed" (assertNotDisposed getter) and aborts the rest of the
@@ -974,7 +974,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.reloadGuard.delete(tabId);
       this.updateReloadBar();
       // Doesn't read panel.active (the getter throws post-dispose): clears the context key directly.
-      void vscode.commands.executeCommand('setContext', 'tootega.cockpitActive', false);
+      void vscode.commands.executeCommand('setContext', 'cockpitDaemon.cockpitActive', false);
       this.postTabs(); // the conversation's surface changed (the side bar tab strip follows)
       sub.dispose();
       vs.dispose();
@@ -1097,7 +1097,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
     let panel: vscode.WebviewPanel;
     try {
-      panel = vscode.window.createWebviewPanel('tootega.cockpit.editor', title, col, {
+      panel = vscode.window.createWebviewPanel('cockpitDaemon.cockpit.editor', title, col, {
         enableScripts: true,
         retainContextWhenHidden: true,
         localResourceRoots: [
@@ -1907,7 +1907,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   private async startVoice(tabId: string, language?: string): Promise<void> {
     this.stopVoice();
-    // Language: an explicit setting (tootega.voiceLanguage) wins; otherwise the
+    // Language: an explicit setting (cockpitDaemon.voiceLanguage) wins; otherwise the
     // webview locale; otherwise the Cockpit locale. Normalized to short (pt-BR->pt).
     const forced = this.cfg().get<string>('voiceLanguage', '').trim();
     const lang = ((forced || language || this.voiceLanguage()).split('-')[0] || 'en').toLowerCase();
@@ -2148,7 +2148,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /**
    * Language of the agent's questions (AskUserQuestion). Same priority as dictation:
-   * explicit `tootega.voiceLanguage` setting > Cockpit locale. Short code.
+   * explicit `cockpitDaemon.voiceLanguage` setting > Cockpit locale. Short code.
    */
   private askLanguageCode(): string {
     const forced = this.cfg().get<string>('voiceLanguage', '').trim();
@@ -2178,7 +2178,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   // Auto-save: before the agent reads/writes a file, it saves the open buffer when
-  // dirty (prevents the agent from working on an old version). Setting tootega.autosave.
+  // dirty (prevents the agent from working on an old version). Setting cockpitDaemon.autosave.
   private autoSaveForTool(tool: string, input: unknown): void {
     if (!this.cfg().get<boolean>('autosave', true)) return;
     if (!/^(Edit|Write|MultiEdit|NotebookEdit|Read)$/.test(tool)) return;
@@ -2536,7 +2536,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /**
    * Asks the user for the API key (masked input) and writes it to SecretStorage.
    * Empty = removes the key. It re-runs model discovery at the end.
-   * Comando `tootega.setApiKey`.
+   * Comando `cockpitDaemon.setApiKey`.
    */
   async setApiKeyInteractive(): Promise<void> {
     if (!this.secrets) {
@@ -2566,7 +2566,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.refreshModels();
   }
 
-  /** Remove a API key do SecretStorage. Comando `tootega.clearApiKey`. */
+  /** Remove a API key do SecretStorage. Comando `cockpitDaemon.clearApiKey`. */
   async clearApiKey(): Promise<void> {
     if (this.secrets) await this.secrets.delete(API_KEY_SECRET);
     void vscode.window.showInformationMessage(vscode.l10n.t('API key removed.'));
@@ -2607,7 +2607,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * One-off migration: when the old `tootega.apiKey` setting (plain text) has a value,
+   * One-off migration: when the old `cockpitDaemon.apiKey` setting (plain text) has a value,
    * move p/ o SecretStorage e apaga a setting. Best-effort, silencioso.
    */
   async migrateApiKeyFromSettings(): Promise<void> {
@@ -2630,7 +2630,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  /** Applies the internal model (tootega.internalModel) to the AI helper. */
+  /** Applies the internal model (cockpitDaemon.internalModel) to the AI helper. */
   applyInternalModel(): void {
     setInternalModel(this.cfg().get<string>('internalModel', ''));
   }
@@ -2664,7 +2664,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * `tootega.enableTodoTools` changed. It is an env var of the engine process, so it only
+   * `cockpitDaemon.enableTodoTools` changed. It is an env var of the engine process, so it only
    * reaches a live tab through a respawn: stopping is enough, the next message resumes the
    * same conversation with the new environment (same path as a model switch).
    */
@@ -3018,7 +3018,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'openSettings':
         // Single entry point: the command resolves the extension id from the manifest.
-        void vscode.commands.executeCommand('tootega.settings');
+        void vscode.commands.executeCommand('cockpitDaemon.settings');
         break;
       case 'openLink':
         void this.openLink(m.href, m.preview);
@@ -3027,7 +3027,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.installCli();
         break;
       case 'daemonInstall':
-        void vscode.commands.executeCommand('tootega.daemon.install');
+        void vscode.commands.executeCommand('cockpitDaemon.daemon.install');
         break;
       case 'updateCli':
         this.updateCli();
@@ -3281,7 +3281,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** Caminho efetivo do CLI (resolvido) — usado p/ spawn/pesquisa/install.
    *
-   *  Segue o motor escolhido: com `tootega.engine = "tootega"` isto aponta para
+   *  Segue o motor escolhido: com `cockpitDaemon.engine = "tootega"` isto aponta para
    *  o agente local, e é o único ponto que precisa saber disso — tudo o que
    *  gera processo passa por aqui. */
   private claudePath(engine: EngineId = currentEngine()): string {
@@ -3611,7 +3611,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     view.webview.html = this.getHtml(view.webview, 'sidebar');
     this.chatView = view;
     const setKey = (): void => {
-      void vscode.commands.executeCommand('setContext', 'tootega.sideBarActive', view.visible);
+      void vscode.commands.executeCommand('setContext', 'cockpitDaemon.sideBarActive', view.visible);
     };
     setKey();
     const sub = view.webview.onDidReceiveMessage((m: WebviewToHost) => this.onWebviewMessage(m, view.webview));
@@ -3622,7 +3622,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     view.onDidDispose(() => {
       sub.dispose();
       visSub.dispose();
-      void vscode.commands.executeCommand('setContext', 'tootega.sideBarActive', false);
+      void vscode.commands.executeCommand('setContext', 'cockpitDaemon.sideBarActive', false);
       if (this.chatView === view) this.chatView = undefined;
     });
   }

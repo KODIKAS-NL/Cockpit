@@ -6,6 +6,16 @@ and the project adopts semantic versioning.
 
 ## [Unreleased]
 
+### Changed
+- **New extension identity, new namespace.** This fork is its own extension
+  (`KODIKAS.cockpit-claude-code-daemon`) and can be installed next to the original. Every command,
+  setting, view and context key moved from `tootega.*` to `cockpitDaemon.*` (for example
+  `cockpitDaemon.preferredLocation`, `cockpitDaemon.daemon.socketPath`), so the two extensions no
+  longer register the same ids. Settings you had under `tootega.*` are not read any more: rename the
+  keys in your `settings.json`. The commands in the palette are listed under **Cockpit Daemon**.
+  The `tootega` engine itself (the optional local engine) keeps its name, and the shared data
+  folders under `~/.claude/tootega/` are unchanged.
+
 ### Added
 - **Per-conversation controls live with the chat.** Model, effort and permission mode are chips in
   the prompt box (like the official panel) and a cog menu holds the rarer ones: Agents &

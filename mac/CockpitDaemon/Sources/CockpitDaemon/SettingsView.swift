@@ -54,7 +54,7 @@ struct SettingsView: View {
                 TextField("Node.js", text: $nodePath, prompt: Text(supervisor.nodePath ?? "from your login shell"))
                 TextField("daemon.js", text: $scriptPath, prompt: Text(supervisor.scriptPath ?? "bundled in the app"))
                 TextField("Socket", text: $socketPath, prompt: Text(Paths.defaultSocket))
-                Text("The socket must match the extension's tootega.daemon.socketPath setting.")
+                Text("The socket must match the extension's cockpitDaemon.daemon.socketPath setting.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 

@@ -19,7 +19,7 @@ body {
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
 }
 
-/* Accent laranja do Tootega: único ponto de cor fixa (destaque de modais e hints). */
+/* Accent laranja do Cockpit Daemon: único ponto de cor fixa (destaque de modais e hints). */
 :root {
   --tt-accent: #ff8c42;
   --tt-accent-strong: #ff7a1a;

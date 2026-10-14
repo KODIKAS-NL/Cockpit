@@ -57,7 +57,7 @@ export function Controls({
   return (
     <div className="controls">
       {/* Engine first: it decides WHO answers, and the model list only makes sense inside the
-          engine that offers it. Only rendered when there IS a choice — with `tootega.tootegaEnabled`
+          engine that offers it. Only rendered when there IS a choice — with `cockpitDaemon.tootegaEnabled`
           off the host offers Claude alone, and a one-option combo is just noise. */}
       {(config.engines?.length ?? 1) > 1 && (
         <Tooltip className="tt-block" title={t('controls.engine')} text={t('tip.ctrl.engine')}>

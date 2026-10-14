@@ -33,10 +33,10 @@ export function cfg(): vscode.WorkspaceConfiguration {
 }
 
 /**
- * Master switch for the local engine (`tootega.tootegaEnabled`, off by default). Off means
+ * Master switch for the local engine (`cockpitDaemon.tootegaEnabled`, off by default). Off means
  * Tootega does not exist for this installation: nothing spawns `agent.exe`, the engine picker
- * stays hidden and `tootega.engine` is ignored. It is the single place to answer "is the local
- * engine in play?", so no other code has to second-guess a stale `tootega.engine`.
+ * stays hidden and `cockpitDaemon.engine` is ignored. It is the single place to answer "is the local
+ * engine in play?", so no other code has to second-guess a stale `cockpitDaemon.engine`.
  */
 export function tootegaEnabled(): boolean {
   return cfg().get<boolean>('tootegaEnabled', false);

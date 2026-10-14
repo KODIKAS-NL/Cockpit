@@ -181,7 +181,7 @@ final class DaemonSupervisor: ObservableObject {
         }
         guard let script = AppSettings.resolvedScript() else {
             state = .failed("daemon.js not found")
-            note("No daemon script: set one in Settings, or run “Tootega: Install daemon” once in VS Code to create \(Paths.installedScript.path).")
+            note("No daemon script: set one in Settings, or run “Cockpit Daemon: Install daemon” once in VS Code to create \(Paths.installedScript.path).")
             return
         }
         let configuredNode = AppSettings.nodePath.trimmingCharacters(in: .whitespaces)

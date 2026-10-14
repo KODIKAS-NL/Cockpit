@@ -4,7 +4,7 @@
 //
 // Why: it is the CLEAN, structured source from the CLI (no transcript scanning) for data
 // stream-json doesn't carry — lines of code per model, edit decisions.
-// Opt-in (setting tootega.otel.enabled, default OFF): it requires the user to turn on the CLI's
+// Opt-in (setting cockpitDaemon.otel.enabled, default OFF): it requires the user to turn on the CLI's
 // OTEL. When turned on, we inject the export env vars into the host's process.env so
 // the child `claude` processes export here. It NEVER logs credentials.
 import * as http from 'node:http';

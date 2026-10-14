@@ -49,7 +49,7 @@ export interface CliOptions {
   enableTodoTools?: boolean;
   // Forces extended thinking off (MAX_THINKING_TOKENS=0 + alwaysThinkingEnabled:false).
   // Off by default: thinking then follows the user's own Claude Code configuration.
-  // Setting `tootega.thinking` = "off" turns it on.
+  // Setting `cockpitDaemon.thinking` = "off" turns it on.
   forceThinkingOff?: boolean;
 }
 
@@ -529,7 +529,7 @@ export function settingsPayload(opts: CliOptions): Record<string, unknown> | und
  *
  * CLAUDE_CODE_ENABLE_TODO_TOOLS: since CLI 2.1.268 TodoWrite/Task* are only offered up to
  * Opus 4.7 / Sonnet 4.6, so on Opus 5.5 the Tasks panel has nothing to show. Opt-in
- * (`tootega.enableTodoTools`): the CLI dropped them on purpose for the newer models.
+ * (`cockpitDaemon.enableTodoTools`): the CLI dropped them on purpose for the newer models.
  */
 export function engineEnvOverrides(opts: CliOptions): Record<string, string> {
   const env: Record<string, string> = {};
