@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { reducer, initialState, activeTab, sidebarTab } from './store';
 import { TabStrip } from './components/TabStrip';
+import { Icon } from './components/Icon';
 import { ComposerPicks } from './components/ComposerPicks';
 import type {
   HostToWebview,
@@ -655,7 +656,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
           aria-pressed={allExpanded ?? false}
           onClick={onToggleExpandAll}
         >
-          {allExpanded ? '⏶' : '⏷'}
+          <Icon name={allExpanded ? 'collapse' : 'expand'} />
         </button>
         </>
         )}

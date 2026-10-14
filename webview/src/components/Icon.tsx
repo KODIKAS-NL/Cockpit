@@ -12,7 +12,9 @@ export type IconName =
   | 'vault'
   | 'settings'
   | 'plus'
-  | 'trash';
+  | 'trash'
+  | 'expand'
+  | 'collapse';
 
 const PATHS: Record<IconName, ReactElement> = {
   usage: <path d="M3 21h18M6 17v-5M11 17V6M16 17v-8M21 17v-3" />,
@@ -34,6 +36,9 @@ const PATHS: Record<IconName, ReactElement> = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  // Unfold / fold: two chevrons pointing away from / toward each other.
+  expand: <path d="m7 15 5 5 5-5M7 9l5-5 5 5" />,
+  collapse: <path d="m7 20 5-5 5 5M7 4l5 5 5-5" />,
   trash: <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />,
 };
 

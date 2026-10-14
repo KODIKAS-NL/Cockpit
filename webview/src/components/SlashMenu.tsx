@@ -102,7 +102,7 @@ export function SlashMenu({ t, commands, meta, busy, onPick }: Props) {
           disabled={busy}
           aria-label={busy ? t('slash.menu.loading') : t('slash.menu.tip')}
         >
-          {busy ? <CockpitSpinner /> : '/'}
+          {busy ? <CockpitSpinner /> : <span className="slash-glyph">/</span>}
         </button>
       </Tooltip>
       {open && (

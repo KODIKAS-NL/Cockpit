@@ -6227,3 +6227,21 @@ body {
   opacity: 1;
   border-color: var(--vscode-focusBorder, #3794ff);
 }
+
+/* A lone slash looks odd: it gets a box like the official panel's. */
+.slash-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid currentColor;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+.expand-all .hub-icon {
+  width: 14px;
+  height: 14px;
+}
