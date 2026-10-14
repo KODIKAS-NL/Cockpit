@@ -364,6 +364,54 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
     }
   };
 
+  // Export: an icon button in the top bar (a popover with the two ways to export), shown when the
+  // conversation is idle and has something to export.
+  const exportControl =
+    tab?.status !== 'busy' && items.length > 0 ? (
+      <div className="export-ctl">
+        <button
+          type="button"
+          className="tabstrip-btn"
+          title={t('export.link')}
+          aria-label={t('export.link')}
+          aria-expanded={exportMenu}
+          onClick={() => setExportMenu((m) => !m)}
+        >
+          <Icon name="download" />
+        </button>
+        {exportMenu && (
+          <div className="export-pop" role="dialog">
+            <button
+              type="button"
+              className="timeline-export-link"
+              onClick={() => {
+                onExportMd('direct');
+                setExportMenu(false);
+              }}
+            >
+              {t('export.direct')}
+            </button>
+            <button
+              type="button"
+              className="timeline-export-link ai"
+              onClick={() => {
+                onExportMd('ai');
+                setExportMenu(false);
+              }}
+            >
+              {t('export.ai')}
+            </button>
+            <div className="export-note">
+              {t('export.ai.note', tab?.stats?.model || state.config?.model || 'default', state.config?.effort || 'default')}
+            </div>
+            <button type="button" className="export-cancel" onClick={() => setExportMenu(false)}>
+              {t('confirm.cancel')}
+            </button>
+          </div>
+        )}
+      </div>
+    ) : null;
+
   const cliMissing = !state.cli.available;
   // Loading: the host hasn't reported the CLI status yet, OR the tab hasn't
   // received the history yet (reopening a context). Avoids the flash of the banner and the empty
@@ -565,9 +613,11 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
           onClose={(id) => send({ kind: 'closeTab', tabId: id })}
           onOpenEditor={() => send({ kind: 'openEditor' })}
           onRename={(sessionId, name) => send({ kind: 'renameSession', sessionId, name })}
+          trailing={exportControl}
         />
       )}
       <div className="scroll-wrap">
+        {view !== 'sidebar' && exportControl && <div className="export-float">{exportControl}</div>}
         {cliLoading ? (
           <div className="cockpit-loader" role="status" aria-label="Cockpit">
             <div className="cockpit-loader-ring">
@@ -592,50 +642,6 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
             verbosity={state.config?.verbosity}
             compacting={tab?.compacting === true}
           />
-          {/* Link de exportação: SÓ no fim e quando ocioso. Some ao recomeçar um
-              turno (busy) e reaparece no novo fim ao concluir. */}
-          {tab?.status !== 'busy' && items.length > 0 && (
-            <div className="timeline-export">
-              {!exportMenu ? (
-                <button type="button" className="timeline-export-link" onClick={() => setExportMenu(true)}>
-                  {t('export.link')}
-                </button>
-              ) : (
-                <div className="export-menu">
-                  <button
-                    type="button"
-                    className="timeline-export-link"
-                    onClick={() => {
-                      onExportMd('direct');
-                      setExportMenu(false);
-                    }}
-                  >
-                    {t('export.direct')}
-                  </button>
-                  <button
-                    type="button"
-                    className="timeline-export-link ai"
-                    onClick={() => {
-                      onExportMd('ai');
-                      setExportMenu(false);
-                    }}
-                  >
-                    {t('export.ai')}
-                  </button>
-                  <div className="export-note">
-                    {t(
-                      'export.ai.note',
-                      tab?.stats?.model || state.config?.model || 'default',
-                      state.config?.effort || 'default',
-                    )}
-                  </div>
-                  <button type="button" className="export-cancel" onClick={() => setExportMenu(false)}>
-                    {t('confirm.cancel')}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
         <ScrollMarkers scrollRef={scrollRef} items={items} />
         {!atBottom && (

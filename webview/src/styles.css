@@ -6245,3 +6245,42 @@ body {
   width: 14px;
   height: 14px;
 }
+
+/* Export: an icon button in the top bar with a small popover, no big link at the end. */
+.export-ctl {
+  position: relative;
+  display: inline-flex;
+}
+.export-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background, var(--vscode-editor-background)));
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-widget-border, rgba(127, 127, 127, 0.35)));
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  font-size: 12px;
+}
+.export-float {
+  position: absolute;
+  top: 4px;
+  right: 22px;
+  z-index: 9;
+}
+.tabstrip-btn .hub-icon {
+  width: 15px;
+  height: 15px;
+}
+/* Expand / collapse all: the icon centred in its circle. */
+.expand-all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}

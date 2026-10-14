@@ -14,7 +14,8 @@ export type IconName =
   | 'plus'
   | 'trash'
   | 'expand'
-  | 'collapse';
+  | 'collapse'
+  | 'download';
 
 const PATHS: Record<IconName, ReactElement> = {
   usage: <path d="M3 21h18M6 17v-5M11 17V6M16 17v-8M21 17v-3" />,
@@ -29,16 +30,19 @@ const PATHS: Record<IconName, ReactElement> = {
       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
     </>
   ),
+  // A cog (gear outline with a hub), not rays.
   settings: (
     <>
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
       <circle cx="12" cy="12" r="3" />
-      <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" />
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
   // Unfold / fold: two chevrons pointing away from / toward each other.
   expand: <path d="m7 15 5 5 5-5M7 9l5-5 5 5" />,
   collapse: <path d="m7 20 5-5 5 5M7 4l5 5 5-5" />,
+  // Arrow down into a tray: save / export.
+  download: <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
   trash: <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />,
 };
 

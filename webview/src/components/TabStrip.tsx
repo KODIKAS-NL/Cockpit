@@ -1,6 +1,6 @@
 // The conversations living in the side bar chat: a slim strip above the chat to switch between
 // them, start a new one, close one, or move the shown one to an editor tab.
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Translator } from '../i18n';
 import type { TabState } from '../store';
 
@@ -14,9 +14,11 @@ interface Props {
   onOpenEditor: () => void;
   /** Renames the conversation (needs its transcript id, so not before the first message). */
   onRename: (sessionId: string, name: string) => void;
+  /** Extra controls (the export button) shown before the new / move buttons. */
+  trailing?: ReactNode;
 }
 
-export function TabStrip({ t, tabs, activeId, onSwitch, onNew, onClose, onOpenEditor, onRename }: Props) {
+export function TabStrip({ t, tabs, activeId, onSwitch, onNew, onClose, onOpenEditor, onRename, trailing }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const commit = (tb: TabState): void => {
@@ -67,6 +69,7 @@ export function TabStrip({ t, tabs, activeId, onSwitch, onNew, onClose, onOpenEd
           );
         })}
       </div>
+      {trailing}
       <button type="button" className="tabstrip-btn" title={t('tabs.new')} aria-label={t('tabs.new')} onClick={onNew}>
         +
       </button>
