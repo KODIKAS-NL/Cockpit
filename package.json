@@ -1,6 +1,6 @@
 {
   "name": "tootega-cockpit",
-  "displayName": "Tootega Cockpit for Claude Code",
+  "displayName": "Cockpit for Claude Code Daemon",
   "description": "%ext.description%",
   "icon": "media/icon.png",
   "version": "1.0.265",
@@ -214,14 +214,14 @@
         },
         {
           "id": "tootega-chat-fallback",
-          "title": "Claude Cockpit",
+          "title": "Cockpit for Claude Code Daemon",
           "icon": "media/icon.svg"
         }
       ],
       "secondarySidebar": [
         {
           "id": "tootega-chat",
-          "title": "Claude Cockpit",
+          "title": "Cockpit for Claude Code Daemon",
           "icon": "media/icon.svg"
         }
       ]
@@ -237,7 +237,7 @@
       "tootega-chat": [
         {
           "id": "tootega.chat",
-          "name": "Claude Cockpit",
+          "name": "Cockpit for Claude Code Daemon",
           "type": "webview",
           "when": "!tootega.noSecondarySidebar"
         }
@@ -245,7 +245,7 @@
       "tootega-chat-fallback": [
         {
           "id": "tootega.chat",
-          "name": "Claude Cockpit",
+          "name": "Cockpit for Claude Code Daemon",
           "type": "webview",
           "when": "tootega.noSecondarySidebar"
         }
@@ -276,7 +276,7 @@
       }
     ],
     "configuration": {
-      "title": "Tootega Cockpit",
+      "title": "Cockpit for Claude Code Daemon",
       "properties": {
         "tootega.tootegaEnabled": {
           "type": "boolean",

@@ -636,7 +636,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (m) {
       m.title = title;
       const p = this.panels.get(tabId);
-      if (p) p.title = title || 'Tootega Cockpit';
+      if (p) p.title = title || 'Cockpit for Claude Code Daemon';
       this.postTabs();
     }
   }
@@ -824,7 +824,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private updateStatusBar(busy: boolean): void {
     if (!this.statusBar) return;
     this.statusBar.text = busy ? '$(loading~spin) Cockpit' : '$(sparkle) Cockpit';
-    this.statusBar.tooltip = 'Tootega Cockpit';
+    this.statusBar.tooltip = 'Cockpit for Claude Code Daemon';
     this.statusBar.command = 'tootega.open';
     this.statusBar.show();
   }
@@ -906,7 +906,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
     const panel = vscode.window.createWebviewPanel(
       'tootega.cockpit.editor',
-      this.tabMeta.get(tabId)?.title || 'Tootega Cockpit',
+      this.tabMeta.get(tabId)?.title || 'Cockpit for Claude Code Daemon',
       vscode.ViewColumn.Active,
       {
         enableScripts: true,
@@ -1085,7 +1085,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const old = this.panels.get(tabId);
     if (!old) return false;
     const col = old.viewColumn ?? vscode.ViewColumn.Active;
-    const title = this.tabMeta.get(tabId)?.title || 'Tootega Cockpit';
+    const title = this.tabMeta.get(tabId)?.title || 'Cockpit for Claude Code Daemon';
     // Unbinds before disposing: the old one's onDidDispose would erase the records
     // of the tabId that will belong to the new panel.
     this.panels.delete(tabId);
@@ -3576,7 +3576,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   <meta http-equiv="Content-Security-Policy" content="${csp}" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="${styleUri}" rel="stylesheet" />
-  <title>Tootega Cockpit</title>
+  <title>Cockpit for Claude Code Daemon</title>
 </head>
 <body>
   <div id="root"></div>

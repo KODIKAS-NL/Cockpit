@@ -2,7 +2,7 @@
 import type { Strings } from './en';
 
 export const ptBR: Partial<Strings> = {
-  'app.title': 'Tootega Cockpit',
+  'app.title': 'Cockpit for Claude Code Daemon',
   'about.cliUpToDate': 'Claude CLI está atualizado.',
   'about.cliReleaseNotes': 'Ver notas da versão no GitHub',
   'spell.pt': 'Português',
