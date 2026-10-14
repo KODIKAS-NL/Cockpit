@@ -117,7 +117,7 @@ export function HubView({
             <path d="M15.9 8.0 V16.6" strokeWidth="2.1" />
           </g>
         </svg>
-        <span className="hub-title">Tootega Cockpit</span>
+        <span className="hub-title">Cockpit for Claude Code Daemon</span>
         {cockpitVersion && <span className="hub-ver">v{cockpitVersion}</span>}
         {cliVersion ? (
           <>

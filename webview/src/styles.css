@@ -4446,6 +4446,8 @@ body {
 .hub-title {
   font-weight: 700;
   font-size: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .hub-ver {
   font-size: 10.5px;

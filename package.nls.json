@@ -1,6 +1,6 @@
 {
   "ext.description": "Rich GUI for Claude Code: context, cache, cost and account-limit transparency, inline diffs, plan mode and checkpoints — running through the Claude Code CLI.",
-  "view.cockpit.name": "Cockpit",
+  "view.cockpit.name": "Dashboard",
   "cmd.open": "Open Cockpit",
   "cmd.newSession": "New session",
   "cmd.interrupt": "Interrupt agent",

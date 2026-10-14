@@ -209,7 +209,7 @@
       "activitybar": [
         {
           "id": "tootega",
-          "title": "Tootega Cockpit",
+          "title": "Cockpit for Claude Code Daemon",
           "icon": "media/icon.svg"
         },
         {
@@ -230,7 +230,7 @@
       "tootega": [
         {
           "id": "tootega.hub",
-          "name": "Cockpit",
+          "name": "%view.cockpit.name%",
           "type": "webview"
         }
       ],
