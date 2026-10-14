@@ -36,7 +36,8 @@
   "activationEvents": [
     "onStartupFinished",
     "onWebviewPanel:tootega.cockpit.editor",
-    "onView:tootega.hub"
+    "onView:tootega.hub",
+    "onView:tootega.chat"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -166,6 +167,12 @@
         "command": "tootega.daemon.stopSession",
         "title": "%cmd.daemonStopSession%",
         "category": "Tootega"
+      },
+      {
+        "command": "tootega.openInSidebar",
+        "title": "%cmd.openInSidebar%",
+        "category": "Tootega",
+        "icon": "$(layout-sidebar-right)"
       }
     ],
     "menus": {
@@ -179,6 +186,23 @@
           "command": "tootega.reloadView",
           "group": "navigation@1"
         }
+      ],
+      "view/title": [
+        {
+          "command": "tootega.newSession",
+          "group": "navigation@0",
+          "when": "view == tootega.chat"
+        },
+        {
+          "command": "tootega.openInEditor",
+          "group": "navigation@1",
+          "when": "view == tootega.chat"
+        },
+        {
+          "command": "tootega.settings",
+          "group": "navigation@2",
+          "when": "view == tootega.chat"
+        }
       ]
     },
     "viewsContainers": {
@@ -186,6 +210,18 @@
         {
           "id": "tootega",
           "title": "Tootega Cockpit",
+          "icon": "media/icon.svg"
+        },
+        {
+          "id": "tootega-chat-fallback",
+          "title": "Claude Cockpit",
+          "icon": "media/icon.svg"
+        }
+      ],
+      "secondarySidebar": [
+        {
+          "id": "tootega-chat",
+          "title": "Claude Cockpit",
           "icon": "media/icon.svg"
         }
       ]
@@ -196,6 +232,22 @@
           "id": "tootega.hub",
           "name": "Cockpit",
           "type": "webview"
+        }
+      ],
+      "tootega-chat": [
+        {
+          "id": "tootega.chat",
+          "name": "Claude Cockpit",
+          "type": "webview",
+          "when": "!tootega.noSecondarySidebar"
+        }
+      ],
+      "tootega-chat-fallback": [
+        {
+          "id": "tootega.chat",
+          "name": "Claude Cockpit",
+          "type": "webview",
+          "when": "tootega.noSecondarySidebar"
         }
       ]
     },
@@ -209,13 +261,13 @@
         "command": "tootega.newSession",
         "key": "ctrl+alt+n",
         "mac": "cmd+alt+n",
-        "when": "activeWebviewPanelId == tootega.cockpit.editor"
+        "when": "activeWebviewPanelId == tootega.cockpit.editor || tootega.sideBarActive"
       },
       {
         "command": "tootega.reopenClosed",
         "key": "ctrl+shift+t",
         "mac": "cmd+shift+t",
-        "when": "tootega.cockpitActive"
+        "when": "tootega.cockpitActive || tootega.sideBarActive"
       },
       {
         "command": "tootega.interrupt",
@@ -479,6 +531,19 @@
             "%cfg.thinking.off%"
           ],
           "description": "%cfg.thinking%"
+        },
+        "tootega.preferredLocation": {
+          "type": "string",
+          "enum": [
+            "sidebar",
+            "editor"
+          ],
+          "enumDescriptions": [
+            "%cfg.preferredLocation.sidebar%",
+            "%cfg.preferredLocation.editor%"
+          ],
+          "default": "sidebar",
+          "description": "%cfg.preferredLocation%"
         }
       }
     }

@@ -63,9 +63,20 @@ export function activate(context: vscode.ExtensionContext): void {
   // Windows — see Utf8HookInstaller for the why.
   void maybeOfferUtf8Fix(context);
 
+  // The secondary side bar exists from VS Code 1.106; before that the chat view sits in the Activity Bar.
+  {
+    const [major, minor] = vscode.version.split('.').map((n) => parseInt(n, 10));
+    const noSecondary = major < 1 || (major === 1 && minor < 106);
+    void vscode.commands.executeCommand('setContext', 'tootega.noSecondarySidebar', noSecondary);
+  }
+
   context.subscriptions.push(
+    // Opens Cockpit where the user prefers it (tootega.preferredLocation: side bar or editor tab).
     vscode.commands.registerCommand('tootega.open', () => {
-      provider.openInEditor();
+      provider.openPreferred();
+    }),
+    vscode.commands.registerCommand('tootega.openInSidebar', () => {
+      provider.moveToSidebar();
     }),
     // ---- Daemon mode (cockpit-daemon keeps Claude running across windows/devices) ----
     vscode.commands.registerCommand('tootega.daemon.install', async () => {
@@ -202,6 +213,12 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('tootega.clearApiKey', () => {
       void provider.clearApiKey();
     }),
+    // The chat in the side bar (secondary side bar; the Activity Bar on VS Code older than 1.106).
+    vscode.window.registerWebviewViewProvider(
+      'tootega.chat',
+      { resolveWebviewView: (view) => provider.resolveChatView(view) },
+      { webviewOptions: { retainContextWhenHidden: true } },
+    ),
     // Hub na Activity Bar (WebviewView). Mesma bundle, modo 'hub'.
     vscode.window.registerWebviewViewProvider('tootega.hub', provider, {
       webviewOptions: { retainContextWhenHidden: true },

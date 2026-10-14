@@ -58,5 +58,9 @@
   "cfg.daemonIdleStopHours": "Para um processo do Claude mantido pelo daemon depois de tantas horas ocioso, sem janela conectada e sem pergunta pendente (ele retoma na próxima mensagem). 0 = nunca. Aplicado quando o daemon é (re)instalado.",
   "cfg.thinking": "Raciocínio estendido (thinking) dos processos do Claude que o Cockpit inicia.",
   "cfg.thinking.cli": "Segue a sua configuração do Claude Code (padrão).",
-  "cfg.thinking.off": "Força o thinking desligado (MAX_THINKING_TOKENS=0 e alwaysThinkingEnabled=false), como as versões anteriores do Cockpit sempre faziam."
+  "cfg.thinking.off": "Força o thinking desligado (MAX_THINKING_TOKENS=0 e alwaysThinkingEnabled=false), como as versões anteriores do Cockpit sempre faziam.",
+  "cmd.openInSidebar": "Mover para o chat da barra lateral",
+  "cfg.preferredLocation": "Onde as novas conversas abrem: no chat da barra lateral (como a extensão oficial) ou em uma aba do editor. Uma conversa fica em um lugar por vez; \"Abrir no editor\" e \"Mover para o chat da barra lateral\" a movem.",
+  "cfg.preferredLocation.sidebar": "Chat da barra lateral (direita)",
+  "cfg.preferredLocation.editor": "Aba do editor"
 }

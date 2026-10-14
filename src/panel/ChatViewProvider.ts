@@ -72,6 +72,7 @@ import { CredentialsStore } from '../secrets/CredentialsStore';
 import { buildSystemPrompt } from '../cli/SystemPromptTemplate';
 import type { LimitWindow, HostToWebview, WebviewToHost, TabInfo, UsageBucket, ScopedBucket, VoiceReplacement, ModelMeta, SkillOverride, MentionItem } from '../../shared/protocol';
 import { Session, type SessionHooks } from '../session/Session';
+import { chooseLocation, type Surface } from './location';
 import { resolveLocale } from '../i18n/host';
 import { researchCommands } from '../cli/SlashCommandResearch';
 import { getLatestCliVersion } from '../cli/CliVersion';
@@ -119,6 +120,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private panels = new Map<string, vscode.WebviewPanel>();
   private webviewSession = new Map<vscode.Webview, string>();
   private hubView?: vscode.WebviewView;
+  // The chat in the side bar (secondary side bar, or the Activity Bar on older VS Code): one
+  // long-lived view that shows one conversation at a time. `sidebarTabs` are the conversations
+  // that live there, `chatTab` the one it shows. A conversation is in the side bar or in an
+  // editor tab, never both (see location.ts).
+  private chatView?: vscode.WebviewView;
+  private chatTab?: string;
+  private sidebarTabs = new Set<string>();
+  /** Tabs whose panel is being closed on purpose (moved to the side bar), not by the user. */
+  private movingTabs = new Set<string>();
 
   // Render watchdog: the webview process (renderer) can die (VSCode GPU
   // bug) — the screen goes blank but the host stays alive (stream/stats/timeline
@@ -600,7 +610,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.sessions.delete(tabId);
     this.tabMeta.delete(tabId);
     this.tabOrder = this.tabOrder.filter((x) => x !== tabId);
-    if (this.activeTab === tabId) this.activeTab = this.tabOrder[this.tabOrder.length - 1] ?? '';
+    this.sidebarTabs.delete(tabId);
+    if (this.chatTab === tabId) this.chatTab = [...this.sidebarTabs].pop();
+    if (this.activeTab === tabId) this.activeTab = this.chatTab ?? this.tabOrder[this.tabOrder.length - 1] ?? '';
+    // The side bar chat always has a conversation to type into.
+    if (this.chatView && this.sidebarTabs.size === 0) this.ensureChatTab();
     this.postTabs();
   }
 
@@ -636,9 +650,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         title: this.tabMeta.get(id)?.title || '',
         status: this.tabMeta.get(id)?.status || 'idle',
         sessionId: s?.sessionId ?? s?.resumeId,
+        surface: this.panels.has(id) ? 'editor' : this.sidebarTabs.has(id) ? 'sidebar' : undefined,
       };
     });
-    this.post({ kind: 'tabs', tabs, activeTab: this.activeTab });
+    this.post({ kind: 'tabs', tabs, activeTab: this.activeTab, chatTab: this.chatTab });
   }
 
   /**
@@ -810,14 +825,70 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.statusBar.show();
   }
 
-  /** Opens (or focuses) the active context as a WebviewPanel in the editor. */
+  /** Opens the active conversation in an editor tab (moving it out of the side bar if needed). */
   openInEditor(): void {
+    const id = this.activeTab && this.sessions.has(this.activeTab) ? this.activeTab : this.createTab();
+    this.openSessionPanel(id, 'editor');
+  }
+
+  /** Opens the active conversation where the user prefers it (side bar by default). */
+  openPreferred(): void {
     const id = this.activeTab && this.sessions.has(this.activeTab) ? this.activeTab : this.createTab();
     this.openSessionPanel(id);
   }
 
-  /** Opens (or focuses) a session's panel. Each context = one WebviewPanel. */
-  private openSessionPanel(tabId: string): void {
+  /** Moves the active conversation into the side bar chat (closing its editor tab). */
+  moveToSidebar(): void {
+    const id = this.activeTab && this.sessions.has(this.activeTab) ? this.activeTab : this.createTab();
+    this.openSessionPanel(id, 'sidebar');
+  }
+
+  /** Shows the side bar chat (focus), for the command and the status bar. */
+  focusSidebar(): void {
+    void vscode.commands.executeCommand('tootega.chat.focus');
+  }
+
+  private preferredLocation(): Surface {
+    return this.cfg().get<string>('preferredLocation', 'sidebar') === 'editor' ? 'editor' : 'sidebar';
+  }
+
+  /**
+   * Shows a conversation in the side bar chat. One that has an editor tab is moved: the tab is
+   * closed (not recorded as "closed by the user") and the chat repaints from the transcript.
+   */
+  private showInSidebar(tabId: string): void {
+    const panel = this.panels.get(tabId);
+    if (panel) {
+      this.movingTabs.add(tabId);
+      try {
+        panel.dispose();
+      } catch {
+        this.movingTabs.delete(tabId);
+      }
+    }
+    this.sidebarTabs.add(tabId);
+    this.chatTab = tabId;
+    this.setActive(tabId);
+    this.postTabs();
+    this.focusSidebar();
+  }
+
+  /** Opens (or focuses) a conversation where it belongs: its editor tab or the side bar chat. */
+  private openSessionPanel(tabId: string, explicit?: Surface): void {
+    const where = chooseLocation({
+      preferred: this.preferredLocation(),
+      explicit,
+      inEditor: this.panels.has(tabId),
+      inSidebar: this.sidebarTabs.has(tabId),
+    });
+    if (where === 'sidebar') {
+      this.showInSidebar(tabId);
+      return;
+    }
+    // Editor: a conversation coming from the side bar leaves it.
+    if (this.sidebarTabs.delete(tabId)) {
+      if (this.chatTab === tabId) this.chatTab = [...this.sidebarTabs][0];
+    }
     const existing = this.panels.get(tabId);
     if (existing) {
       try {
@@ -846,6 +917,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     panel.iconPath = vscode.Uri.joinPath(this.extensionUri, 'media', 'icon-color.svg');
     this.bindPanel(panel, tabId);
     this.setActive(tabId);
+    this.postTabs();
   }
 
   /** Binds a WebviewPanel to a specific session. */
@@ -887,10 +959,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     panel.onDidDispose(() => {
       // A genuine close by the user (not a watchdog recreate): the map still
       // points to THIS panel. Stored for "reopen closed session".
-      if (this.panels.get(tabId) === panel) {
+      if (this.panels.get(tabId) === panel && !this.movingTabs.has(tabId)) {
         const s = this.sessions.get(tabId);
         this.lastClosed = { tabId, sessionId: s?.sessionId ?? s?.resumeId };
       }
+      this.movingTabs.delete(tabId);
       this.panels.delete(tabId);
       this.webviewSession.delete(wv);
       this.lastBeat.delete(tabId);
@@ -898,6 +971,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.updateReloadBar();
       // Doesn't read panel.active (the getter throws post-dispose): clears the context key directly.
       void vscode.commands.executeCommand('setContext', 'tootega.cockpitActive', false);
+      this.postTabs(); // the conversation's surface changed (the side bar tab strip follows)
       sub.dispose();
       vs.dispose();
     });
@@ -2200,6 +2274,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (!this.cfg().get<boolean>('notifyOnComplete', true)) return;
     // Notifies when no chat panel is visible.
     for (const p of this.panels.values()) if (p.visible) return;
+    if (this.chatView?.visible) return;
     void vscode.window.showInformationMessage(vscode.l10n.t('Claude finished responding.'));
   }
 
@@ -2681,15 +2756,35 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       if (g && Date.now() - g.at > RELOAD_COOLDOWN_MS) this.reloadGuard.delete(sk); // recuperou: zera o cap
     }
     // Origin session: chat panel -> its session; hub/unbound -> the active one.
-    const bound = webview ? this.webviewSession.get(webview) : undefined;
+    const bound = webview
+      ? this.webviewSession.get(webview) ?? (webview === this.chatView?.webview ? this.chatTab : undefined)
+      : undefined;
     const srcTab = bound && this.sessions.has(bound) ? bound : this.activeTab;
     const srcSession = (): Session => this.sessions.get(srcTab) ?? this.active();
+    // The side bar chat acts on the conversation it shows: make that the active one first, so the
+    // parts of the host that follow the active tab (combos, stats) agree with it.
+    if (
+      webview &&
+      webview === this.chatView?.webview &&
+      bound &&
+      this.sessions.has(bound) &&
+      this.activeTab !== bound &&
+      m.kind !== 'heartbeat' &&
+      m.kind !== 'init' &&
+      m.kind !== 'switchTab'
+    ) {
+      this.setActive(bound);
+    }
     switch (m.kind) {
       case 'heartbeat':
         this.startWatchdog(); // idempotente: garante o checador rodando
         break;
       case 'init':
         if (this.tabOrder.length === 0) this.createTab();
+        if (webview && webview === this.chatView?.webview) {
+          this.ensureChatTab();
+          if (this.chatTab) this.primeCommands(this.chatTab);
+        }
         this.startWatchdog();
         this.post({ kind: 'ready', locale: resolveLocale() });
         this.sendConfig();
@@ -2905,6 +3000,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.closeTab(m.tabId);
         break;
       case 'switchTab':
+        if (webview && webview === this.chatView?.webview && this.sidebarTabs.has(m.tabId)) this.chatTab = m.tabId;
         this.setActive(m.tabId);
         break;
       case 'openSettings':
@@ -3425,6 +3521,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const payload = tab ? { ...msg, tab } : msg;
     // The hub receives everything (it mirrors the global state + the active session).
     this.trySend(this.hubView?.webview, payload);
+    // The side bar chat keeps every conversation's state too (it can show any of its tabs).
+    this.trySend(this.chatView?.webview, payload);
     if (tab) {
       // Message from one session: only that session's panel.
       this.trySend(this.panels.get(tab)?.webview, payload);
@@ -3443,7 +3541,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private getHtml(webview: vscode.Webview, mode: 'chat' | 'hub' = 'chat', sessionTab?: string): string {
+  private getHtml(webview: vscode.Webview, mode: 'chat' | 'hub' | 'sidebar' = 'chat', sessionTab?: string): string {
     const base = vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview');
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(base, 'main.js'));
     const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(base, 'main.css'));
@@ -3476,6 +3574,46 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /** Provider da view na Activity Bar (hub). Mesma bundle, modo 'hub'. */
+  /** The side bar chat needs a conversation to show: the active one if it has no editor tab. */
+  private ensureChatTab(): void {
+    if (this.chatTab && this.sessions.has(this.chatTab) && this.sidebarTabs.has(this.chatTab)) return;
+    const first = [...this.sidebarTabs].find((id) => this.sessions.has(id));
+    const candidate =
+      first ?? (this.activeTab && this.sessions.has(this.activeTab) && !this.panels.has(this.activeTab) ? this.activeTab : undefined);
+    const id = candidate ?? this.createTab();
+    this.sidebarTabs.add(id);
+    this.chatTab = id;
+    if (this.activeTab !== id) this.activeTab = id;
+  }
+
+  /** The side bar chat view: same webview app, `sidebar` mode (a chat that can switch tabs). */
+  resolveChatView(view: vscode.WebviewView): void {
+    view.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [
+        vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview'),
+        vscode.Uri.joinPath(this.extensionUri, 'media'),
+      ],
+    };
+    view.webview.html = this.getHtml(view.webview, 'sidebar');
+    this.chatView = view;
+    const setKey = (): void => {
+      void vscode.commands.executeCommand('setContext', 'tootega.sideBarActive', view.visible);
+    };
+    setKey();
+    const sub = view.webview.onDidReceiveMessage((m: WebviewToHost) => this.onWebviewMessage(m, view.webview));
+    const visSub = view.onDidChangeVisibility(() => {
+      setKey();
+      if (view.visible && this.chatTab) this.setActive(this.chatTab);
+    });
+    view.onDidDispose(() => {
+      sub.dispose();
+      visSub.dispose();
+      void vscode.commands.executeCommand('setContext', 'tootega.sideBarActive', false);
+      if (this.chatView === view) this.chatView = undefined;
+    });
+  }
+
   resolveWebviewView(view: vscode.WebviewView): void {
     view.webview.options = {
       enableScripts: true,

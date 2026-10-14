@@ -7,6 +7,19 @@ and the project adopts semantic versioning.
 ## [Unreleased]
 
 ### Added
+- **Side bar chat.** The conversation can now run in a side bar next to the code, like the
+  official Claude Code extension: a chat view in the secondary side bar (the Activity Bar on VS
+  Code older than 1.106) with a strip of conversation tabs, new, close, and "open in an editor
+  tab". `tootega.preferredLocation` (`sidebar` by default, or `editor`) says where new
+  conversations open. A conversation is in one place at a time, never both: **Open in editor**
+  and **Move to the side bar chat** move it, the daemon keeps it running meanwhile.
+- **Cockpit's own Claude CLI.** When the CLI is missing, Cockpit offers to download its own copy
+  (about 230 MB) from Anthropic's release server, checked against the published SHA-256, into
+  `~/.cockpit/claude` (the last two versions are kept, the active one has a stable path the
+  daemon can rely on). Resolution order: `tootega.claudePath` if you set it, that copy, `PATH`,
+  `~/.local/bin`. The update button and the "outdated" chip use the same release server. The
+  official installer is still offered as an alternative. All platforms of the official installers
+  are mapped; only macOS has been run on a real machine so far.
 - **Daemon mode: conversations that outlive the window.** Claude (the Claude engine; the
   Tootega engine stays local) always runs in cockpit-daemon, a background service on the same machine, instead of as a
   child of the VS Code window. Closing the window or letting the laptop sleep no longer ends

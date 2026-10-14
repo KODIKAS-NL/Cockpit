@@ -37,6 +37,7 @@ export interface TabState {
   remotePhase?: 'connecting' | 'active' | 'failed' | 'cloud' | 'offline';
   compacting?: boolean; // o CLI está condensando o contexto agora
   sessionId?: string; // id do transcript (casa com SessionInfo.id); vem do 'tabs'
+  surface?: 'sidebar' | 'editor'; // where the host shows this conversation; vem do 'tabs'
   session?: { sessionId: string; model?: string; cwd?: string; mode?: string };
   items: TimelineItem[];
   historyLoaded?: boolean; // 1ª mensagem 'history' já chegou (timeline pronta p/ pintar)
@@ -53,6 +54,8 @@ export interface TabState {
 
 export interface UiState {
   locale: string;
+  /** The conversation the side bar chat shows (from the host's `tabs` message). */
+  chatTab?: string;
   /** Daemon mode status from the host (absent until the first report). */
   daemon?: { enabled: boolean; connected: boolean; pid?: number };
   cli: {
@@ -92,6 +95,14 @@ export const initialState: UiState = {
 
 function emptyTab(id: string, title = '', status: TabState['status'] = 'idle'): TabState {
   return { id, title, status, items: [], todos: [], slashCommands: [] };
+}
+
+/** The conversation the side bar chat shows: the host's choice, else the first one living there. */
+export function sidebarTab(state: UiState): TabState | undefined {
+  return (
+    state.tabs.find((t) => t.id === state.chatTab && t.surface === 'sidebar') ??
+    state.tabs.find((t) => t.surface === 'sidebar')
+  );
 }
 
 /** Active tab (or undefined when there is none yet). */
@@ -206,10 +217,10 @@ export function reducer(state: UiState, action: Action): UiState {
       const tabs = msg.tabs.map((info) => {
         const prev = existing.get(info.id);
         return prev
-          ? { ...prev, title: info.title, status: info.status, sessionId: info.sessionId }
-          : { ...emptyTab(info.id, info.title, info.status), sessionId: info.sessionId };
+          ? { ...prev, title: info.title, status: info.status, sessionId: info.sessionId, surface: info.surface }
+          : { ...emptyTab(info.id, info.title, info.status), sessionId: info.sessionId, surface: info.surface };
       });
-      return { ...state, tabs, activeTab: msg.activeTab };
+      return { ...state, tabs, activeTab: msg.activeTab, chatTab: msg.chatTab };
     }
 
     // --- Per tab ---

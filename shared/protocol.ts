@@ -432,6 +432,8 @@ export interface TabInfo {
   title: string;
   status: 'idle' | 'busy' | 'error';
   sessionId?: string; // the session's transcript id (matches SessionInfo.id)
+  /** Where the conversation is shown: the side bar chat or an editor tab (none = neither yet). */
+  surface?: 'sidebar' | 'editor';
 }
 
 // Metadata of a vault credential (it never carries the secret value).
@@ -459,7 +461,7 @@ type HostMsg =
   | { kind: 'ready'; locale: string }
   /** Daemon mode: whether it is on, and whether the daemon answers on its socket. */
   | { kind: 'daemonStatus'; enabled: boolean; connected: boolean; pid?: number }
-  | { kind: 'tabs'; tabs: TabInfo[]; activeTab: string }
+  | { kind: 'tabs'; tabs: TabInfo[]; activeTab: string; chatTab?: string }
   | { kind: 'config'; config: SessionConfig }
   | {
       kind: 'cliStatus';

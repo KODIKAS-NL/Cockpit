@@ -58,5 +58,9 @@
   "cfg.daemonIdleStopHours": "Stop a daemon-owned Claude process after this many hours idle with no window attached and no prompt waiting (it resumes on the next message). 0 = never. Applied when the daemon is (re)installed.",
   "cfg.thinking": "Extended thinking for the Claude processes Cockpit starts.",
   "cfg.thinking.cli": "Follow your Claude Code configuration (default).",
-  "cfg.thinking.off": "Force thinking off (MAX_THINKING_TOKENS=0 and alwaysThinkingEnabled=false), as earlier Cockpit versions always did."
+  "cfg.thinking.off": "Force thinking off (MAX_THINKING_TOKENS=0 and alwaysThinkingEnabled=false), as earlier Cockpit versions always did.",
+  "cmd.openInSidebar": "Move to the side bar chat",
+  "cfg.preferredLocation": "Where new conversations open: the side bar chat (like the official extension) or an editor tab. A conversation is in one place at a time; \"Open in editor\" and \"Move to the side bar chat\" move it.",
+  "cfg.preferredLocation.sidebar": "Side bar chat (right)",
+  "cfg.preferredLocation.editor": "Editor tab"
 }

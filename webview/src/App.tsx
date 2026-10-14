@@ -7,7 +7,8 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
-import { reducer, initialState, activeTab } from './store';
+import { reducer, initialState, activeTab, sidebarTab } from './store';
+import { TabStrip } from './components/TabStrip';
 import type {
   HostToWebview,
   ImageAttachment,
@@ -45,7 +46,7 @@ import { resetSpell } from './spell/spell';
 const NO_TODOS: never[] = [];
 const NO_SLASH: never[] = [];
 
-export function App({ view, sessionId }: { view: 'chat' | 'hub'; sessionId: string }) {
+export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; sessionId: string }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [confirmDelete, setConfirmDelete] = useState<SessionInfo | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
@@ -88,8 +89,13 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub'; sessionId: stri
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Chat: renders the injected session (one webview per context). Hub: the active one.
+  // Sidebar: the conversation the host put in the side bar chat (it switches between its own).
   const tab =
-    view === 'hub' ? activeTab(state) : state.tabs.find((tb) => tb.id === sessionId) ?? activeTab(state);
+    view === 'hub'
+      ? activeTab(state)
+      : view === 'sidebar'
+        ? sidebarTab(state)
+        : state.tabs.find((tb) => tb.id === sessionId) ?? activeTab(state);
   const items = tab?.items ?? [];
 
   // Ctrl+F: opens the search bar (chat only, not the hub).
@@ -433,10 +439,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub'; sessionId: stri
                 .map((tb) => tb.sessionId as string),
             )
           }
-          onNewSession={() => {
-            send({ kind: 'newTab' });
-            send({ kind: 'openEditor' });
-          }}
+          onNewSession={() => send({ kind: 'newTab' })}
           onOpenFolder={(path) => send({ kind: 'openFolder', path })}
           onSettings={onSettings}
           onUsage={onUsage}
@@ -455,10 +458,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub'; sessionId: stri
           onPermission={onPermissionMode}
           onAllowAgents={onAllowAgents}
           onEngine={onEngine}
-          onResume={(id) => {
-            onResume(id);
-            send({ kind: 'openEditor' });
-          }}
+          onResume={onResume}
           onReload={(id) => send({ kind: 'reloadSession', sessionId: id })}
           onRemote={(id) => send({ kind: 'remoteControl', sessionId: id })}
           onDelete={onAskDelete}
@@ -561,6 +561,17 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub'; sessionId: stri
         />
       )}
 
+      {view === 'sidebar' && (
+        <TabStrip
+          t={t}
+          tabs={state.tabs.filter((tb) => tb.surface === 'sidebar')}
+          activeId={tab?.id}
+          onSwitch={(id) => send({ kind: 'switchTab', tabId: id })}
+          onNew={() => send({ kind: 'newTab' })}
+          onClose={(id) => send({ kind: 'closeTab', tabId: id })}
+          onOpenEditor={() => send({ kind: 'openEditor' })}
+        />
+      )}
       <div className="scroll-wrap">
         {cliLoading ? (
           <div className="cockpit-loader" role="status" aria-label="Cockpit">

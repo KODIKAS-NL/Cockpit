@@ -237,6 +237,29 @@ run until it is up; there is no local fallback. The Tootega engine is not affect
 | `$TMPDIR/cockpit-daemon-*/` | daemon | Per-process files the CLI reads (`--settings`, appended system prompt). Removed when the process exits. |
 | `~/.claude/projects/…/*.jsonl` | Claude CLI | The transcripts, as always. |
 
+## Side bar chat and where a conversation lives
+
+The chat can run in a side bar (view `tootega.chat`, in the secondary side bar from VS Code 1.106,
+else in the Activity Bar) next to the dashboard (`tootega.hub`). Both are windows onto the same
+host state; the daemon is what keeps the Claude processes alive regardless of which surface shows
+them. A conversation lives in **one** place, the side bar chat or an editor tab: opening one that
+already has an editor tab reveals that tab, and only the explicit commands (**Open in editor**,
+**Move to the side bar chat**) move it. `tootega.preferredLocation` decides where a conversation
+with no place yet opens. The rule is `src/panel/location.ts`.
+
+## Roadmap
+
+Next, in this order:
+
+1. **Narrow daemon operations**, the agreed split of what moves into the daemon: the CLI version,
+   `auth status`, `plugin ...`/MCP calls and the cache keep-alive for closed conversations, so
+   the dashboard no longer guesses from the window's PATH and a thin client without `claude`
+   works. Explicitly not a generic "run this command" operation.
+2. **Validate the managed CLI on Linux and Windows** on real machines (the download and the
+   platform mapping exist and are unit-tested against a fake server; only macOS has been run).
+3. **Daemon service install for Linux and Windows** (a systemd user unit, a scheduled task or
+   service) instead of a detached process that does not survive a reboot.
+
 ## Wire protocol
 
 Newline-delimited JSON over the Unix socket. Types: `shared/daemon.ts`.

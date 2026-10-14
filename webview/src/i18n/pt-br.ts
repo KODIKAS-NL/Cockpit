@@ -31,6 +31,7 @@ export const ptBR: Partial<Strings> = {
     'Este CLI é anterior à {0}. Interromper o agente pode falhar silenciosamente. Atualize com: claude update',
   'about.update': 'Atualizar',
   'about.install': 'Instalar',
+  'tabs.openEditor': 'Abrir em uma aba do editor',
   'daemon.label': 'Daemon',
   'daemon.connected': 'conectado',
   'daemon.disconnected': 'desconectado',

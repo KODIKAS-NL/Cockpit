@@ -29,6 +29,7 @@ export const en = {
     'This CLI is older than {0}. Interrupting the agent may silently fail. Update with: claude update',
   'about.update': 'Update',
   'about.install': 'Install',
+  'tabs.openEditor': 'Open in an editor tab',
   'daemon.label': 'Daemon',
   'daemon.connected': 'connected',
   'daemon.disconnected': 'disconnected',

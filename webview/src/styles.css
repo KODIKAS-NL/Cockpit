@@ -5862,3 +5862,85 @@ body {
   align-items: center;
   gap: 8px;
 }
+
+/* Side bar chat: the strip of conversations above the chat. */
+.tabstrip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(127, 127, 127, 0.25));
+  flex: 0 0 auto;
+}
+.tabstrip-tabs {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabstrip-tab {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 160px;
+  border-radius: 6px;
+  color: var(--vscode-foreground);
+  opacity: 0.7;
+}
+.tabstrip-tab.active {
+  opacity: 1;
+  background: color-mix(in srgb, var(--vscode-foreground) 10%, transparent);
+}
+.tabstrip-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 3px 4px 3px 8px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tabstrip-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tabstrip-busy {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--vscode-charts-yellow, #d29922);
+}
+.tabstrip-close,
+.tabstrip-btn {
+  background: none;
+  border: none;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  border-radius: 5px;
+  line-height: 1;
+}
+.tabstrip-close {
+  padding: 2px 5px;
+  font-size: 14px;
+  opacity: 0.5;
+}
+.tabstrip-btn {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  font-size: 14px;
+  opacity: 0.8;
+}
+.tabstrip-close:hover,
+.tabstrip-btn:hover {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.15));
+}

@@ -758,6 +758,15 @@ Architecture, operations and troubleshooting: [Docs/daemon-mode.md](Docs/daemon-
 On a Mac you can run the daemon from a menu bar app instead of the launchd agent, with a
 live log and Start/Stop/Restart: see [mac/CockpitDaemon](mac/CockpitDaemon/README.md).
 
+Where the chat runs: by default in the **side bar** (the secondary side bar on the right, like the
+official extension), with a strip of conversation tabs. Set `tootega.preferredLocation` to `editor`
+to open new conversations in editor tabs instead. A conversation is in one place at a time:
+**Open in editor** and **Move to the side bar chat** move it.
+
+Your own Claude CLI: if `claude` is not found, Cockpit offers to download its own copy into
+`~/.cockpit/claude` (verified against Anthropic's published checksum). A path you set in
+`tootega.claudePath` always wins; then that copy, `PATH` and `~/.local/bin`.
+
 Commands: **Install daemon**, **Restart daemon** (stops running turns), **Show daemon log**
 (`~/.cockpit/daemon.log`), **Stop this session's process in the daemon**.
 
