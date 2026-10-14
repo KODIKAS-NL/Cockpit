@@ -5795,3 +5795,26 @@ body {
   border-radius: 14px;
   padding: 3px 14px;
 }
+
+/* Narrow sidebar: the saved-contexts header and the stat rows wrap cleanly instead of
+   overlapping (New session / Delete all) or breaking mid-value (Peak ... cache). */
+.ctx-panel-grid-head {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.ctx-panel-grid-head .col-title,
+.ctx-link {
+  white-space: nowrap;
+}
+.hub-del-all {
+  margin-left: 0;
+}
+.stat-row {
+  gap: 12px;
+}
+.stat-row > :first-child {
+  flex: 0 0 auto;
+}
+.stat-row > :last-child {
+  text-align: right;
+}
