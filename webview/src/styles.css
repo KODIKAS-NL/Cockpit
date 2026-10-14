@@ -5963,3 +5963,41 @@ body {
   opacity: 1;
   background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.15));
 }
+
+/* Popovers in the quieter look: the editor's own hover widget colors, a plain bold title and
+   no orange header or glow (the accent stays only on the values that ask for it). */
+.tt-pop {
+  background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background, var(--vscode-editor-background)));
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-widget-border, rgba(127, 127, 127, 0.35)));
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  font-size: 12px;
+}
+.tt-title {
+  padding: 7px 10px 0;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+  background: none;
+}
+.tt-text {
+  padding: 5px 10px 8px;
+  opacity: 0.9;
+}
+.tt-rows {
+  padding: 5px 10px 8px;
+}
+.tt-k {
+  opacity: 0.6;
+}
+.tt-v.accent {
+  color: var(--vscode-textLink-foreground);
+}
+.tt-meta {
+  border-top-color: var(--vscode-editorHoverWidget-border, rgba(127, 127, 127, 0.3));
+}
+.tt-fact-sep {
+  background: var(--vscode-editorHoverWidget-border, rgba(127, 127, 127, 0.3));
+}
+.tt-fact-v::before {
+  box-shadow: none;
+}
