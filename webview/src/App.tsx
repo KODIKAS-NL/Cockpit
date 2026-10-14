@@ -360,7 +360,11 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub'; sessionId: stri
   // Loading: the host hasn't reported the CLI status yet, OR the tab hasn't
   // received the history yet (reopening a context). Avoids the flash of the banner and the empty
   // timeline — it shows the Cockpit loader. The banner only after the CLI status.
-  const cliLoading = !state.cli.checked || (!!tab?.sessionId && !tab.historyLoaded);
+  // A tab that already shows messages is not waiting for anything: a brand-new session gets its
+  // id (and so a `tabs` update) after its first turn, and its empty history message can arrive
+  // before the panel is mounted and be dropped; the loader would then cover a live conversation.
+  const cliLoading =
+    !state.cli.checked || (!!tab?.sessionId && !tab.historyLoaded && tab.items.length === 0);
 
   // Vault modal — shared between Hub and Chat. In the Hub there is no composer, so
   // "use" copies the value to the clipboard; in the Chat it injects into the composer (the

@@ -590,7 +590,7 @@ function ClaudeTurn({
     <div className="bubble assistant turn">
       <Tooltip className="tt-block" focusable title={t('role.assistant')} rows={turnRows(items, t)}>
         <div className="role role-assistant">
-          {t('role.assistant')}
+          <span className="role-name">{t('role.assistant')}</span>
           {active && <span className="caret">▋</span>}
           {canceled && <span className="canceled-tag">{t('turn.canceled')}</span>}
         </div>
@@ -692,7 +692,7 @@ function UserBubble({
     >
       <div className={`bubble user ${pinned ? 'pinned' : ''}`} id={`msg-${item.id}`}>
         <div className="role role-user">
-          <span>{userName || t('role.user')}</span>
+          <span className="role-name">{userName || t('role.user')}</span>
           {item.ts && <span className="bubble-time">{fmtStamp(item.ts)}</span>}
           {item.text && <CopyButton text={item.text} t={t} />}
           {collapsible && (

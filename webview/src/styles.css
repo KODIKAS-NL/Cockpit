@@ -3362,7 +3362,9 @@ body {
   display: flex;
   gap: 9px;
   align-items: flex-start;
-  background: var(--vscode-terminal-background, #0d0d0d);
+  /* The terminal tokens are not always exposed to webviews, and a light theme gave a dark
+     background (fallback) under dark text. Both colors come from the editor, which always pairs. */
+  background: var(--vscode-editor-background, #1e1e1e);
   border: 1px solid var(--vscode-panel-border, #333);
   border-radius: 8px;
   padding: 11px 13px;
@@ -3382,7 +3384,7 @@ body {
 .perm-term-cmd {
   white-space: pre-wrap;
   word-break: break-word;
-  color: var(--vscode-terminal-foreground, var(--vscode-foreground));
+  color: var(--vscode-editor-foreground, var(--vscode-foreground));
 }
 
 /* URL */
@@ -5665,4 +5667,46 @@ body {
 /* Daemon mode: session kept alive by cockpit-daemon. */
 .ctx-card-live {
   color: var(--vscode-charts-green, #3fb950);
+}
+
+/* Conversation look closer to the official Claude Code panel: no author labels, the reply is
+   plain text across the full width, the prompt a quiet rounded box. The names stay in the DOM
+   (screen readers, tooltips); only the row that carried them goes away. */
+.bubble .role-name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.bubble.assistant {
+  width: 100%;
+}
+/* The assistant header only shows while it has something to say (typing caret, canceled). */
+.bubble .role.role-assistant:not(:has(.caret, .canceled-tag)) {
+  display: none;
+}
+.bubble.user {
+  position: relative;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, rgba(127, 127, 127, 0.25)));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
+  box-shadow: none;
+}
+/* Time, copy and rewind: out of the text's way until the prompt is hovered. */
+.bubble.user .role {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  margin: 0;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.bubble.user:hover .role,
+.bubble.user:focus-within .role {
+  opacity: 1;
 }
