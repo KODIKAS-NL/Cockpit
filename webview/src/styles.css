@@ -5696,17 +5696,103 @@ body {
   background: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
   box-shadow: none;
 }
-/* Time, copy and rewind: out of the text's way until the prompt is hovered. */
+/* The time sits above the box, right-aligned; copy and rewind show on hover (their own rule). */
+.bubble.user {
+  margin-top: 22px;
+  background: var(--vscode-input-background, var(--vscode-editor-background));
+}
 .bubble.user .role {
   position: absolute;
-  top: 4px;
-  right: 8px;
+  top: -19px;
+  right: 2px;
   margin: 0;
   gap: 2px;
-  opacity: 0;
-  transition: opacity 0.12s;
 }
-.bubble.user:hover .role,
-.bubble.user:focus-within .role {
-  opacity: 1;
+.bubble.user .bubble-time {
+  margin-right: 0;
+}
+/* Replies are indented a little under the prompt box, like the official panel. */
+.bubble.assistant {
+  padding-left: 14px;
+}
+/* Tool calls: a status dot in front of the name (green done, yellow running, red failed). */
+.tool-card.busy,
+.tool-card.err {
+  box-shadow: none;
+}
+.tool-head::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-left: -14px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--vscode-charts-green, #3fb950);
+}
+.tool-card.busy .tool-head::before {
+  background: var(--vscode-charts-yellow, #d29922);
+}
+.tool-card.err .tool-head::before {
+  background: var(--vscode-charts-red, #f85149);
+}
+
+/* Composer closer to the official panel: one rounded card, the text on top and a slim toolbar
+   under it (small icon buttons on the left, Send/Stop as a round button on the right). */
+.composer {
+  border-top: none;
+  padding: 8px 10px 10px;
+}
+.composer-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border, rgba(127, 127, 127, 0.4)));
+  border-radius: 10px;
+  background: var(--vscode-input-background);
+}
+.composer-row:focus-within {
+  border-color: var(--vscode-focusBorder, #3794ff);
+}
+/* While the agent works the card turns to the stop color, as in the official panel. */
+.composer-row:has(.composer-side .btn.stop) {
+  border-color: var(--vscode-charts-red, #c0392b);
+}
+.composer-row .composer-input-wrap,
+.composer-row .composer-input-wrap:focus-within {
+  border: none;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  outline: none;
+}
+.composer-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  width: auto;
+  padding: 4px 6px 6px;
+  border-top: 1px solid color-mix(in srgb, var(--vscode-foreground) 10%, transparent);
+}
+.composer-side .composer-side-btn {
+  width: 28px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 15px;
+}
+.composer-side .composer-side-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.15));
+}
+.composer-side .composer-side-btn.on {
+  background: color-mix(in srgb, var(--vscode-focusBorder, #3794ff) 15%, transparent);
+}
+.composer-side .btn {
+  width: auto;
+  min-width: 56px;
+  margin-left: auto;
+  grid-column: auto;
+  border-radius: 14px;
+  padding: 3px 14px;
 }
