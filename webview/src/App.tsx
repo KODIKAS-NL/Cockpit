@@ -570,6 +570,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
           onNew={() => send({ kind: 'newTab' })}
           onClose={(id) => send({ kind: 'closeTab', tabId: id })}
           onOpenEditor={() => send({ kind: 'openEditor' })}
+          onRename={(sessionId, name) => send({ kind: 'renameSession', sessionId, name })}
         />
       )}
       <div className="scroll-wrap">

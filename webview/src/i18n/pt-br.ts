@@ -32,6 +32,7 @@ export const ptBR: Partial<Strings> = {
   'about.update': 'Atualizar',
   'about.install': 'Instalar',
   'tabs.openEditor': 'Abrir em uma aba do editor',
+  'tabs.renameHint': 'clique duplo para renomear',
   'daemon.label': 'Daemon',
   'daemon.connected': 'conectado',
   'daemon.disconnected': 'desconectado',

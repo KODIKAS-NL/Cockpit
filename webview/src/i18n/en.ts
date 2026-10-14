@@ -30,6 +30,7 @@ export const en = {
   'about.update': 'Update',
   'about.install': 'Install',
   'tabs.openEditor': 'Open in an editor tab',
+  'tabs.renameHint': 'double-click to rename',
   'daemon.label': 'Daemon',
   'daemon.connected': 'connected',
   'daemon.disconnected': 'disconnected',
