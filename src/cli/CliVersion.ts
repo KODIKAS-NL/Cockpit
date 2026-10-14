@@ -1,13 +1,26 @@
-// Queries the latest Claude Code version on the npm registry and compares it with
-// the installed one. Best-effort: network failure → undefined (the UI treats it as up to date).
+// Queries the latest Claude Code version and compares it with the installed one. The release
+// server is asked first (the same `latest` the installers and the managed copy use, so the
+// outdated chip and the updater agree), the npm registry is the fallback. Best-effort: network
+// failure → undefined (the UI treats it as up to date).
 import * as https from 'node:https';
+import { latestVersion } from './ManagedCli';
 
 const PKG = '@anthropic-ai/claude-code';
 const TTL_MS = 6 * 60 * 60 * 1000; // 6h
 let cache: { latest?: string; at: number } | undefined;
 
-export function getLatestCliVersion(): Promise<string | undefined> {
-  if (cache && Date.now() - cache.at < TTL_MS) return Promise.resolve(cache.latest);
+export async function getLatestCliVersion(): Promise<string | undefined> {
+  if (cache && Date.now() - cache.at < TTL_MS) return cache.latest;
+  try {
+    const latest = await latestVersion();
+    cache = { latest, at: Date.now() };
+    return latest;
+  } catch {
+    return getLatestFromNpm();
+  }
+}
+
+function getLatestFromNpm(): Promise<string | undefined> {
   return new Promise((resolve) => {
     const url = `https://registry.npmjs.org/${PKG}/latest`;
     const req = https.get(url, { timeout: 5000 }, (res) => {

@@ -13,7 +13,6 @@
   "Accent fix removed.": "Correção de acentuação removida.",
   "Nothing to install: shells on this platform already output UTF-8.": "Nada a instalar: os shells desta plataforma já produzem saída em UTF-8.",
   "Installing Claude Code CLI… when it finishes, click \"Re-check\".": "Instalando o Claude Code CLI… ao terminar, clique em \"Verificar novamente\".",
-  "Claude Code CLI not found. The Cockpit needs it to run.": "Claude Code CLI não encontrado. O Cockpit precisa dele para funcionar.",
   "Install": "Instalar",
   "Documentation": "Documentação",
   "In the terminal, use /login to sign in. Then click \"Re-check\".": "No terminal, use /login para entrar. Depois clique em \"Verificar novamente\".",
@@ -39,5 +38,12 @@
   "cockpit-daemon is already running (pid {0}), for example from the Cockpit Daemon app. Nothing was installed.": "O cockpit-daemon já está rodando (pid {0}), por exemplo pelo app Cockpit Daemon. Nada foi instalado.",
   "cockpit-daemon is running. Claude keeps running when this window closes.": "O cockpit-daemon está rodando. O Claude continua rodando quando esta janela fecha.",
   "cockpit-daemon uninstalled. Claude cannot run until it is installed again.": "cockpit-daemon desinstalado. O Claude não roda até ele ser instalado de novo.",
-  "It stops the daemon and the Claude processes it runs, removes the launchd agent and deletes ~/.cockpit (including its list of sessions). Claude cannot run in Cockpit until the daemon is installed again. Your conversations stay on disk.": "Ele para o daemon e os processos do Claude que ele mantém, remove o agente do launchd e apaga ~/.cockpit (inclusive a lista de sessões). O Claude não roda no Cockpit até o daemon ser instalado de novo. Suas conversas continuam no disco."
+  "It stops the daemon and the Claude processes it runs, removes the launchd agent and deletes ~/.cockpit (including its list of sessions). Claude cannot run in Cockpit until the daemon is installed again. Your conversations stay on disk.": "Ele para o daemon e os processos do Claude que ele mantém, remove o agente do launchd e apaga ~/.cockpit (inclusive a lista de sessões). O Claude não roda no Cockpit até o daemon ser instalado de novo. Suas conversas continuam no disco.",
+  "Download": "Baixar",
+  "Use the official installer": "Usar o instalador oficial",
+  "Claude Code CLI not found. Cockpit can keep its own copy (about 230 MB, downloaded from Anthropic and checked against its published checksum).": "CLI do Claude Code não encontrado. O Cockpit pode manter uma cópia própria (cerca de 230 MB, baixada da Anthropic e conferida com o checksum publicado).",
+  "Updating Claude Code CLI…": "Atualizando o CLI do Claude Code…",
+  "Downloading Claude Code CLI…": "Baixando o CLI do Claude Code…",
+  "Claude Code CLI {0} is ready (kept in {1}).": "CLI do Claude Code {0} pronto (guardado em {1}).",
+  "Could not download Claude Code CLI: {0}": "Não foi possível baixar o CLI do Claude Code: {0}"
 }

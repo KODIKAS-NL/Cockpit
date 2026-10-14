@@ -75,6 +75,7 @@ import { Session, type SessionHooks } from '../session/Session';
 import { resolveLocale } from '../i18n/host';
 import { researchCommands } from '../cli/SlashCommandResearch';
 import { getLatestCliVersion } from '../cli/CliVersion';
+import { installManaged, managedRoot, managedVersion } from '../cli/ManagedCli';
 import { log, dlog } from '../util/logger';
 
 // NO curated model list. The CLI has no `models` subcommand (checked on 2.1.220: `--model`
@@ -3242,6 +3243,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** Runs `claude update` in a visible terminal (the user follows the progress). */
   private updateCli(): void {
+    // Cockpit's own copy is updated by downloading the new version next to the old one; any other
+    // install is left to the CLI's own updater.
+    const inUse = this.resolvedPaths.get('claude');
+    if (managedVersion() && inUse && inUse.startsWith(managedRoot())) {
+      void this.downloadManagedCli(true);
+      return;
+    }
     const term = vscode.window.createTerminal('Claude Update');
     term.show();
     term.sendText(`${this.claudeCmd()} update`);
@@ -3263,14 +3271,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // and the bare name then fails although the CLI is installed (resolve also probes there).
     const path = this.cfg().get<string>('claudePath', 'claude');
     if (CliProcessManager.resolve(path).ok) return;
-    const install = vscode.l10n.t('Install');
+    const download = vscode.l10n.t('Download');
+    const installer = vscode.l10n.t('Use the official installer');
     const docs = vscode.l10n.t('Documentation');
     const pick = await vscode.window.showWarningMessage(
-      vscode.l10n.t('Claude Code CLI not found. The Cockpit needs it to run.'),
-      install,
+      vscode.l10n.t(
+        'Claude Code CLI not found. Cockpit can keep its own copy (about 230 MB, downloaded from Anthropic and checked against its published checksum).',
+      ),
+      download,
+      installer,
       docs,
     );
-    if (pick === install) this.installCli();
+    if (pick === download) this.installCli();
+    else if (pick === installer) this.installCliInTerminal();
     else if (pick === docs) {
       void vscode.env.openExternal(
         vscode.Uri.parse('https://docs.claude.com/en/docs/claude-code/overview'),
@@ -3280,6 +3293,55 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** Instala o Claude Code CLI globalmente num terminal integrado (guiado). */
   private installCli(): void {
+    void this.downloadManagedCli(false);
+  }
+
+  /**
+   * Downloads Cockpit's own copy of the CLI (see ManagedCli) with a progress notification, then
+   * re-detects. `update` = the copy exists and is being brought to the newest version. When the
+   * download fails the user is offered the official installer in a terminal instead.
+   */
+  private async downloadManagedCli(update: boolean): Promise<void> {
+    try {
+      const result = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: update ? vscode.l10n.t('Updating Claude Code CLI…') : vscode.l10n.t('Downloading Claude Code CLI…'),
+          cancellable: false,
+        },
+        async (progress) => {
+          let last = 0;
+          return installManaged({
+            onProgress: (done, total) => {
+              if (!total) return;
+              const pct = Math.floor((done / total) * 100);
+              if (pct > last) {
+                progress.report({ increment: pct - last, message: `${pct}%` });
+                last = pct;
+              }
+            },
+          });
+        },
+      );
+      log(`[cli] managed copy ${result.changed ? 'installed' : 'already current'}: ${result.version} @ ${result.path}`);
+      this.reportCliStatus();
+      void vscode.window.showInformationMessage(
+        vscode.l10n.t('Claude Code CLI {0} is ready (kept in {1}).', result.version, managedRoot()),
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      log(`[cli] managed download failed: ${message}`);
+      const installer = vscode.l10n.t('Use the official installer');
+      const pick = await vscode.window.showErrorMessage(
+        vscode.l10n.t('Could not download Claude Code CLI: {0}', message),
+        installer,
+      );
+      if (pick === installer) this.installCliInTerminal();
+    }
+  }
+
+  /** The official installer in a terminal (installs for the user under ~/.local). */
+  private installCliInTerminal(): void {
     const term = vscode.window.createTerminal('Claude Code · install');
     term.show();
     // Official NATIVE installer: it doesn't depend on Node/npm (solves the "npm not

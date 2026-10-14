@@ -11,6 +11,7 @@ import type { EngineId } from './Engine';
 import type { ClaudeEvent } from '../../shared/events';
 import type { CliProcess } from './CliProcess';
 import { killGroup } from '../util/killTree';
+import { managedBinaryPath } from './ManagedCli';
 
 export interface CliOptions {
   claudePath: string;
@@ -125,8 +126,13 @@ export class CliProcessManager extends EventEmitter implements CliProcess {
   ): { path: string; ok: boolean; version?: string; error?: string } {
     // `~/.local/bin` is where the Claude native installer puts things; probing
     // it for the tootega agent would only report the wrong binary as "found".
+    // Order: a path the user set, then Cockpit's own downloaded copy, then PATH, then ~/.local/bin.
+    const managed = engine === 'claude' ? managedBinaryPath() : undefined;
+    const userSet = configured !== 'claude';
     const candidates =
-      engine === 'tootega' ? [configured] : [configured, ...nativeCandidates()];
+      engine === 'tootega'
+        ? [configured]
+        : [...(userSet ? [configured] : []), ...(managed ? [managed] : []), ...(userSet ? [] : [configured]), ...nativeCandidates()];
     let last: { path: string; ok: boolean; version?: string; error?: string } = {
       path: configured,
       ok: false,

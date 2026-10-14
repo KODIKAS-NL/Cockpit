@@ -34,5 +34,12 @@
   "cockpit-daemon is already running (pid {0}), for example from the Cockpit Daemon app. Nothing was installed.": "cockpit-daemon is already running (pid {0}), for example from the Cockpit Daemon app. Nothing was installed.",
   "cockpit-daemon is running. Claude keeps running when this window closes.": "cockpit-daemon is running. Claude keeps running when this window closes.",
   "cockpit-daemon uninstalled. Claude cannot run until it is installed again.": "cockpit-daemon uninstalled. Claude cannot run until it is installed again.",
-  "It stops the daemon and the Claude processes it runs, removes the launchd agent and deletes ~/.cockpit (including its list of sessions). Claude cannot run in Cockpit until the daemon is installed again. Your conversations stay on disk.": "It stops the daemon and the Claude processes it runs, removes the launchd agent and deletes ~/.cockpit (including its list of sessions). Claude cannot run in Cockpit until the daemon is installed again. Your conversations stay on disk."
+  "It stops the daemon and the Claude processes it runs, removes the launchd agent and deletes ~/.cockpit (including its list of sessions). Claude cannot run in Cockpit until the daemon is installed again. Your conversations stay on disk.": "It stops the daemon and the Claude processes it runs, removes the launchd agent and deletes ~/.cockpit (including its list of sessions). Claude cannot run in Cockpit until the daemon is installed again. Your conversations stay on disk.",
+  "Download": "Download",
+  "Use the official installer": "Use the official installer",
+  "Claude Code CLI not found. Cockpit can keep its own copy (about 230 MB, downloaded from Anthropic and checked against its published checksum).": "Claude Code CLI not found. Cockpit can keep its own copy (about 230 MB, downloaded from Anthropic and checked against its published checksum).",
+  "Updating Claude Code CLI…": "Updating Claude Code CLI…",
+  "Downloading Claude Code CLI…": "Downloading Claude Code CLI…",
+  "Claude Code CLI {0} is ready (kept in {1}).": "Claude Code CLI {0} is ready (kept in {1}).",
+  "Could not download Claude Code CLI: {0}": "Could not download Claude Code CLI: {0}"
 }
