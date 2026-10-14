@@ -5818,3 +5818,17 @@ body {
 .stat-row > :last-child {
   text-align: right;
 }
+
+/* Hub pill buttons: line icon + label, one row; Settings follows the others instead of
+   sitting alone on the right of a wrapped line. */
+.ctx-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.hub-icon {
+  flex: 0 0 auto;
+}
+.hub-settings-wrap {
+  margin-left: 0;
+}

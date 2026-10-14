@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Translator } from '../i18n';
+import { Icon } from './Icon';
 import type { StatsSnapshot, SessionConfig, SessionInfo } from '../../../shared/protocol';
 import { fmtInt, fmtPct, fmtCompact, fmtBytes, fmtDuration, fmtUsdShort } from '../util/format';
 import type { TooltipRow } from './Tooltip';
@@ -175,40 +176,40 @@ export function HubView({
       <div className="ctx-panel-actions">
         <Tooltip title={t('usage.title')} text={t('tip.usage.desc')}>
           <button type="button" className="ctx-link" onClick={onUsage}>
-            📊 {t('usage.button')}
+            <Icon name="usage" /> {t('usage.button')}
           </button>
         </Tooltip>
         {loggedIn ? (
           <Tooltip title={t('tip.logout.title')} text={t('tip.logout.desc')}>
             <button type="button" className="ctx-link" onClick={onLogout}>
-              🚪 {t('tip.logout.title')}
+              <Icon name="signOut" /> {t('tip.logout.title')}
             </button>
           </Tooltip>
         ) : (
           <Tooltip title={t('tip.login.title')} text={t('tip.login.desc')}>
             <button type="button" className="ctx-link" onClick={onLogin}>
-              🔑 {t('tip.login.title')}
+              <Icon name="signIn" /> {t('tip.login.title')}
             </button>
           </Tooltip>
         )}
         <Tooltip title={t('plugins.title')} text={t('plugins.desc')}>
           <button type="button" className="ctx-link" onClick={onPlugins}>
-            🧩 {t('plugins.title')}
+            <Icon name="plugins" /> {t('plugins.title')}
           </button>
         </Tooltip>
         <Tooltip title={t('mcp.title')} text={t('mcp.desc')}>
           <button type="button" className="ctx-link" onClick={onMcp}>
-            🔌 {t('mcp.title')}
+            <Icon name="mcp" /> {t('mcp.title')}
           </button>
         </Tooltip>
         <Tooltip title={t('skills.title')} text={t('skills.desc')}>
           <button type="button" className="ctx-link" onClick={onSkills}>
-            🎯 {t('skills.title')}
+            <Icon name="skills" /> {t('skills.title')}
           </button>
         </Tooltip>
         <Tooltip title={t('creds.title')} text={t('creds.open')}>
           <button type="button" className="ctx-link" onClick={onCredentials}>
-            🔐 {t('creds.title')}
+            <Icon name="vault" /> {t('creds.title')}
           </button>
         </Tooltip>
         <Tooltip
@@ -217,7 +218,7 @@ export function HubView({
           text={t('tip.settings.desc')}
         >
           <button type="button" className="ctx-link" onClick={onSettings}>
-            ⚙️ {t('tip.settings.title')}
+            <Icon name="settings" /> {t('tip.settings.title')}
           </button>
         </Tooltip>
       </div>
@@ -260,13 +261,13 @@ export function HubView({
             <span className="ctx-panel-count">{sessions.length}</span>
             <Tooltip title={t('tip.new.title')} text={t('tip.new.desc')}>
               <button type="button" className="ctx-link hub-new" onClick={onNewSession}>
-                ＋ {t('tip.new.title')}
+                <Icon name="plus" /> {t('tip.new.title')}
               </button>
             </Tooltip>
             {sessions.length > 0 && (
               <Tooltip title={t('tip.deleteAll.title')} text={t('tip.deleteAll.desc')}>
                 <button type="button" className="ctx-link hub-del-all" onClick={onDeleteAll}>
-                  🗑 {t('sessions.deleteAll')}
+                  <Icon name="trash" /> {t('sessions.deleteAll')}
                 </button>
               </Tooltip>
             )}
