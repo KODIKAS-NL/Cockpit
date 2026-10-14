@@ -2194,17 +2194,36 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * e zera sessionId/resumeId, detachando a aba do transcript apagado.
    * `all=true` detacha todas as abas vivas (usado no "apagar tudo").
    */
-  private detachLiveSessions(sessionId?: string, all = false): void {
+  private detachLiveSessions(sessionId?: string, all = false, end = false): void {
     for (const [tabId, s] of this.sessions) {
       const match = all || s.sessionId === sessionId || s.resumeId === sessionId;
       if (!match) continue;
       const wasOpen = !!(s.sessionId || s.resumeId || s.cli);
-      s.clearConversation();
+      s.clearConversation(end);
       if (!wasOpen) continue;
       // Reflete a limpeza na webview aberta desta aba (se houver).
       this.setTabTitle(tabId, '');
       this.post({ kind: 'history', items: [] }, tabId);
     }
+  }
+
+  /**
+   * Before a transcript is deleted: ends the conversation's process everywhere. Detaching is
+   * not enough in daemon mode, since the process lives on in the daemon and writes the
+   * transcript again as it exits, so the "deleted" conversation comes back as an empty one.
+   * Resolves once the daemon's processes have exited.
+   */
+  private async endLiveSessions(sessionId?: string, all = false): Promise<void> {
+    this.detachLiveSessions(sessionId, all, true);
+    const client = this.daemonClient();
+    if (!client) return;
+    try {
+      const mine = (await this.refreshDaemonSessions()).filter((d) => all || d.cliSessionId === sessionId);
+      await Promise.all(mine.map((d) => client.forgetAndWait(d.id)));
+    } catch (e) {
+      log(`[daemon] could not end the process before deleting: ${String(e)}`);
+    }
+    await this.refreshDaemonSessions();
   }
 
   // They reflect the active tab (tab override ?? settings default).
@@ -2828,16 +2847,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'deleteSession':
         // Confirmation already done in the webview (elegant modal). Detaches the live tab
         // (releases the handle / prevents recreation) and then deletes the transcript.
-        this.detachLiveSessions(m.sessionId);
-        deleteSession(this.workspaceCwd(), m.sessionId);
-        this.sendSessions();
+        void this.endLiveSessions(m.sessionId).then(() => {
+          deleteSession(this.workspaceCwd(), m.sessionId);
+          this.sendSessions();
+        });
         break;
       case 'deleteAllSessions':
         // Confirmation already done in the webview. Detaches ALL live tabs before
         // deleting — otherwise the open session holds/recreates its .jsonl and it reappears.
-        this.detachLiveSessions(undefined, true);
-        deleteAllSessions(this.workspaceCwd());
-        this.sendSessions();
+        void this.endLiveSessions(undefined, true).then(() => {
+          deleteAllSessions(this.workspaceCwd());
+          this.sendSessions();
+        });
         break;
       case 'newTab':
         this.openNewTab();

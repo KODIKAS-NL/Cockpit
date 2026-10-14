@@ -335,6 +335,20 @@ describe('cockpit-daemon', () => {
     expect((await a.list(project)).map((s) => s.cliSessionId)).toEqual(['sess-8']);
   });
 
+  it('answers a forget only after the process has exited', async () => {
+    const a = await peer('A');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-9'] }));
+    a.user(s.session.id, 'hello');
+    await a.wait((m) => m.type === 'event' && (m as any).event.type === 'result');
+    a.write({ op: 'forget', sessionId: s.session.id, reqId: 'f1' });
+    await a.wait((m) => m.type === 'forgotten' && (m as any).reqId === 'f1');
+    const exitAt = a.msgs.findIndex((m) => m.type === 'exit');
+    const forgottenAt = a.msgs.findIndex((m) => m.type === 'forgotten');
+    expect(exitAt).toBeGreaterThanOrEqual(0);
+    expect(exitAt).toBeLessThan(forgottenAt);
+    expect(await a.list(project)).toEqual([]);
+  });
+
   it('replaces a stale socket file and refuses to run twice', async () => {
     const second = new Daemon({ socketPath: sock });
     await expect(second.start()).rejects.toThrow('already listening');

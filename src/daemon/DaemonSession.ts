@@ -186,6 +186,25 @@ export class DaemonSession {
     this.write({ type: 'control_request', request_id: this.initRequestId, request: { subtype: 'initialize' } });
   }
 
+  /** Resolves when the process is gone (at once when there is none), or after `timeoutMs`. */
+  whenStopped(timeoutMs = 5000): Promise<void> {
+    if (!this.proc) return Promise.resolve();
+    return new Promise((resolve) => {
+      const done = (): void => {
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        this.exitWaiters = this.exitWaiters.filter((w) => w !== done);
+        resolve();
+      }, timeoutMs);
+      timer.unref?.();
+      this.exitWaiters.push(done);
+    });
+  }
+
+  private exitWaiters: Array<() => void> = [];
+
   stop(): void {
     const proc = this.proc;
     if (!proc) return;
@@ -335,6 +354,9 @@ export class DaemonSession {
     this.initWaiters = [];
     this.removeTempDir();
     this.broadcast({ type: 'exit', sessionId: this.id, code });
+    const waiters = this.exitWaiters;
+    this.exitWaiters = [];
+    for (const w of waiters) w();
   }
 
   // ---- helpers ----

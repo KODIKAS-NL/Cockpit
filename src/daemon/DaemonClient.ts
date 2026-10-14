@@ -69,6 +69,11 @@ export class DaemonClient {
     this.post({ op: 'forget', sessionId });
   }
 
+  /** Forgets a session and resolves once its process has exited (the CLI writes on its way out). */
+  async forgetAndWait(sessionId: string): Promise<void> {
+    await this.request({ op: 'forget', sessionId, reqId: this.nextId('f') });
+  }
+
   /** Stops receiving a session's messages; the session keeps running in the daemon. */
   detach(sessionId: string): void {
     this.handlers.delete(sessionId);

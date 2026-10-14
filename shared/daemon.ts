@@ -74,11 +74,17 @@ export type ClientMessage =
   /** Ends the CLI process; the session stays listed (idle) and restarts on the next send. */
   | { op: 'stop'; sessionId: string }
   /** Ends the process and drops the session from the daemon's list. */
-  | { op: 'forget'; sessionId: string };
+  /**
+   * With a `reqId` the daemon answers `forgotten` once the process has really exited: the CLI
+   * writes to its transcript while it shuts down, so a caller about to delete that file must
+   * wait for it.
+   */
+  | { op: 'forget'; sessionId: string; reqId?: string };
 
 export type DaemonMessage =
   | { type: 'hello_ok'; version: number; pid: number }
   | { type: 'sessions'; reqId: string; sessions: DaemonSessionInfo[] }
+  | { type: 'forgotten'; reqId: string }
   | { type: 'snapshot'; reqId: string; snapshot: SessionSnapshot }
   | { type: 'event'; sessionId: string; event: unknown }
   /** Another window answered this prompt: close it here. */

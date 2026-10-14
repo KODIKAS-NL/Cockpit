@@ -190,13 +190,17 @@ export class Daemon {
         this.need(msg.sessionId).send(conn, msg.msg);
         return;
       case 'stop':
+        this.log(`[${msg.sessionId}] stop requested by ${conn.id}`);
         this.need(msg.sessionId).stop();
         return;
       case 'forget': {
         const s = this.need(msg.sessionId);
+        this.log(`[${s.id}] forget (${s.info().cliSessionId ?? 'no CLI session yet'}) requested by ${conn.id}`);
         s.stop();
         this.sessions.delete(s.id);
         this.scheduleSave();
+        const { reqId } = msg;
+        if (reqId) void s.whenStopped().then(() => conn.send({ type: 'forgotten', reqId }));
         return;
       }
       default:

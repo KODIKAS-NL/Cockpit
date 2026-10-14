@@ -456,10 +456,12 @@ export class Session {
   }
 
   /** Clears the conversation entirely (new/resume): also resets the statistics. */
-  clearConversation(): void {
+  clearConversation(end = false): void {
     // Daemon mode: the conversation this tab leaves keeps running (another window, or this
-    // one later, can pick it up). Local mode: detach() is stop().
-    this.detach();
+    // one later, can pick it up). Local mode: detach() is stop(). `end`: the conversation is
+    // being deleted, so it must not keep running.
+    if (end) this.stop();
+    else this.detach();
     this.sessionId = undefined;
     // Also clears the resumeId: a REALLY new conversation. Without this, after "clear
     // context" on a resumed session the next send() would respawn with --resume of the
