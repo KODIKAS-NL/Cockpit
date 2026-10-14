@@ -5929,15 +5929,20 @@ body {
   line-height: 1;
 }
 .tabstrip-close {
-  padding: 2px 5px;
+  padding: 2px 6px;
   font-size: 14px;
-  opacity: 0.5;
+  opacity: 0.55;
 }
 .tabstrip-btn {
   flex: 0 0 auto;
-  padding: 3px 7px;
-  font-size: 14px;
-  opacity: 0.8;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 18px;
+  opacity: 0.85;
+}
+.tabstrip-close {
+  font-size: 16px;
 }
 .tabstrip-close:hover,
 .tabstrip-btn:hover {
