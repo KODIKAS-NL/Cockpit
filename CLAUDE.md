@@ -10,7 +10,7 @@
 | Field | Value |
 |-------|-------|
 | **Working name** | Tootega Cockpit for Claude Code *(working name — to be confirmed)* |
-| **Authorship / Maintainer** | **Tootega Pesquisa e Inovação** |
+| **Authorship / Maintainer** | **Tootega Pesquisa e Inovação** (original author); this fork is maintained by **Jeroen Versteege (KODIKAS)** |
 | **Type** | Native **Visual Studio Code** extension (GUI) |
 | **License** | **MIT** (open source) |
 | **Nature** | Interface/tool that operates **through the Claude Code CLI** — it does not reimplement the agent |

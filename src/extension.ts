@@ -333,7 +333,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
-  // URI handler: vscode://tootega.tootega-cockpit/open
+  // URI handler: vscode://KODIKAS.cockpit-claude-code-daemon/open
   context.subscriptions.push(
     vscode.window.registerUriHandler({
       handleUri: (uri) => {

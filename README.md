@@ -58,13 +58,10 @@ only a presentation and control layer, and all orchestration stays in the Claude
 
 ## About Tootega Cockpit (the project this fork is based on)
 
-[![Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/HermesSilva.tootega-cockpit?label=Marketplace&color=007ACC)](https://marketplace.visualstudio.com/items?itemName=HermesSilva.tootega-cockpit)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/HermesSilva.tootega-cockpit?color=1f883d)](https://marketplace.visualstudio.com/items?itemName=HermesSilva.tootega-cockpit)
-[![Rating](https://img.shields.io/visual-studio-marketplace/r/HermesSilva.tootega-cockpit)](https://marketplace.visualstudio.com/items?itemName=HermesSilva.tootega-cockpit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Languages: pt-BR · EN](https://img.shields.io/badge/i18n-pt--BR%20%C2%B7%20EN-blueviolet)
 
-![Cockpit main panel](https://raw.githubusercontent.com/HermesSilva/Cockpit/master/images/Main%20Panel.png)
+![Cockpit main panel](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/Main%20Panel.png)
 
 | | |
 |---|---|
@@ -343,7 +340,7 @@ It runs as an **editor tab** (resizable panel) and/or as a **view in the Activit
 
 | Main panel | Session statistics |
 |---|---|
-| ![Main panel](https://raw.githubusercontent.com/HermesSilva/Cockpit/master/images/Main%20Panel.png) | ![Statistics](https://raw.githubusercontent.com/HermesSilva/Cockpit/master/images/Session%20Statistics%20View.png) |
+| ![Main panel](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/Main%20Panel.png) | ![Statistics](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/Session%20Statistics%20View.png) |
 
 ---
 
@@ -445,7 +442,7 @@ On activation, if the CLI is missing, the extension offers to help.
 **From a `.vsix`** (recommended while there is no Marketplace publication):
 
 ```bash
-code --install-extension tootega-cockpit-<version>.vsix
+code --install-extension cockpit-claude-code-daemon-<version>.vsix
 ```
 
 Or via the UI: *Extensions → ⋯ → Install from VSIX…*
@@ -559,7 +556,7 @@ automatically resumes the most recent session for that directory.
 
 **Rendered diff** (an edit expanded in the timeline):
 
-![Expanded edit](https://raw.githubusercontent.com/HermesSilva/Cockpit/master/images/Expanded%20Element%20View.png)
+![Expanded edit](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/Expanded%20Element%20View.png)
 
 ### Editing, diff, and human control
 
@@ -581,11 +578,11 @@ automatically resumes the most recent session for that directory.
 
 | Question (multi-select) | Recorded answer |
 |---|---|
-| ![Question](https://raw.githubusercontent.com/HermesSilva/Cockpit/master/images/Question%20View.png) | ![Answer](https://raw.githubusercontent.com/HermesSilva/Cockpit/master/images/Question%20Response.png) |
+| ![Question](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/Question%20View.png) | ![Answer](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/Question%20Response.png) |
 
 **Tasks (Todos) panel:**
 
-![Tasks](https://raw.githubusercontent.com/HermesSilva/Cockpit/master/images/Tasks%20View.png)
+![Tasks](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/Tasks%20View.png)
 
 ### Checkpoints and recovery
 
@@ -620,7 +617,7 @@ automatically resumes the most recent session for that directory.
 
 **Detailed session statistics (tooltip/hint):**
 
-![Session hint](https://raw.githubusercontent.com/HermesSilva/Cockpit/master/images/Session%20Hint%20View.png)
+![Session hint](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/Session%20Hint%20View.png)
 
 #### What you can see here and nowhere else
 
@@ -686,14 +683,14 @@ alongside duration and turn count.
 
 Browse previous prompts and the session stream directly in the panel:
 
-![Prompt history](https://raw.githubusercontent.com/HermesSilva/Cockpit/master/images/Prompt%20History%20View.png)
+![Prompt history](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/Prompt%20History%20View.png)
 
 ### Delete session
 
 Deleting a session removes the transcript from disk — an **irreversible action**, guarded
 by a confirmation:
 
-![Delete session](https://raw.githubusercontent.com/HermesSilva/Cockpit/master/images/Delete%20Session%20View.png)
+![Delete session](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/Delete%20Session%20View.png)
 
 ---
 
@@ -1075,7 +1072,7 @@ All under **Settings → Extensions → Tootega Cockpit** (prefix `tootega.`):
 > (same source as the CLI's `/usage`), so no manual budgets are needed. The context
 > meter limit is auto-derived from the active model (1M for `[1m]` variants and the natively-1M
 
-![Settings](https://raw.githubusercontent.com/HermesSilva/Cockpit/master/images/Settings%20View.png)
+![Settings](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/Settings%20View.png)
 
 ---
 
@@ -1122,7 +1119,7 @@ menu · the **▾** button opens options · **drag files** onto it to attach.
 On a session card (hub), hover reveals: **📱 remote control**, **↻ reload**, **✏ rename**,
 **🗑 delete**.
 
-URI handler: `vscode://tootega.tootega-cockpit/open` opens the Cockpit.
+URI handler: `vscode://KODIKAS.cockpit-claude-code-daemon/open` opens the Cockpit.
 
 ---
 

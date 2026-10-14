@@ -28,7 +28,7 @@ pilots the official `claude` CLI; it does not reimplement or replace it.
 
 ### Is it open source? What license?
 Yes — **MIT**. Source and issues live in the
-[GitHub repository](https://github.com/HermesSilva/Cockpit).
+[GitHub repository](https://github.com/KODIKAS-NL/Cockpit).
 
 ---
 
@@ -162,5 +162,5 @@ last answer it cached, and **Custom…** still accepts any id. Make sure you're 
 discovery right away.
 
 ### Where do I report bugs or ask questions?
-Open an issue in the [GitHub repository](https://github.com/HermesSilva/Cockpit). That is the
+Open an issue in the [GitHub repository](https://github.com/KODIKAS-NL/Cockpit). That is the
 best place for anything extension-related (the Marketplace Q & A tab points there too).
