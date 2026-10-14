@@ -5725,8 +5725,7 @@ body {
   flex: 0 0 auto;
   width: 8px;
   height: 8px;
-  margin-left: -14px;
-  margin-right: 6px;
+  margin-right: 2px;
   border-radius: 50%;
   background: var(--vscode-charts-green, #3fb950);
 }
