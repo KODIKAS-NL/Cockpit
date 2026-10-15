@@ -1,9 +1,9 @@
 {
   "name": "cockpit-claude-code-daemon",
-  "displayName": "Cockpit for Claude Code Daemon",
+  "displayName": "Cockpit for Claude Code",
   "description": "%ext.description%",
   "icon": "media/icon.png",
-  "version": "1.0.266",
+  "version": "1.0.267",
   "publisher": "KODIKAS",
   "license": "MIT",
   "author": {
@@ -216,19 +216,19 @@
       "activitybar": [
         {
           "id": "cockpitDaemon",
-          "title": "Cockpit for Claude Code Daemon",
+          "title": "Cockpit for Claude Code",
           "icon": "media/icon.svg"
         },
         {
           "id": "cockpitDaemon-chat-fallback",
-          "title": "Cockpit for Claude Code Daemon",
+          "title": "Cockpit for Claude Code",
           "icon": "media/icon.svg"
         }
       ],
       "secondarySidebar": [
         {
           "id": "cockpitDaemon-chat",
-          "title": "Cockpit for Claude Code Daemon",
+          "title": "Cockpit for Claude Code",
           "icon": "media/icon.svg"
         }
       ]
@@ -244,7 +244,7 @@
       "cockpitDaemon-chat": [
         {
           "id": "cockpitDaemon.chat",
-          "name": "Cockpit for Claude Code Daemon",
+          "name": "Cockpit for Claude Code",
           "type": "webview",
           "when": "!cockpitDaemon.noSecondarySidebar"
         }
@@ -252,7 +252,7 @@
       "cockpitDaemon-chat-fallback": [
         {
           "id": "cockpitDaemon.chat",
-          "name": "Cockpit for Claude Code Daemon",
+          "name": "Cockpit for Claude Code",
           "type": "webview",
           "when": "cockpitDaemon.noSecondarySidebar"
         }
@@ -283,7 +283,7 @@
       }
     ],
     "configuration": {
-      "title": "Cockpit for Claude Code Daemon",
+      "title": "Cockpit for Claude Code",
       "properties": {
         "cockpitDaemon.tootegaEnabled": {
           "type": "boolean",

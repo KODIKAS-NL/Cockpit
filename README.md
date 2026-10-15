@@ -1,4 +1,6 @@
-# Cockpit for Claude Code Daemon
+# Cockpit for Claude Code
+
+*by KODIKAS*
 
 > **Unofficial.** Not affiliated with, endorsed by, or sponsored by Anthropic.
 > "Claude", "Claude Code" and "Anthropic" are trademarks of Anthropic, PBC, used here
@@ -10,7 +12,7 @@
 > they have had little testing, and none on Linux or Windows. Expect rough edges and report what you
 > find. This note will be removed once the fork has had more use.
 
-**Cockpit for Claude Code Daemon is a fork of [Tootega Cockpit for Claude Code](https://github.com/HermesSilva/Cockpit)**
+**Cockpit for Claude Code by KODIKAS is a fork of [Tootega Cockpit for Claude Code](https://github.com/HermesSilva/Cockpit)**
 by Tootega Pesquisa e Inovação (HermesSilva). Everything good in this extension starts with their
 work, and I am grateful for it: a serious, well-thought-out GUI for Claude Code, with
 consumption transparency and fine-grained control. Thank you for building
@@ -69,7 +71,7 @@ only a presentation and control layer, and all orchestration stays in the Claude
 | | |
 |---|---|
 | **Original author** | Tootega Pesquisa e Inovação ([HermesSilva/Cockpit](https://github.com/HermesSilva/Cockpit)) |
-| **This fork** | Cockpit for Claude Code Daemon ([KODIKAS-NL/Cockpit](https://github.com/KODIKAS-NL/Cockpit)) |
+| **This fork** | Cockpit for Claude Code by KODIKAS ([KODIKAS-NL/Cockpit](https://github.com/KODIKAS-NL/Cockpit)) |
 | **License** | MIT (open source) |
 | **Type** | Visual Studio Code extension (React webview + TypeScript host) |
 | **Extension version** | `1.0.264` |

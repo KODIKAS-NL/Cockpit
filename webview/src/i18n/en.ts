@@ -1,6 +1,6 @@
 // English (international) — base catalog.
 export const en = {
-  'app.title': 'Cockpit for Claude Code Daemon',
+  'app.title': 'Cockpit for Claude Code',
   'about.cliUpToDate': 'Claude CLI is up to date.',
   'about.cliReleaseNotes': 'View release notes on GitHub',
   'spell.pt': 'Portuguese',

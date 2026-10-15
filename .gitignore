@@ -11,3 +11,6 @@ context-*.md
 
 # Plan-mode plans written by the extension (ExitPlanMode), one file per plan
 Planing/
+
+# Session handoff notes (personal, not for the repo)
+HANDOFF.md
