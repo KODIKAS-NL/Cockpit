@@ -385,6 +385,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Ensures the context is visible (creates/focuses its panel) for the permission/question.
         this.openSessionPanel(tabId);
       },
+      onPermissionPrompt: (p) => this.offerPermissionNotice(tabId, p),
+      onPromptClosed: (requestId) => this.closePermissionNotice(requestId),
       onInit: (model, cmds) => this.onSessionInit(model, cmds, tabId),
       onModels: (models) => this.onCliModels(models),
       onAuthRequired: () => this.post({ kind: 'authRequired' }, tabId),
@@ -2276,6 +2278,69 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.post({ kind: 'mentionResults', requestId, items: items.slice(0, 12) }, tabId);
   }
 
+  /**
+   * "Focus waiting prompt": open the chat that has a permission request or a question waiting
+   * (the active conversation first) and put keyboard focus on it.
+   */
+  focusWaitingPrompt(): void {
+    const order = [this.activeTab, ...this.sessions.keys()];
+    const tabId = order.find((id) => id && this.sessions.get(id)?.hasPendingPrompt());
+    if (!tabId) {
+      void vscode.window.showInformationMessage(vscode.l10n.t('No prompt is waiting for an answer.'));
+      return;
+    }
+    this.openSessionPanel(tabId);
+    setTimeout(() => this.post({ kind: 'focusPrompt' }, tabId), 200);
+  }
+
+  /** Permission requests currently also shown as a native notification. */
+  private permissionNotices = new Set<string>();
+
+  /** Is the chat that shows this conversation on screen right now? */
+  private chatInView(tabId: string): boolean {
+    if (this.panels.get(tabId)?.visible) return true;
+    return this.sidebarTabs.has(tabId) && !!this.chatView?.visible;
+  }
+
+  /**
+   * Besides the card in the chat, raise a native notification with Allow / Deny when the chat is
+   * not in view (side bar closed, another editor tab on top). The panel is revealed first (see
+   * onInteraction) and that takes a moment, so look again shortly. Answering in either place
+   * closes the other.
+   */
+  private offerPermissionNotice(
+    tabId: string,
+    p: { requestId: string; title: string; detail: string; canAlways: boolean },
+  ): void {
+    if (!this.cfg().get<boolean>('notifyOnPermission', true)) return;
+    setTimeout(() => {
+      const session = this.sessions.get(tabId);
+      if (!session?.hasPendingPermission(p.requestId) || this.chatInView(tabId)) return;
+      const allow = vscode.l10n.t('Allow');
+      const always = vscode.l10n.t('Always allow');
+      const deny = vscode.l10n.t('Deny');
+      this.permissionNotices.add(p.requestId);
+      void vscode.window
+        .showWarningMessage(
+          vscode.l10n.t('Claude wants to use {0}: {1}', p.title, p.detail),
+          ...(p.canAlways ? [allow, always, deny] : [allow, deny]),
+        )
+        .then((pick) => {
+          this.permissionNotices.delete(p.requestId);
+          const s = this.sessions.get(tabId);
+          if (!pick || !s?.hasPendingPermission(p.requestId)) return; // dismissed, or answered in the chat
+          s.decideFromHost(p.requestId, pick === allow ? 'allow' : pick === always ? 'allow_always' : 'deny');
+        });
+    }, 800);
+  }
+
+  /** The request was answered or withdrawn: take its notification down. */
+  private closePermissionNotice(requestId: string): void {
+    if (this.permissionNotices.delete(requestId)) {
+      void vscode.commands.executeCommand('notifications.hideToasts');
+    }
+  }
+
   private notifyComplete(): void {
     if (!this.cfg().get<boolean>('notifyOnComplete', true)) return;
     // Notifies when no chat panel is visible.
@@ -3580,7 +3645,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
   <div id="root"></div>
-  <script nonce="${nonce}">window.__TOOTEGA_VIEW__ = ${JSON.stringify(mode)}; window.__TOOTEGA_SESSION__ = ${JSON.stringify(sessionTab ?? '')}; window.__TOOTEGA_REGION__ = ${JSON.stringify(osRegionLocale())}; window.__TOOTEGA_ICON__ = ${JSON.stringify(iconUri.toString())};</script>
+  <script nonce="${nonce}">window.__TOOTEGA_VIEW__ = ${JSON.stringify(mode)}; window.__TOOTEGA_SESSION__ = ${JSON.stringify(sessionTab ?? '')}; window.__TOOTEGA_REGION__ = ${JSON.stringify(viewRegionLocale())}; window.__TOOTEGA_ICON__ = ${JSON.stringify(iconUri.toString())};</script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
@@ -3760,6 +3825,21 @@ function osRegionLocale(): string {
       /* fallback abaixo */
     }
   }
+  if (process.platform === 'darwin') {
+    // Node takes its locale from LANG, which says nothing about System Settings > Region.
+    // `AppleLocale` has both, e.g. "en_US@rg=nlzzzz": English, with the Netherlands as the region.
+    try {
+      const r = spawnSync('defaults', ['read', '-g', 'AppleLocale'], { encoding: 'utf8', timeout: 2000 });
+      const raw = (r.stdout || '').trim();
+      const m = /^([a-z]{2,3})(?:[_-][A-Za-z]+)?(?:@rg=([a-z]{2})zzzz)?/i.exec(raw);
+      if (m) {
+        const region = m[2] ? m[2].toUpperCase() : /[_-]([A-Za-z]{2})\b/.exec(raw)?.[1]?.toUpperCase();
+        loc = region ? `${m[1].toLowerCase()}-${region}` : m[1].toLowerCase();
+      }
+    } catch {
+      /* fallback below */
+    }
+  }
   if (!loc) {
     try {
       loc = new Intl.DateTimeFormat().resolvedOptions().locale;
@@ -3769,6 +3849,29 @@ function osRegionLocale(): string {
   }
   cachedRegion = loc || 'en';
   return cachedRegion;
+}
+
+/**
+ * The locale for dates and times in the webviews.
+ *  1. `cockpitDaemon.dateLocale`, when set (and valid).
+ *  2. Empty in a browser (code-server): the host's region says nothing about the viewer's, and
+ *     the browser knows its own, so the webview falls back to its `navigator.language`.
+ *  3. Otherwise the region of the machine the host runs on. Under Remote-SSH that is the remote
+ *     machine, but a desktop webview only gets VS Code's display language, no region, so this is
+ *     the best there is; `cockpitDaemon.dateLocale` overrides it.
+ */
+function viewRegionLocale(): string {
+  const set = (vscode.workspace.getConfiguration('cockpitDaemon').get<string>('dateLocale') ?? '').trim();
+  if (set) {
+    try {
+      new Intl.DateTimeFormat(set);
+      return set;
+    } catch {
+      /* not a valid locale: ignore it */
+    }
+  }
+  if (vscode.env.uiKind === vscode.UIKind.Web) return '';
+  return osRegionLocale();
 }
 
 function makeNonce(): string {

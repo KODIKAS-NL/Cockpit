@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 let channel: vscode.OutputChannel | undefined;
 
 export function getLogger(): vscode.OutputChannel {
-  if (!channel) channel = vscode.window.createOutputChannel('Tootega Cockpit');
+  if (!channel) channel = vscode.window.createOutputChannel('Cockpit for Claude Code');
   return channel;
 }
 

@@ -507,6 +507,8 @@ type HostMsg =
   | { kind: 'askRequest'; requestId: string; questions: AskQuestion[] }
   // Daemon mode: another window answered this prompt (permission card or question).
   | { kind: 'promptSettled'; requestId: string }
+  // Move keyboard focus to the waiting permission card or question (the "focus prompt" command).
+  | { kind: 'focusPrompt' }
   // Daemon mode: another window sent this prompt; it shows as a user bubble here too.
   | { kind: 'remoteUser'; text: string }
   // Daemon mode: our last message was refused (a turn was running): drop its bubble.

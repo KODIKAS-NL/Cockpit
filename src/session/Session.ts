@@ -30,6 +30,12 @@ export interface SessionHooks {
   onBusy: (busy: boolean) => void;
   onResult: () => void;
   onInteraction: () => void;
+  /**
+   * A permission card was just sent to the chat. The host may also raise it elsewhere (a native
+   * notification, when the chat is not in view); `onPromptClosed` says it was answered or withdrawn.
+   */
+  onPermissionPrompt?: (p: { requestId: string; title: string; detail: string; canAlways: boolean }) => void;
+  onPromptClosed?: (requestId: string) => void;
   onInit: (model?: string, slashCommands?: string[]) => void;
   /** The model list the CLI reports in its `initialize` reply (what the account can use). */
   onModels?: (models: DiscoveredModel[]) => void;
@@ -436,6 +442,23 @@ export class Session {
     this.pendingPerm.delete(requestId);
     this.pendingPromptMsg.delete(requestId);
     this.emit({ kind: 'promptSettled', requestId });
+    this.hooks.onPromptClosed?.(requestId);
+  }
+
+  /** Is a permission request or a question waiting for an answer? */
+  hasPendingPrompt(): boolean {
+    return this.pendingPromptMsg.size > 0;
+  }
+
+  /** Is this permission request still waiting for an answer? */
+  hasPendingPermission(requestId: string): boolean {
+    return this.pendingPerm.has(requestId);
+  }
+
+  /** Answer a permission request from the host (a native notification) and close its chat card. */
+  decideFromHost(requestId: string, decision: 'allow' | 'deny' | 'allow_always'): void {
+    this.decide(requestId, decision);
+    this.emit({ kind: 'promptSettled', requestId });
   }
 
   /** Another window sent a prompt: show it, and follow the turn it started. */
@@ -591,6 +614,7 @@ export class Session {
     const pend = this.pendingPerm.get(requestId);
     this.pendingPerm.delete(requestId);
     this.pendingPromptMsg.delete(requestId);
+    this.hooks.onPromptClosed?.(requestId);
     if (pend?.tool) {
       // On denials, records the reason (the user's feedback) in the denial log.
       this.stats.recordDecision(pend.tool, decision, decision === 'deny' ? message : undefined);
@@ -904,6 +928,14 @@ export class Session {
             };
             this.pendingPromptMsg.set(reqId, card);
             this.emit(card);
+            if (!this.replaying) {
+              this.hooks.onPermissionPrompt?.({
+                requestId: reqId,
+                title: r.request.display_name || tool,
+                detail: promptDetail(input, r.request.description),
+                canAlways: !!suggestions?.length,
+              });
+            }
           }
         }
         break;
@@ -1244,4 +1276,17 @@ function isAuthError(text: unknown): boolean {
   return /please run \/login|\/login|not authenticated|authentication (failed|required|error)|invalid api key|unauthorized|\b401\b|oauth|please (log ?in|sign ?in)/i.test(
     s,
   );
+}
+
+/** One short line saying what a permission request is about: the command, the file, or the note. */
+function promptDetail(input: unknown, description?: string): string {
+  const inp = (input ?? {}) as Record<string, unknown>;
+  const pick =
+    (typeof inp.command === 'string' && inp.command) ||
+    (typeof inp.file_path === 'string' && inp.file_path) ||
+    (typeof inp.url === 'string' && inp.url) ||
+    description ||
+    '';
+  const line = String(pick).split('\n')[0].trim();
+  return line.length > 120 ? `${line.slice(0, 117)}…` : line;
 }

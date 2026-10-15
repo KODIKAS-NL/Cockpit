@@ -3,7 +3,7 @@
   "displayName": "Cockpit for Claude Code",
   "description": "%ext.description%",
   "icon": "media/icon.png",
-  "version": "1.0.272",
+  "version": "1.0.275",
   "publisher": "KODIKAS",
   "license": "MIT",
   "author": {
@@ -58,6 +58,11 @@
         "title": "%cmd.open%",
         "category": "Cockpit Daemon",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "cockpitDaemon.focusPrompt",
+        "title": "%cmd.focusPrompt%",
+        "category": "Cockpit Daemon"
       },
       {
         "command": "cockpitDaemon.newSession",
@@ -328,6 +333,11 @@
           "default": "auto",
           "description": "%cfg.language%"
         },
+        "cockpitDaemon.dateLocale": {
+          "type": "string",
+          "default": "",
+          "description": "%cfg.dateLocale%"
+        },
         "cockpitDaemon.model": {
           "type": "string",
           "default": "default",
@@ -386,6 +396,11 @@
           "type": "boolean",
           "default": false,
           "description": "%cfg.enableTodoTools%"
+        },
+        "cockpitDaemon.notifyOnPermission": {
+          "type": "boolean",
+          "default": true,
+          "description": "%cfg.notifyOnPermission%"
         },
         "cockpitDaemon.notifyOnComplete": {
           "type": "boolean",

@@ -24,7 +24,7 @@ import {
 
 export function activate(context: vscode.ExtensionContext): void {
   setDebugLogging(vscode.workspace.getConfiguration('tootega').get<boolean>('debugLog', false));
-  log('Tootega Cockpit activating…');
+  log('Cockpit for Claude Code activating…');
 
   // Restart/reload: VSCode tries to restore the contexts' webview tabs, but
   // without state they end up "dead". Close them all on activate — start clean.
@@ -195,6 +195,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('cockpitDaemon.openInEditor', () => {
       provider.openInEditor();
     }),
+    vscode.commands.registerCommand('cockpitDaemon.focusPrompt', () => {
+      provider.focusWaitingPrompt();
+    }),
     vscode.commands.registerCommand('cockpitDaemon.reloadView', () => {
       provider.reloadActivePanel();
     }),
@@ -344,12 +347,12 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
-  log('Tootega Cockpit activated.');
+  log('Cockpit for Claude Code activated.');
 }
 
 export function deactivate(): void {
   flushStats(); // writes each session's pending statistics before exiting
-  log('Tootega Cockpit deactivated.');
+  log('Cockpit for Claude Code deactivated.');
 }
 
 /** Closes the Cockpit webview tabs (viewType cockpitDaemon.cockpit.editor) that VSCode
