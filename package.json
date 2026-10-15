@@ -3,7 +3,7 @@
   "displayName": "Cockpit for Claude Code Daemon",
   "description": "%ext.description%",
   "icon": "media/icon.png",
-  "version": "1.0.265",
+  "version": "1.0.266",
   "publisher": "KODIKAS",
   "license": "MIT",
   "author": {

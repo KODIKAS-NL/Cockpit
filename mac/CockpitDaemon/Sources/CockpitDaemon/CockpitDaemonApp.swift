@@ -62,13 +62,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// The menu bar icon reflects the daemon's state.
+/// The menu bar icon reflects the daemon's state: a gauge glyph, drawn as a template image so
+/// the menu bar tints it for light and dark. Falls back to an SF Symbol if the glyph is missing.
 struct MenuBarLabel: View {
     @ObservedObject var supervisor: DaemonSupervisor
 
     var body: some View {
-        Image(systemName: symbol)
-            .accessibilityLabel("Cockpit Daemon: \(supervisor.state.label)")
+        Group {
+            if let glyph = Self.glyph(named: glyphName) {
+                Image(nsImage: glyph)
+            } else {
+                Image(systemName: symbol)
+            }
+        }
+        .accessibilityLabel("Cockpit Daemon: \(supervisor.state.label)")
+    }
+
+    private var glyphName: String {
+        switch supervisor.state {
+        case .running, .external: return "running"
+        case .starting, .stopping: return "busy"
+        case .failed: return "failed"
+        case .stopped: return "stopped"
+        }
     }
 
     private var symbol: String {
@@ -78,5 +94,15 @@ struct MenuBarLabel: View {
         case .failed: return "exclamationmark.triangle"
         case .stopped: return "terminal"
         }
+    }
+
+    /// The PNGs are 36 px (18 pt @2x).
+    private static func glyph(named name: String) -> NSImage? {
+        guard let url = Bundle.main.url(forResource: "MenuBar-\(name)", withExtension: "png"),
+              let image = NSImage(contentsOf: url)
+        else { return nil }
+        image.size = NSSize(width: 18, height: 18)
+        image.isTemplate = true
+        return image
     }
 }

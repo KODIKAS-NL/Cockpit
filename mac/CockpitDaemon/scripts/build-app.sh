@@ -52,6 +52,8 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/CockpitDaemon" "$APP/Contents/MacOS/CockpitDaemon"
 cp "$REPO/dist/daemon.js" "$APP/Contents/Resources/daemon.js"
+# Icons: the committed output of scripts/make-icons.mjs.
+cp "$HERE/Assets/AppIcon.icns" "$HERE/Assets"/MenuBar-*.png "$APP/Contents/Resources/"
 
 VERSION="$(node -p "require('$REPO/package.json').version" 2>/dev/null || echo 1.0.0)"
 cat > "$APP/Contents/Info.plist" <<PLIST
@@ -63,6 +65,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleDisplayName</key><string>$APP_NAME</string>
   <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
   <key>CFBundleExecutable</key><string>CockpitDaemon</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$VERSION</string>
