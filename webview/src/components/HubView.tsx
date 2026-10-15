@@ -100,22 +100,10 @@ export function HubView({
     <div className="hub">
       <header className="hub-head">
         <svg className="hub-logo" width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <g fill="#ff7a18">
-            <path id="hub-flame" d="M12 0.4C14.1 3.4 13.9 4.9 12 6.3C10.1 4.9 9.9 3.4 12 0.4Z" />
-            <use href="#hub-flame" transform="rotate(45 12 12)" />
-            <use href="#hub-flame" transform="rotate(90 12 12)" />
-            <use href="#hub-flame" transform="rotate(135 12 12)" />
-            <use href="#hub-flame" transform="rotate(180 12 12)" />
-            <use href="#hub-flame" transform="rotate(225 12 12)" />
-            <use href="#hub-flame" transform="rotate(270 12 12)" />
-            <use href="#hub-flame" transform="rotate(315 12 12)" />
-          </g>
-          <circle cx="12" cy="12" r="7.7" fill="none" stroke="#ff9a3c" strokeWidth="1.7" />
-          <g fill="none" stroke="#4da3ff" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M7.8 16.6 L10.5 8.0 L13.2 16.6" />
-            <path d="M8.7 13.9 H12.3" />
-            <path d="M15.9 8.0 V16.6" strokeWidth="2.1" />
-          </g>
+          <defs><linearGradient id="hub-g" x1="0.1" y1="0.9" x2="0.9" y2="0.1"><stop offset="0" stopColor="#4da3ff"/><stop offset="0.55" stopColor="#ff9a3c"/><stop offset="1" stopColor="#ff5a1f"/></linearGradient></defs>
+          <path d="M5.92 18.08A8.6 8.6 0 1 1 18.08 18.08" fill="none" stroke="url(#hub-g)" strokeWidth="2" strokeLinecap="round"/>
+          <line x1="15.77" y1="9.36" x2="18.06" y2="7.76" stroke="#ff7a18" strokeWidth="2" strokeLinecap="round"/>
+          <path d="M12 8.1Q12.78 11.22 15.9 12Q12.78 12.78 12 15.9Q11.22 12.78 8.1 12Q11.22 11.22 12 8.1Z" fill="#ffb066"/>
         </svg>
         <span className="hub-title">Cockpit for Claude Code</span>
         {cockpitVersion && <span className="hub-ver">v{cockpitVersion}</span>}
