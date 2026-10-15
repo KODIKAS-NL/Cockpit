@@ -15,7 +15,11 @@ export type IconName =
   | 'trash'
   | 'expand'
   | 'collapse'
-  | 'download';
+  | 'download'
+  | 'info'
+  | 'remote'
+  | 'reload'
+  | 'edit';
 
 const PATHS: Record<IconName, ReactElement> = {
   usage: <path d="M3 21h18M6 17v-5M11 17V6M16 17v-8M21 17v-3" />,
@@ -43,6 +47,24 @@ const PATHS: Record<IconName, ReactElement> = {
   collapse: <path d="m7 20 5-5 5 5M7 4l5 5 5-5" />,
   // Arrow down into a tray: save / export.
   download: <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
+  // Circled "i": the details of a session.
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 8h.01" />
+    </>
+  ),
+  // A phone: remote control from your phone.
+  remote: (
+    <>
+      <rect x="7" y="2.5" width="10" height="19" rx="2" />
+      <path d="M11 18h2" />
+    </>
+  ),
+  // Circular arrow: reload the view.
+  reload: <path d="M20 12a8 8 0 1 1-2.5-5.8M20 4v5h-5" />,
+  // Pencil: rename.
+  edit: <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />,
   trash: <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />,
 };
 

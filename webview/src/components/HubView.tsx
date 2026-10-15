@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Translator } from '../i18n';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 import type { StatsSnapshot, SessionInfo } from '../../../shared/protocol';
 import { fmtInt, fmtPct, fmtCompact, fmtBytes, fmtDuration, fmtUsdShort } from '../util/format';
 import type { TooltipRow } from './Tooltip';
 import { Tooltip, type TooltipMeta } from './Tooltip';
-import { send, readState, saveState } from '../vscodeApi';
+import { send } from '../vscodeApi';
 
 // Provenance of a piece of data: source + confidence level, already localized, for the
 // hint footer (colored chips). It keeps the i18n descriptions clean.
@@ -33,11 +33,9 @@ interface Props {
   busy?: boolean; // contexto ativo processando um turno → spinner no card
   loggedIn: boolean;
   sessions: SessionInfo[];
-  cwd?: string;
   activeSessionId?: string;
   busySessions?: Set<string>; // sessionIds with a turn in progress → spinner on the card
   onNewSession: () => void;
-  onOpenFolder: (path: string) => void;
   onSettings: () => void;
   onUsage: () => void;
   onPlugins: () => void;
@@ -73,11 +71,9 @@ export function HubView({
   busy,
   loggedIn,
   sessions,
-  cwd,
   activeSessionId,
   busySessions,
   onNewSession,
-  onOpenFolder,
   onSettings,
   onUsage,
   onPlugins,
@@ -96,80 +92,106 @@ export function HubView({
   onRename,
   onDeleteAll,
 }: Props) {
+  // The button bar's items grow to fill their row, except a single button left alone on the
+  // last row, which keeps its natural width. Flexbox cannot tell how many items share a row, so
+  // this marks that button (`lone`) whenever the layout changes.
+  const barRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    const mark = () => {
+      const items = Array.from(bar.children) as HTMLElement[];
+      items.forEach((el) => el.classList.remove('lone'));
+      if (items.length < 2) return;
+      const last = items[items.length - 1];
+      if (last.offsetTop > items[items.length - 2].offsetTop + 2) last.classList.add('lone');
+    };
+    mark();
+    const ro = new ResizeObserver(mark);
+    ro.observe(bar);
+    return () => ro.disconnect();
+  }, [loggedIn, locale]);
+
   return (
     <div className="hub">
       <header className="hub-head">
-        <svg className="hub-logo" width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <defs><linearGradient id="hub-g" x1="0.1" y1="0.9" x2="0.9" y2="0.1"><stop offset="0" stopColor="#4da3ff"/><stop offset="0.55" stopColor="#ff9a3c"/><stop offset="1" stopColor="#ff5a1f"/></linearGradient></defs>
-          <path d="M5.92 18.08A8.6 8.6 0 1 1 18.08 18.08" fill="none" stroke="url(#hub-g)" strokeWidth="2" strokeLinecap="round"/>
-          <line x1="15.77" y1="9.36" x2="18.06" y2="7.76" stroke="#ff7a18" strokeWidth="2" strokeLinecap="round"/>
-          <path d="M12 8.1Q12.78 11.22 15.9 12Q12.78 12.78 12 15.9Q11.22 12.78 8.1 12Q11.22 11.22 12 8.1Z" fill="#ffb066"/>
-        </svg>
-        <span className="hub-title">Cockpit for Claude Code</span>
-        {cockpitVersion && <span className="hub-ver">v{cockpitVersion}</span>}
-        {cliVersion ? (
-          <>
-            <Tooltip
-              text={
-                cliBelowMin(cliVersion)
-                  ? t('about.cliBelowMin', MIN_CLI_VERSION)
-                  : t('about.cliReleaseNotes')
-              }
-            >
-              <button
-                type="button"
-                className={`hub-cli ${cliOutdated(cliVersion, cliLatest) || cliBelowMin(cliVersion) ? 'outdated' : ''}`}
-                onClick={() => onOpenLink(CLI_RELEASES_URL)}
+        <div className="hub-title-row">
+          <svg className="hub-logo" width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs><linearGradient id="hub-g" x1="0.1" y1="0.9" x2="0.9" y2="0.1"><stop offset="0" stopColor="#4da3ff"/><stop offset="0.55" stopColor="#ff9a3c"/><stop offset="1" stopColor="#ff5a1f"/></linearGradient></defs>
+            <path d="M5.92 18.08A8.6 8.6 0 1 1 18.08 18.08" fill="none" stroke="url(#hub-g)" strokeWidth="2" strokeLinecap="round"/>
+            <line x1="15.77" y1="9.36" x2="18.06" y2="7.76" stroke="#ff7a18" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M12 8.1Q12.78 11.22 15.9 12Q12.78 12.78 12 15.9Q11.22 12.78 8.1 12Q11.22 11.22 12 8.1Z" fill="#ffb066"/>
+          </svg>
+          <span className="hub-title">Cockpit for Claude Code</span>
+        </div>
+        {/* One line, never wrapping: daemon status first, then the versions. */}
+        <div className="hub-status-row">
+          {daemon?.enabled && (
+            <>
+              <Tooltip
+                text={
+                  daemon.connected
+                    ? t('daemon.tip.connected', daemon.pid ?? '?')
+                    : t('daemon.tip.disconnected')
+                }
               >
-                Claude CLI {semver(cliVersion) ?? cliVersion}
-              </button>
-            </Tooltip>
-            {(cliOutdated(cliVersion, cliLatest) || cliBelowMin(cliVersion)) && (
+                <span className={`hub-daemon ${daemon.connected ? 'on' : 'off'}`}>
+                  <span className="hub-daemon-dot" aria-hidden="true" />
+                  <span className="hub-daemon-label">{t('daemon.label')}: </span>
+                  {daemon.connected ? t('daemon.connected') : t('daemon.disconnected')}
+                </span>
+              </Tooltip>
+              {!daemon.connected && (
+                <button type="button" className="hub-update install" onClick={onDaemonInstall}>
+                  {t('daemon.install')}
+                </button>
+              )}
+            </>
+          )}
+          {cockpitVersion && <span className="hub-ver">v{cockpitVersion}</span>}
+          {cliVersion ? (
+            <>
               <Tooltip
                 text={
                   cliBelowMin(cliVersion)
                     ? t('about.cliBelowMin', MIN_CLI_VERSION)
-                    : t('about.cliOutdated', semver(cliLatest) ?? cliLatest ?? '')
+                    : t('about.cliReleaseNotes')
                 }
               >
-                <button type="button" className="hub-update" onClick={onUpdate}>
-                  ↑ {t('about.update')}
+                <button
+                  type="button"
+                  className={`hub-cli ${cliOutdated(cliVersion, cliLatest) || cliBelowMin(cliVersion) ? 'outdated' : ''}`}
+                  onClick={() => onOpenLink(CLI_RELEASES_URL)}
+                >
+                  CLI {semver(cliVersion) ?? cliVersion}
                 </button>
               </Tooltip>
-            )}
-          </>
-        ) : (
-          <Tooltip text={t('about.install.tip')}>
-            <button type="button" className="hub-update install" onClick={onInstall}>
-              ⤓ {t('about.install')}
-            </button>
-          </Tooltip>
-        )}
-        {daemon?.enabled && (
-          <div className="hub-daemon-row">
-            <Tooltip
-              text={
-                daemon.connected
-                  ? t('daemon.tip.connected', daemon.pid ?? '?')
-                  : t('daemon.tip.disconnected')
-              }
-            >
-              <span className={`hub-daemon ${daemon.connected ? 'on' : 'off'}`}>
-                <span className="hub-daemon-dot" aria-hidden="true" />
-                {t('daemon.label')}: {daemon.connected ? t('daemon.connected') : t('daemon.disconnected')}
-              </span>
-            </Tooltip>
-            {!daemon.connected && (
-              <button type="button" className="hub-update install" onClick={onDaemonInstall}>
-                {t('daemon.install')}
+              {(cliOutdated(cliVersion, cliLatest) || cliBelowMin(cliVersion)) && (
+                <Tooltip
+                  text={
+                    cliBelowMin(cliVersion)
+                      ? t('about.cliBelowMin', MIN_CLI_VERSION)
+                      : t('about.cliOutdated', semver(cliLatest) ?? cliLatest ?? '')
+                  }
+                >
+                  <button type="button" className="hub-update" onClick={onUpdate}>
+                    ↑ {t('about.update')}
+                  </button>
+                </Tooltip>
+              )}
+            </>
+          ) : (
+            <Tooltip text={t('about.install.tip')}>
+              <button type="button" className="hub-update install" onClick={onInstall}>
+                ⤓ {t('about.install')}
               </button>
-            )}
-          </div>
-        )}
+            </Tooltip>
+          )}
+        </div>
       </header>
 
       {/* Barra de botões */}
-      <div className="ctx-panel-actions">
+      <div className="ctx-panel-actions" ref={barRef}>
         <Tooltip title={t('usage.title')} text={t('tip.usage.desc')}>
           <button type="button" className="ctx-link" onClick={onUsage}>
             <Icon name="usage" /> {t('usage.button')}
@@ -219,8 +241,7 @@ export function HubView({
         </Tooltip>
       </div>
 
-      <Onboarding t={t} cliMissing={cliMissing} loggedIn={loggedIn} hasSessions={sessions.length > 0} />
-
+      {/* Everything below the header and the buttons scrolls. */}
       <div className="ctx-panel-body">
         {/* Painel de informações do contexto ativo */}
         <section className="ctx-panel-info">
@@ -238,29 +259,34 @@ export function HubView({
         {/* Grade de contextos salvos (sessões) */}
         <section className="ctx-panel-grid-wrap">
           <div className="ctx-panel-grid-head">
-            <span className="col-title">{t('ctxPanel.contexts')}</span>
-            <span className="ctx-panel-count">{sessions.length}</span>
-            <Tooltip title={t('tip.new.title')} text={t('tip.new.desc')}>
-              <button type="button" className="ctx-link hub-new" onClick={onNewSession}>
-                <Icon name="plus" /> {t('tip.new.title')}
-              </button>
-            </Tooltip>
-            {sessions.length > 0 && (
-              <Tooltip title={t('tip.deleteAll.title')} text={t('tip.deleteAll.desc')}>
-                <button type="button" className="ctx-link hub-del-all" onClick={onDeleteAll}>
-                  <Icon name="trash" /> {t('sessions.deleteAll')}
+            <span className="col-title">
+              {t('ctxPanel.contexts')} {sessions.length}
+            </span>
+            <span className="ctx-panel-grid-tools">
+              <Tooltip text={t('sessions.startNew')}>
+                <button
+                  type="button"
+                  className="ctx-link ctx-icon-btn hub-new"
+                  aria-label={t('sessions.startNew')}
+                  onClick={onNewSession}
+                >
+                  <Icon name="plus" />
                 </button>
               </Tooltip>
-            )}
+              {sessions.length > 0 && (
+                <Tooltip text={t('tip.deleteAll.title')}>
+                  <button
+                    type="button"
+                    className="ctx-link ctx-icon-btn hub-del-all"
+                    aria-label={t('tip.deleteAll.title')}
+                    onClick={onDeleteAll}
+                  >
+                    <Icon name="trash" />
+                  </button>
+                </Tooltip>
+              )}
+            </span>
           </div>
-          {cwd && (
-            <Tooltip className="tt-block" title={t('ctxPanel.openFolder')} text={cwd}>
-              <button type="button" className="hub-folder" onClick={() => onOpenFolder(cwd)}>
-                <span className="hub-folder-ico">🗀</span>
-                <span className="hub-folder-path">{cwd}</span>
-              </button>
-            </Tooltip>
-          )}
           {sessions.length === 0 ? (
             <div className="muted sessions-empty">{t('sessions.empty')}</div>
           ) : (
@@ -275,6 +301,8 @@ export function HubView({
                         s={s}
                         t={t}
                         active={s.id === activeSessionId}
+                        stats={s.id === activeSessionId ? stats : undefined}
+                        locale={locale}
                         running={(busySessions?.has(s.id) ?? false) || s.live === 'busy'}
                         onResume={onResume}
                         onReload={onReload}
@@ -301,6 +329,8 @@ function SessionCard({
   s,
   t,
   active,
+  stats,
+  locale,
   running,
   onResume,
   onReload,
@@ -311,6 +341,8 @@ function SessionCard({
   s: SessionInfo;
   t: Translator;
   active: boolean;
+  stats?: StatsSnapshot; // only given for the active session
+  locale: string;
   running: boolean;
   onResume: (id: string) => void;
   onReload: (id: string) => void;
@@ -319,6 +351,7 @@ function SessionCard({
   onRename: (session: SessionInfo, name: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [draft, setDraft] = useState(s.title || '');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -361,29 +394,35 @@ function SessionCard({
     );
   }
 
+  const title = s.title || t('session.untitled');
   return (
-    <Tooltip
-      className="tt-block"
-      title={s.title || t('session.untitled')}
-      text={t('sessions.openHint')}
-      rows={sessionRows(s, t)}
-    >
+    <div className="ctx-card-wrap">
+      {/* A small tab on the card's top edge, outside the button: the title keeps the full width. */}
+      <span className="ctx-card-tools">
+        <CardAction icon="info" label={t('sessions.details')} pressed={infoOpen} keep onClick={() => setInfoOpen((o) => !o)} />
+        <CardAction icon="remote" label={t('sessions.remote')} onClick={() => onRemote(s.id)} />
+        <CardAction icon="reload" label={t('sessions.reload')} onClick={() => onReload(s.id)} />
+        <CardAction icon="edit" label={t('sessions.rename')} onClick={startEdit} />
+        <CardAction icon="trash" label={t('sessions.delete')} danger onClick={() => onDelete(s)} />
+      </span>
       <button
         type="button"
         className={`ctx-card ${active ? 'active' : ''} ${running ? 'running' : ''}`}
         onClick={() => onResume(s.id)}
       >
-        <span className="ctx-card-title">
-          {running && (
-            <span
-              className="voice-spinner ctx-card-spinner"
-              role="status"
-              title={t('status.busy')}
-              aria-label={t('status.busy')}
-            />
-          )}
-          {s.title || t('session.untitled')}
-        </span>
+        <Tooltip className="ctx-card-title-wrap" text={title}>
+          <span className="ctx-card-title">
+            {running && (
+              <span
+                className="voice-spinner ctx-card-spinner"
+                role="status"
+                title={t('status.busy')}
+                aria-label={t('status.busy')}
+              />
+            )}
+            {title}
+          </span>
+        </Tooltip>
         <span className="ctx-card-meta">
           {fmtDate(s.updatedAt)} · {s.messageCount} {t('sessions.messages')}
           {s.sizeBytes != null && <span className="muted"> · {fmtBytes(s.sizeBytes)}</span>}
@@ -393,58 +432,47 @@ function SessionCard({
             </span>
           )}
         </span>
-        <span className="ctx-card-actions">
-          <span
-            className="ctx-card-remote"
-            title={t('sessions.remote')}
-            role="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemote(s.id);
-            }}
-          >
-            📱
-          </span>
-          <span
-            className="ctx-card-reload"
-            title={t('sessions.reload')}
-            role="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onReload(s.id);
-            }}
-          >
-            ↻
-          </span>
-          <span
-            className="ctx-card-edit-btn"
-            title={t('sessions.rename')}
-            role="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              startEdit();
-            }}
-          >
-            ✏
-          </span>
-          <span
-            className="ctx-card-del"
-            title={t('sessions.delete')}
-            role="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(s);
-            }}
-          >
-            🗑
-          </span>
-        </span>
       </button>
-    </Tooltip>
+      {infoOpen && <SessionDetails t={t} locale={locale} session={s} stats={stats} />}
+    </div>
   );
 }
 
-// Vida do cache (TTL de 1h): barra do tempo restante + checkbox de keep-alive.
+// One small icon button on a session card.
+function CardAction({
+  icon,
+  label,
+  pressed,
+  danger,
+  keep,
+  onClick,
+}: {
+  icon: IconName;
+  label: string;
+  pressed?: boolean;
+  danger?: boolean;
+  keep?: boolean; // stays visible on the active card; the others show on hover
+  onClick: () => void;
+}) {
+  return (
+    <span
+      className={`ctx-card-act ${pressed ? 'open' : ''} ${danger ? 'danger' : ''} ${keep ? 'keep' : ''}`}
+      title={label}
+      aria-label={label}
+      role="button"
+      aria-pressed={pressed}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+    >
+      <Icon name={icon} />
+    </span>
+  );
+}
+
+// Cache life (1h TTL): the keep-alive checkbox, and, only while it is unchecked, the time left.
+// With keep-alive on the cache is refreshed before it expires, so the countdown says nothing.
 // `now` comes from the parent's 1s tick (live countdown).
 function CacheLife({ t, stats, now }: { t: Translator; stats: StatsSnapshot; now: number }) {
   const expiresAt = stats.cacheExpiresAt ?? 0;
@@ -455,16 +483,20 @@ function CacheLife({ t, stats, now }: { t: Translator; stats: StatsSnapshot; now
   const band = !alive ? 'crit' : pct > 0.25 ? 'ok' : pct > 0.08 ? 'warn' : 'crit';
   const keep = !!stats.keepCacheAlive;
   return (
-    <Tooltip className="tt-block" title={t('stats.cache.life')} text={t('tip.ctx.cacheLife')} meta={meta(t, 'computed', 'low')}>
-      <div className="stat-row stat-row-session">
-        <span className="stat-k">{t('stats.cache.life')}</span>
-        <span className={`stat-v ${band}`}>
-          {alive ? t('stats.cache.life.left', fmtDuration(remaining)) : t('stats.cache.life.expired')}
-        </span>
-      </div>
-      <div className="meter">
-        <div className={`meter-fill ${band}`} style={{ width: `${pct * 100}%` }} />
-      </div>
+    <div className="ctx-cache">
+      {!keep && (
+        <Tooltip className="tt-block" title={t('stats.cache.life')} text={t('tip.ctx.cacheLife')} meta={meta(t, 'computed', 'low')}>
+          <div className="stat-row stat-row-session">
+            <span className="stat-k">{t('stats.cache.life')}</span>
+            <span className={`stat-v ${band}`}>
+              {alive ? t('stats.cache.life.left', fmtDuration(remaining)) : t('stats.cache.life.expired')}
+            </span>
+          </div>
+          <div className="meter">
+            <div className={`meter-fill ${band}`} style={{ width: `${pct * 100}%` }} />
+          </div>
+        </Tooltip>
+      )}
       <label className="ctx-keepalive">
         <input
           type="checkbox"
@@ -473,10 +505,12 @@ function CacheLife({ t, stats, now }: { t: Translator; stats: StatsSnapshot; now
         />
         <span>{t('stats.cache.keepAlive')}</span>
       </label>
-    </Tooltip>
+    </div>
   );
 }
 
+// What stays on the dashboard: the context window and the cache keep-alive. The rest of the
+// session's numbers live under the (i) on the active session card (SessionDetails).
 function ContextInfo({
   t,
   locale,
@@ -489,17 +523,18 @@ function ContextInfo({
   busy?: boolean;
 }) {
   const [now, setNow] = useState(Date.now());
+  // The cache countdown is only shown without keep-alive: tick only then.
+  const counting = stats.cacheExpiresAt != null && !stats.keepCacheAlive;
   useEffect(() => {
-    if (!stats.sessionStartTs) return;
+    if (!counting) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [stats.sessionStartTs]);
+  }, [counting]);
 
   const used = stats.contextUsed;
   const limit = stats.contextLimit || 1;
   const pct = Math.min(1, used / limit);
   const band = pct < 0.6 ? 'ok' : pct < 0.85 ? 'warn' : 'crit';
-  const elapsed = stats.sessionStartTs ? now - stats.sessionStartTs : undefined;
 
   return (
     <>
@@ -521,95 +556,110 @@ function ContextInfo({
         <div className="meter">
           <div className={`meter-fill ${band}`} style={{ width: `${pct * 100}%` }} />
         </div>
+        <div className="ctx-info-nums">{t('stats.context.used', fmtInt(used, locale), fmtInt(limit, locale))}</div>
       </Tooltip>
-      <div className="ctx-info-nums">
-        {t('stats.context.used', fmtInt(used, locale), fmtInt(limit, locale))}
-        <span className="muted">
-          {' '}
-          · {t('stats.context.remaining', fmtInt(Math.max(0, limit - used), locale))}
-        </span>
-      </div>
       {pct >= 0.85 && <div className="alert">{t('alert.contextHigh')}</div>}
 
-      {/* Duração da sessão */}
-      {elapsed != null && (
-        <Tooltip className="tt-block" title={t('stats.session.duration')} text={t('tip.ctx.duration')} meta={meta(t, 'local', 'high')}>
-          <div className="stat-row stat-row-session">
-            <span className="stat-k">{t('stats.session.duration')}</span>
-            <span className="stat-v">{fmtDuration(elapsed)}</span>
+      {stats.cacheExpiresAt != null && <CacheLife t={t} stats={stats} now={now} />}
+    </>
+  );
+}
+
+// The numbers of the active session, in a compact two-column layout; opened with the (i) on its
+// card. Tokens, cache, cost and activity, as they used to sit on the dashboard.
+function SessionDetails({
+  t,
+  locale,
+  session,
+  stats,
+}: {
+  t: Translator;
+  locale: string;
+  session: SessionInfo;
+  stats?: StatsSnapshot; // only for the active session
+}) {
+  const peak =
+    stats && stats.peakContextUsed != null && stats.peakContextUsed > 0
+      ? (() => {
+          const peakPct = fmtPct(Math.min(1, stats.peakContextUsed / (stats.contextLimit || 1)));
+          const peakStr = `${fmtCompact(stats.peakContextUsed)} (${peakPct})`;
+          // Old sessions have no persisted peakCacheTokens: the current cache is the fallback.
+          const peakCache = stats.peakCacheTokens ?? stats.cacheReadTokens + stats.cacheCreateTokens;
+          return peakCache > 0 ? `${peakStr} · cache ${fmtCompact(peakCache)}` : peakStr;
+        })()
+      : undefined;
+  return (
+    <div className="ctx-details">
+      <div className="ctx-details-grid">
+        {sessionRows(session, t).map((r) => (
+          <div className="stat-row" key={r.label}>
+            <span className="stat-k">{r.label}</span>
+            <span className={`stat-v ${r.accent ? 'accent' : ''}`}>{r.value}</span>
           </div>
-        </Tooltip>
-      )}
+        ))}
+      </div>
+      {stats && <SessionStats t={t} locale={locale} stats={stats} peak={peak} />}
+    </div>
+  );
+}
 
-      {/* Vida do cache (TTL de 1h) + keep-alive */}
-      {stats.cacheExpiresAt != null && (
-        <CacheLife t={t} stats={stats} now={now} />
-      )}
-
-      <div className="ctx-info-grid">
-        <div>
-          <Tooltip className="tt-block" title={t('stats.tokens')} text={t('tip.ctx.tokensSection')} meta={meta(t, 'server', 'high')}>
-            <div className="stats-section-title">{t('stats.tokens')}</div>
-          </Tooltip>
-          <Row k={t('stats.tokens.input')} v={fmtInt(stats.inputTokens, locale)} tip={t('tip.ctx.input')} tipMeta={meta(t, 'server', 'high')} />
-          <Row k={t('stats.tokens.output')} v={fmtInt(stats.outputTokens, locale)} tip={t('tip.ctx.output')} tipMeta={meta(t, 'server', 'high')} />
-        </div>
-        <div>
-          <Tooltip className="tt-block" title={t('stats.cache')} text={t('tip.ctx.cacheSection')} meta={meta(t, 'server', 'high')}>
-            <div className="stats-section-title">{t('stats.cache')}</div>
-          </Tooltip>
-          <Row k={t('stats.cache.hitRate')} v={fmtPct(stats.cacheHitRate)} tip={t('tip.ctx.hit')} tipMeta={meta(t, 'computed', 'high')} />
-          <Row k={t('stats.cache.read')} v={fmtCompact(stats.cacheReadTokens)} tip={t('tip.ctx.cacheRead')} tipMeta={meta(t, 'server', 'high')} />
-          <Row k={t('stats.cache.write')} v={fmtCompact(stats.cacheCreateTokens)} tip={t('tip.ctx.cacheWrite')} tipMeta={meta(t, 'server', 'high')} />
-          {stats.cacheSavingsUsd != null && stats.cacheSavingsUsd > 0 && (
-            <Row
-              k={t('stats.cache.savings')}
-              v={fmtUsdShort(stats.cacheSavingsUsd)}
-              tip={t('tip.ctx.savings')}
-              tipMeta={meta(t, 'estimate', 'medium')}
-            />
-          )}
-        </div>
+// Tokens, cache, cost and activity of the active session.
+function SessionStats({
+  t,
+  locale,
+  stats,
+  peak,
+}: {
+  t: Translator;
+  locale: string;
+  stats: StatsSnapshot;
+  peak?: string;
+}) {
+  return (
+    <>
+      <div className="ctx-details-title">{t('stats.tokens')}</div>
+      <div className="ctx-details-grid">
+        <Row k={t('stats.tokens.input')} v={fmtInt(stats.inputTokens, locale)} tip={t('tip.ctx.input')} tipMeta={meta(t, 'server', 'high')} />
+        <Row k={t('stats.tokens.output')} v={fmtInt(stats.outputTokens, locale)} tip={t('tip.ctx.output')} tipMeta={meta(t, 'server', 'high')} />
       </div>
 
-      {/* Custo da sessão com badge estimado/real */}
-      <div className="ctx-info-grid">
-        <div>
-          <div className="stats-section-title">{t('stats.cost')}</div>
-          <div className="stat-row">
-            <span className="stat-k">{t('stats.cost.session')}</span>
-            <span className="stat-v">
-              {fmtUsdShort(stats.sessionCostUsd)}
-              {stats.costIsEstimate && (
-                <span className="stat-badge est" title={t('tip.ctx.costEstimate')}>
-                  ~
-                </span>
-              )}
-            </span>
-          </div>
-          {stats.lastTurnCostUsd > 0 && (
-            <Row k={t('stats.cost.lastTurn')} v={fmtUsdShort(stats.lastTurnCostUsd)} />
-          )}
-        </div>
+      <div className="ctx-details-title">{t('stats.cache')}</div>
+      <div className="ctx-details-grid">
+        <Row k={t('stats.cache.hitRate')} v={fmtPct(stats.cacheHitRate)} tip={t('tip.ctx.hit')} tipMeta={meta(t, 'computed', 'high')} />
+        <Row k={t('stats.cache.read')} v={fmtCompact(stats.cacheReadTokens)} tip={t('tip.ctx.cacheRead')} tipMeta={meta(t, 'server', 'high')} />
+        <Row k={t('stats.cache.write')} v={fmtCompact(stats.cacheCreateTokens)} tip={t('tip.ctx.cacheWrite')} tipMeta={meta(t, 'server', 'high')} />
+        {stats.cacheSavingsUsd != null && stats.cacheSavingsUsd > 0 && (
+          <Row
+            k={t('stats.cache.savings')}
+            v={fmtUsdShort(stats.cacheSavingsUsd)}
+            tip={t('tip.ctx.savings')}
+            tipMeta={meta(t, 'estimate', 'medium')}
+          />
+        )}
       </div>
 
-      {/* Atividade da sessão: contadores persistentes (turnos, pico, compactações,
-          resets de cache). Só aparece quando há ao menos um turno consolidado. */}
+      <div className="ctx-details-title">{t('stats.cost')}</div>
+      <div className="ctx-details-grid">
+        <div className="stat-row">
+          <span className="stat-k">{t('stats.cost.session')}</span>
+          <span className="stat-v">
+            {fmtUsdShort(stats.sessionCostUsd)}
+            {stats.costIsEstimate && (
+              <span className="stat-badge est" title={t('tip.ctx.costEstimate')}>
+                ~
+              </span>
+            )}
+          </span>
+        </div>
+        {stats.lastTurnCostUsd > 0 && <Row k={t('stats.cost.lastTurn')} v={fmtUsdShort(stats.lastTurnCostUsd)} />}
+      </div>
+
+      {/* Persistent counters: only once at least one turn is consolidated. */}
       {(stats.turnCount ?? 0) > 0 && (
-        <div className="ctx-info-grid">
-          <div>
-            <Tooltip className="tt-block" title={t('stats.activity')} text={t('tip.ctx.activity')} meta={meta(t, 'computed', 'medium')}>
-              <div className="stats-section-title">{t('stats.activity')}</div>
-            </Tooltip>
+        <>
+          <div className="ctx-details-title">{t('stats.activity')}</div>
+          <div className="ctx-details-grid">
             <Row k={t('stats.activity.turns')} v={fmtInt(stats.turnCount ?? 0, locale)} />
-            {stats.peakContextUsed != null && stats.peakContextUsed > 0 && (() => {
-              const peakPct = fmtPct(Math.min(1, stats.peakContextUsed / (stats.contextLimit || 1)));
-              const peakStr = `${fmtCompact(stats.peakContextUsed)} (${peakPct})`;
-              // Sessões antigas não têm peakCacheTokens persistido: usa o cache atual como fallback
-              const peakCache = stats.peakCacheTokens ?? (stats.cacheReadTokens + stats.cacheCreateTokens);
-              const v = peakCache > 0 ? `${peakStr} · cache ${fmtCompact(peakCache)}` : peakStr;
-              return <Row k={t('stats.activity.peak')} v={v} tip={t('tip.ctx.peak')} tipMeta={meta(t, 'computed', 'high')} />;
-            })()}
             {(stats.compactionCount ?? 0) > 0 && (
               <Row
                 k={t('stats.activity.compactions')}
@@ -630,13 +680,14 @@ function ContextInfo({
                 tipMeta={meta(t, 'computed', 'medium')}
               />
             )}
+            {peak && (
+              <div className="ctx-details-wide">
+                <Row k={t('stats.activity.peak')} v={peak} tip={t('tip.ctx.peak')} tipMeta={meta(t, 'computed', 'high')} />
+              </div>
+            )}
           </div>
-        </div>
+        </>
       )}
-
-      {/* Aceitação de ferramentas e log de negações (E5) NÃO ficam aqui: o Hub é a
-          tela inicial, e essa auditoria é da conversa. Os dados continuam sendo
-          coletados/persistidos (StatsAggregator + StatsStore) para quem os exibir. */}
     </>
   );
 }
@@ -721,53 +772,6 @@ function prettyChip(id: string): string {
 
 // Date/time in the PC's REGION format (injected by the host via Node Intl),
 // independente do idioma da UI. Fallback: locale do webview.
-// Onboarding checklist (dismissible, persisted in the webview state). The CLI and
-// login steps tick themselves from the state; opening a context and dictation are hints.
-function Onboarding({
-  t,
-  cliMissing,
-  loggedIn,
-  hasSessions,
-}: {
-  t: Translator;
-  cliMissing: boolean;
-  loggedIn: boolean;
-  hasSessions: boolean;
-}) {
-  const [dismissed, setDismissed] = useState(
-    () => readState<{ onboardingDone?: boolean }>()?.onboardingDone === true,
-  );
-  if (dismissed) return null;
-  const steps: { done: boolean; label: string }[] = [
-    { done: !cliMissing, label: t('onboarding.cli') },
-    { done: loggedIn, label: t('onboarding.signin') },
-    { done: hasSessions, label: t('onboarding.session') },
-    { done: false, label: t('onboarding.voice') },
-  ];
-  const dismiss = () => {
-    saveState({ onboardingDone: true });
-    setDismissed(true);
-  };
-  return (
-    <div className="onboarding">
-      <div className="onboarding-head">
-        <span className="onboarding-title">🎓 {t('onboarding.title')}</span>
-        <button type="button" className="onboarding-x" title={t('onboarding.dismiss')} onClick={dismiss}>
-          ✕
-        </button>
-      </div>
-      <ul className="onboarding-list">
-        {steps.map((s) => (
-          <li key={s.label} className={s.done ? 'done' : ''}>
-            <span className="onboarding-check">{s.done ? '✓' : '○'}</span>
-            {s.label}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 // Groups the sessions by time range (updatedAt) for the hub grid. The list already
 // arrives sorted by most recent; that order is preserved within each range.
 function groupSessions(sessions: SessionInfo[]): { key: string; items: SessionInfo[] }[] {

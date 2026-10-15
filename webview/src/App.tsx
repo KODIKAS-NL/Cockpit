@@ -478,7 +478,6 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
           busy={tab?.status === 'busy' || tab?.bgBusy === true}
           loggedIn={state.loggedIn}
           sessions={state.sessions}
-          cwd={state.sessionsCwd}
           activeSessionId={tab?.sessionId ?? tab?.session?.sessionId}
           busySessions={
             new Set(
@@ -488,7 +487,6 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
             )
           }
           onNewSession={() => send({ kind: 'newTab' })}
-          onOpenFolder={(path) => send({ kind: 'openFolder', path })}
           onSettings={onSettings}
           onUsage={onUsage}
           onPlugins={onPlugins}

@@ -29,3 +29,6 @@ package-vsix.ps1
 package-vsix.cmd
 package-vsix.sh
 mac/**
+
+# Personal session notes, never shipped
+HANDOFF.md

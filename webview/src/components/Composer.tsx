@@ -69,6 +69,10 @@ const rid = () => `c_${Date.now()}_${seq++}`;
 // Memoised for the same reason as Timeline: the composer holds the draft in local state, so
 // a stream delta has nothing new to tell it, yet every delta used to re-render it — and with
 // it the highlight.js pass over the draft. Its handlers are useCallback-stable in App.
+// The prompt box shows 2 rows at rest and grows with the text up to 10 rows, then scrolls.
+const MIN_ROWS = 2;
+const MAX_ROWS = 10;
+
 export const Composer = memo(function Composer({
   t,
   locale,
@@ -108,7 +112,7 @@ export const Composer = memo(function Composer({
   const ref = useRef<HTMLTextAreaElement>(null);
   const hadFocus = useRef(false); // the textarea was focused when the window lost focus
   const hlRef = useRef<HTMLPreElement>(null); // syntax-highlight mirror behind the textarea
-  const baseH = useRef(0); // default height (rows=2), captured on the first measurement
+  const measureRef = useRef<HTMLPreElement>(null); // hidden copy of the text, sized by its content
   // Voice dictation: button state + the text base when it started. The mic capture
   // happens IN THE HOST (the VSCode webview blocks getUserMedia); here we only signal it.
   const [recording, setRecording] = useState(false);
@@ -136,34 +140,36 @@ export const Composer = memo(function Composer({
     return off;
   }, []);
 
-  // Auto-expands the height (up to 4x) and updates the highlight mirror.
+  // Auto-expands the textarea: 2 rows to start with, growing as the text needs more rows, up to 10.
   //
-  // This used to write height:'auto' and then read scrollHeight. That pair forces a
-  // SYNCHRONOUS full-document reflow on EVERY keystroke, and the composer is a flex sibling
-  // of the timeline, so the cost grew with the transcript until typing became unusable in
-  // long sessions. Two changes fix it without changing the behaviour:
-  //
-  //  - We measure the mirror <pre> instead. It carries the same text under the same font,
-  //    padding and wrapping rules (both share one CSS rule) and is overflow:hidden, so its
-  //    scrollHeight IS the natural content height — no need to un-set our own height first.
-  //  - The result is memoised, so the common keystroke (same line count) writes no style at
-  //    all and never dirties layout.
+  // The height is counted in ROWS, not read back from the box: the highlight mirror is pinned
+  // to the textarea's own box (inset:0), so its scrollHeight can never be smaller than the box
+  // and says nothing about the text. A hidden <pre> that shares the mirror's typography and
+  // width but has no fixed height gives the real content height. Reading it costs one layout of
+  // that small element; the textarea itself is never reset to height:auto (which used to force
+  // a full-document reflow on every keystroke, and grew with the transcript). The result is
+  // memoised, so the common keystroke (same row count) writes no style at all.
   const lastH = useRef(-1);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const hl = hlRef.current;
+    const meter = measureRef.current;
     // The trailing \n guarantees the last line (and trailing breaks) have height in the mirror.
     // spell=true marks wrong words (after the dictionaries load; spellTick).
     if (hl) hl.innerHTML = `${richHighlight(text, spellCheck && spellReady())}\n`;
-    if (!baseH.current) baseH.current = el.clientHeight; // 2 lines, before any inline height
-    const max = baseH.current * 4;
-    const natural = hl ? hl.scrollHeight : el.scrollHeight;
-    const next = Math.max(Math.min(natural, max), baseH.current);
+    if (!meter) return;
+    meter.textContent = `${text}\n`;
+    const cs = getComputedStyle(el);
+    const lineH = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.4;
+    const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const rows = Math.round((meter.offsetHeight - pad) / lineH);
+    const shown = Math.min(Math.max(rows, MIN_ROWS), MAX_ROWS);
+    const next = Math.ceil(shown * lineH + pad);
     if (next === lastH.current) return; // same height: don't touch style, don't invalidate layout
     lastH.current = next;
     el.style.height = `${next}px`;
-    el.style.overflowY = natural > max ? 'auto' : 'hidden';
+    el.style.overflowY = rows > MAX_ROWS ? 'auto' : 'hidden';
   }, [text, spellTick, spellCheck]);
 
   // Focus lost when coming back from another app: when the VSCode window is reactivated, the
@@ -740,6 +746,7 @@ export const Composer = memo(function Composer({
           }}
         >
           <pre className="composer-highlight hljs" ref={hlRef} aria-hidden="true" />
+          <pre className="composer-measure" ref={measureRef} aria-hidden="true" />
           {connecting && (
             <div className="voice-connecting" role="status">
               <span className="voice-spinner" aria-hidden="true" />
