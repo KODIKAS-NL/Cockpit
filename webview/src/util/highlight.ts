@@ -83,7 +83,7 @@ export interface Highlighted {
 
 export function highlightCode(code: string, language?: string): Highlighted {
   if (!code) return { html: '' };
-  if (code.length > MAX) return { html: escapeHtml(code) };
+  if (code.length > MAX || language === 'plaintext') return { html: escapeHtml(code) };
   try {
     if (language && hljs.getLanguage(language)) {
       return {

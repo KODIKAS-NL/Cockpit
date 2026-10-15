@@ -19,7 +19,13 @@ export type IconName =
   | 'info'
   | 'remote'
   | 'reload'
-  | 'edit';
+  | 'edit'
+  | 'terminal'
+  | 'file'
+  | 'globe'
+  | 'search'
+  | 'diamond'
+  | 'plan';
 
 const PATHS: Record<IconName, ReactElement> = {
   usage: <path d="M3 21h18M6 17v-5M11 17V6M16 17v-8M21 17v-3" />,
@@ -65,15 +71,33 @@ const PATHS: Record<IconName, ReactElement> = {
   reload: <path d="M20 12a8 8 0 1 1-2.5-5.8M20 4v5h-5" />,
   // Pencil: rename.
   edit: <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />,
+  terminal: <path d="M4 17l6-6-6-6M12 19h8" />,
+  file: <path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8l-4-5zM14 3v5h4" />,
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9S14.5 18.3 12 21c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6" />
+      <path d="M20 20l-4.2-4.2" />
+    </>
+  ),
+  // A generic tool.
+  diamond: <path d="M12 3l9 9-9 9-9-9 9-9z" />,
+  // A list: a plan.
+  plan: <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" />,
   trash: <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />,
 };
 
-export function Icon({ name }: { name: IconName }) {
+export function Icon({ name, size = 12 }: { name: IconName; size?: number }) {
   return (
     <svg
       className="hub-icon"
-      width="12"
-      height="12"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

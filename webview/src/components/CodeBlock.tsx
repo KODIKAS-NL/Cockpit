@@ -20,7 +20,7 @@ export function CodeBlock({ code, language, lineNumbers }: Props) {
     });
   };
   return (
-    <pre className="md-code">
+    <pre className={`md-code ${language === 'plaintext' ? 'wrap' : ''}`}>
       <button type="button" className="code-copy" onClick={copy} title="Copy">
         {copied ? '✓' : '⧉'}
       </button>

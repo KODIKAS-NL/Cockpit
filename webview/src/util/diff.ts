@@ -16,8 +16,10 @@ export interface DiffResult {
 const MAX_CELLS = 400_000; // DP limit (n*m) to avoid freezing on huge files
 
 export function sideBySideDiff(oldText: string, newText: string): DiffResult {
-  const a = oldText.length ? oldText.split('\n') : [];
-  const b = newText.length ? newText.split('\n') : [];
+  // A final newline ends the last line; it does not start another one.
+  const lines = (t: string) => (t.length ? t.replace(/\n$/, '').split('\n') : []);
+  const a = lines(oldText);
+  const b = lines(newText);
   const n = a.length;
   const m = b.length;
 

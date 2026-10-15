@@ -1199,6 +1199,10 @@ body {
   font-size: 12px;
   line-height: 1.45;
 }
+.md-code.wrap code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .md-code .code-lang {
   position: absolute;
   top: 4px;
@@ -2460,13 +2464,13 @@ body {
   position: fixed;
   inset: 0;
   z-index: 1000; /* acima de tudo (texto do chat, cards, scroll-bottom) */
-  background: rgba(0, 0, 0, 0.58);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   animation: overlay-in 0.16s ease;
 }
 @keyframes overlay-in {
@@ -2479,15 +2483,12 @@ body {
 }
 .modal {
   background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-  border: 1.5px solid var(--tt-accent);
-  border-radius: 10px;
-  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--vscode-foreground) 22%, transparent);
+  border-radius: 6px;
+  padding: 14px 16px;
   max-width: 100%;
   width: 360px;
-  box-shadow:
-    0 0 0 1px var(--tt-accent),
-    0 10px 40px var(--tt-accent-soft),
-    0 18px 52px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.3);
   animation: modal-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 @keyframes modal-in {
@@ -2507,7 +2508,7 @@ body {
   }
 }
 .modal-title {
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 6px;
 }
 .modal-body {
@@ -3302,6 +3303,12 @@ body {
   cursor: default;
 }
 
+/* Keyboard focus in a dialog: the editor's own ring, not a glow. */
+.modal .btn:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #3794ff);
+  outline-offset: 1px;
+}
+
 /* ---------- Permission modal ---------- */
 .modal.perm {
   width: 420px;
@@ -3316,19 +3323,10 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  font-size: 15px;
-  font-weight: 700;
-  background: color-mix(in srgb, var(--vscode-focusBorder, #3794ff) 22%, transparent);
-  color: var(--vscode-focusBorder, #3794ff);
+  width: 24px;
   flex: 0 0 auto;
-}
-.perm-icon.shell {
-  font-family: var(--vscode-editor-font-family, monospace);
-  background: color-mix(in srgb, var(--vscode-charts-green, #3fb950) 20%, transparent);
-  color: var(--vscode-charts-green, #3fb950);
+  color: var(--vscode-foreground);
+  opacity: 0.7;
 }
 .perm-headtext .modal-title {
   margin-bottom: 0;
@@ -3336,8 +3334,7 @@ body {
 }
 .perm-tool {
   font-size: 12px;
-  font-weight: 600;
-  opacity: 0.75;
+  opacity: 0.65;
 }
 .perm-desc {
   font-size: 12px;
@@ -3364,14 +3361,14 @@ body {
 /* Comando -> bloco de terminal */
 .perm-term {
   display: flex;
-  gap: 9px;
+  gap: 8px;
   align-items: flex-start;
   /* The terminal tokens are not always exposed to webviews, and a light theme gave a dark
      background (fallback) under dark text. Both colors come from the editor, which always pairs. */
   background: var(--vscode-editor-background, #1e1e1e);
   border: 1px solid var(--vscode-panel-border, #333);
-  border-radius: 8px;
-  padding: 11px 13px;
+  border-radius: 4px;
+  padding: 9px 11px;
   font-family: var(--vscode-editor-font-family, monospace);
   font-size: 12.5px;
   line-height: 1.5;
@@ -3379,13 +3376,13 @@ body {
   overflow: auto;
 }
 .perm-term-prompt {
-  color: var(--vscode-charts-green, #3fb950);
-  font-weight: 700;
+  opacity: 0.55;
   flex: 0 0 auto;
   -webkit-user-select: none;
   user-select: none;
 }
 .perm-term-cmd {
+  background: transparent; /* VS Code's webview stylesheet would give <code> its own */
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--vscode-editor-foreground, var(--vscode-foreground));
@@ -3446,8 +3443,9 @@ body {
 
 /* ---------- Diff lado-a-lado ---------- */
 .diff {
+  container: diff / inline-size;
   border: 1px solid var(--vscode-panel-border, #444);
-  border-radius: 8px;
+  border-radius: 4px;
   overflow: hidden;
   font-family: var(--vscode-editor-font-family, monospace);
   font-size: 12px;
@@ -3465,7 +3463,10 @@ body {
 }
 .diff-file {
   opacity: 0.8;
-  word-break: break-all;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .diff-stat {
   display: flex;
@@ -3506,6 +3507,11 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
   padding: 0 5px;
+  /* VS Code's webview stylesheet gives every <code> a preformatted background and colour; the
+     empty cells of an added or removed line must not pick them up. */
+  background: transparent;
+  color: inherit;
+  border-radius: 0;
 }
 .diff-row.del .diff-code.left,
 .diff-row.change .diff-code.left {
@@ -3523,6 +3529,32 @@ body {
 .diff-row.change .diff-sign.right {
   color: var(--vscode-charts-green, #3fb950);
 }
+/* Narrow (a side bar chat): one column instead of before | after. A changed line shows the old
+   one above the new one; an added or removed line shows only its own side. */
+@container diff (max-width: 520px) {
+  .diff-row {
+    grid-template-columns: 2.6em 1.1em minmax(0, 1fr);
+  }
+  .diff-row.add > :nth-child(-n + 3),
+  .diff-row.del > :nth-child(n + 4),
+  .diff-row.equal > :nth-child(n + 4) {
+    display: none;
+  }
+  .diff-ln.diff-mid {
+    border-left: 0;
+  }
+}
+/* A file that is only added (or only removed) never needs the empty half. */
+.diff-single .diff-row {
+  grid-template-columns: 2.6em 1.1em minmax(0, 1fr);
+}
+.diff-single .diff-row.add > :nth-child(-n + 3),
+.diff-single .diff-row.del > :nth-child(n + 4) {
+  display: none;
+}
+.diff-single .diff-ln.diff-mid {
+  border-left: 0;
+}
 .diff-trunc {
   text-align: center;
   opacity: 0.5;
@@ -3538,12 +3570,17 @@ body {
   border: 1px solid var(--vscode-panel-border, #444);
   background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.08));
 }
-/* Botão "Abrir diff no editor" no modal de permissão. */
-.perm-opendiff {
-  margin-top: 8px;
+/* "Open diff in editor": a quiet link under the diff. */
+.btn.perm-opendiff {
+  margin-top: 4px;
   font-size: 11px;
-  padding: 3px 10px;
-  opacity: 0.9;
+  padding: 0;
+  background: transparent;
+  color: var(--vscode-textLink-foreground, #3794ff);
+}
+.btn.perm-opendiff:hover {
+  background: transparent;
+  text-decoration: underline;
 }
 /* Botão Editar/Visualizar no cabeçalho do plano. */
 .perm-plan-edit {
@@ -3707,7 +3744,7 @@ body {
   font-size: 10.5px;
   opacity: 0.55;
   text-align: right;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 /* ---------- Ask (AskUserQuestion) modal ---------- */
@@ -4371,6 +4408,9 @@ body {
 .ctx-card-act.danger:hover {
   color: var(--vscode-charts-red, #f85149);
   background: color-mix(in srgb, var(--vscode-charts-red, #f85149) 16%, transparent);
+}
+.ctx-details .stat-v {
+  white-space: nowrap;
 }
 .ctx-details .stat-v.accent {
   color: var(--vscode-textLink-foreground, #3794ff);

@@ -325,7 +325,7 @@ export const ptBR: Partial<Strings> = {
   'tip.deleteAll.title': 'Apagar todas as sessões',
   'tip.deleteAll.desc': 'Apaga do disco, permanentemente, todas as sessões salvas nesta pasta.',
   'tip.settings.title': 'Configurações',
-  'tip.settings.desc': 'Abre as configurações do Tootega Cockpit: modelo, effort, permissões, idioma e mais.',
+  'tip.settings.desc': 'Abre as configurações do Cockpit for Claude Code: modelo, effort, permissões, idioma e mais.',
   'tip.login.title': 'Entrar',
   'tip.login.desc': 'Entra no Claude num terminal (OAuth no browser via CLI). Credenciais ficam no CLI.',
   'tip.logout.title': 'Sair',

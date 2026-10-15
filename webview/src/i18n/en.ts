@@ -388,7 +388,7 @@ export const en = {
   'tip.deleteAll.title': 'Delete all sessions',
   'tip.deleteAll.desc': 'Permanently delete every saved session in this folder from disk.',
   'tip.settings.title': 'Settings',
-  'tip.settings.desc': 'Open Tootega Cockpit settings: model, effort, permissions, language and more.',
+  'tip.settings.desc': 'Open Cockpit for Claude Code settings: model, effort, permissions, language and more.',
   'tip.login.title': 'Sign in',
   'tip.login.desc': 'Sign in to Claude in a terminal (browser OAuth via the CLI). Credentials stay in the CLI.',
   'tip.logout.title': 'Sign out',

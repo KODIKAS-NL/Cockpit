@@ -4,6 +4,7 @@ import type { PermissionRequest } from '../types';
 import { Markdown } from './Markdown';
 import { DiffView } from './DiffView';
 import { Portal } from './Portal';
+import { Icon, type IconName } from './Icon';
 import { send } from '../vscodeApi';
 import { splitInvisible, hasInvisible, codeLabel, codeMark } from '../invisible';
 
@@ -13,17 +14,15 @@ interface Props {
   onDecision: (d: 'allow' | 'deny' | 'allow_always', message?: string) => void;
 }
 
-// Icon per tool (mirrors the Timeline's set).
-const TOOL_ICON: Record<string, string> = {
-  Bash: '$_',
-  Write: '✎',
-  Edit: '✎',
-  MultiEdit: '✎',
-  NotebookEdit: '✎',
-  Read: '◇',
-  WebFetch: '🌐',
-  WebSearch: '🔎',
-  Task: '⚙',
+// Line icon per tool.
+const TOOL_ICON: Record<string, IconName> = {
+  Write: 'edit',
+  Edit: 'edit',
+  MultiEdit: 'edit',
+  NotebookEdit: 'edit',
+  Read: 'file',
+  WebFetch: 'globe',
+  WebSearch: 'search',
 };
 
 export function PermissionModal({ t, req, onDecision }: Props) {
@@ -44,7 +43,7 @@ export function PermissionModal({ t, req, onDecision }: Props) {
   const inp = (req.input ?? {}) as Record<string, unknown>;
   const isShell = typeof inp.command === 'string' && !!inp.command;
   const name = req.displayName || req.tool;
-  const icon = isShell ? '❯' : (TOOL_ICON[req.tool] ?? '◆');
+  const icon: IconName = isShell ? 'terminal' : (TOOL_ICON[req.tool] ?? 'diamond');
   const preview = inputPreview(req);
   const alwaysLabel = suggestionLabel(t, req) ?? t('permission.allowAlways');
 
@@ -56,7 +55,9 @@ export function PermissionModal({ t, req, onDecision }: Props) {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="perm-head">
-            <span className={`perm-icon ${isShell ? 'shell' : ''}`}>{icon}</span>
+            <span className="perm-icon">
+              <Icon name={icon} size={16} />
+            </span>
             <div className="perm-headtext">
               <div className="modal-title">{t('permission.title')}</div>
               <div className="perm-tool">{name}</div>
@@ -130,7 +131,7 @@ function PreviewBlock({ p }: { p: Preview }) {
   if (p.kind === 'cmd') {
     return (
       <div className="perm-term">
-        <span className="perm-term-prompt">❯</span>
+        <span className="perm-term-prompt">$</span>
         <code className="perm-term-cmd">
           {splitInvisible(p.text).map((s, i) =>
             s.code == null ? (
@@ -153,7 +154,9 @@ function PreviewBlock({ p }: { p: Preview }) {
       <div className="perm-preview">
         {p.label && (
           <div className="perm-file">
-            <span className="perm-file-ico">▤</span>
+            <span className="perm-file-ico">
+              <Icon name="file" />
+            </span>
             <span className="perm-file-name">{p.label}</span>
           </div>
         )}
@@ -236,7 +239,9 @@ function PlanModal({ t, req, onDecision }: Props) {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="perm-head">
-            <span className="perm-icon">◑</span>
+            <span className="perm-icon">
+              <Icon name="plan" size={16} />
+            </span>
             <div className="perm-headtext">
               <div className="modal-title">{t('permission.planTitle')}</div>
               <div className="perm-tool">{t('permission.planSubtitle')}</div>
@@ -269,7 +274,9 @@ function PlanModal({ t, req, onDecision }: Props) {
             {planFile ? (
               <div className="perm-plan-file">
                 <button type="button" className="perm-plan-link" onClick={openPlan} title={planFile}>
-                  <span className="perm-plan-fileicon" aria-hidden>📄</span>
+                  <span className="perm-plan-fileicon" aria-hidden>
+                    <Icon name="file" />
+                  </span>
                   {planFile}
                 </button>
                 <div className="perm-plan-filenote">{t('permission.planSavedNote')}</div>

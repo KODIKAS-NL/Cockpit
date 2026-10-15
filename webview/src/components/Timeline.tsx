@@ -872,7 +872,8 @@ function ToolCard({ items, t, defaultOpen }: { items: ToolItem[]; t: Translator;
   function renderBody(item: ToolItem) {
     const input = (item.input ?? {}) as Record<string, unknown>;
     const filePath = typeof input.file_path === 'string' ? input.file_path : undefined;
-    const lang = languageFromPath(filePath);
+    // A file whose type we do not know is plain text, not whatever highlight.js guesses from it.
+    const lang = languageFromPath(filePath) ?? (filePath ? 'plaintext' : undefined);
     const name = item.name;
     const command = typeof input.command === 'string' ? input.command : undefined;
     const description = typeof input.description === 'string' ? input.description : undefined;

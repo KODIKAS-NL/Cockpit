@@ -592,7 +592,10 @@ function SessionDetails({
     <div className="ctx-details">
       <div className="ctx-details-grid">
         {sessionRows(session, t).map((r) => (
-          <div className="stat-row" key={r.label}>
+          <div
+            className={`stat-row ${r.label === t('tip.sess.created') || r.label === t('tip.sess.updated') ? 'ctx-details-wide' : ''}`}
+            key={r.label}
+          >
             <span className="stat-k">{r.label}</span>
             <span className={`stat-v ${r.accent ? 'accent' : ''}`}>{r.value}</span>
           </div>

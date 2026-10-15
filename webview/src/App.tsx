@@ -162,6 +162,13 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
         }
         setShowCreds(false);
       }
+      if (data?.kind === 'focusPrompt') {
+        // The waiting card's main button (Allow, Submit, Approve), else the first control in it.
+        setTimeout(() => {
+          const modal = document.querySelector('.modal');
+          (modal?.querySelector<HTMLElement>('.btn.send') ?? modal?.querySelector<HTMLElement>('input, button'))?.focus();
+        }, 60);
+      }
       dispatch({ type: 'host', msg: data });
     };
     window.addEventListener('message', onMsg);
