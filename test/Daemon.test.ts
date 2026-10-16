@@ -268,6 +268,22 @@ describe('cockpit-daemon', () => {
     await until(() => cliLog().filter((l) => l.request?.subtype === 'remote_control').length > before);
   });
 
+  it('keeps Remote Control on when re-enabling fails once after a restart', async () => {
+    const flaky = path.join(os.tmpdir(), `fake-rc-${process.pid}-${Date.now()}`);
+    const a = await peer('A');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-f'], env: { FAKE_RC_FLAKY: flaky } }));
+    a.write({ op: 'remote', sessionId: s.session.id, on: true, reqId: 'rf1' });
+    await a.wait((m) => m.type === 'remote_result');
+    a.write({ op: 'stop', sessionId: s.session.id });
+    await a.wait((m) => m.type === 'exit');
+    a.user(s.session.id, 'again');
+    // The first re-enable fails, the retry succeeds: the window gets the link again, never an 'off'.
+    const seen = (await a.wait((m) => m.type === 'remote_state' && (m as any).on === true && !!(m as any).url)) as any;
+    expect(seen.url).toContain('https://claude.ai/code/');
+    expect(a.msgs.some((m) => m.type === 'remote_state' && (m as any).on === false)).toBe(false);
+    expect((await a.list()).find((x) => x.id === s.session.id).remote?.on).toBe(true);
+  }, 15_000);
+
   it('keeps the conversation\'s auto-compact across restarts, whatever window opens it', async () => {
     const a = await peer('A');
     const b = await peer('B');

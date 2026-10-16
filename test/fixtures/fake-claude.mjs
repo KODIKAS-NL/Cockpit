@@ -15,6 +15,7 @@
 //    (`system/status` with `permissionMode`), as the CLI does when a plan is approved;
 //  - `remote_control` {enabled} → success with a pairing link; once on, a prompt typed on the
 //    phone (`PHONE` in $FAKE_PHONE) starts a turn that no window sent, as a plain user event;
+//  - `FAKE_RC_FLAKY=<path>` makes the first `remote_control` enable after a good one fail once;
 //  - an allow answer carrying a `setMode` update reports that mode (`system/status`).
 // Every line it receives is appended to $FAKE_LOG (argv first), so tests can check what
 // actually reached the CLI.
@@ -63,6 +64,16 @@ rl.on('line', async (line) => {
       out({ type: 'system', subtype: 'status', status: null, permissionMode: msg.request.mode });
     } else if (sub === 'remote_control') {
       const on = msg.request.enabled === true;
+      // $FAKE_RC_FLAKY=<path>: the first enable after a successful one fails (a CLI not ready yet).
+      const flaky = process.env.FAKE_RC_FLAKY;
+      if (on && flaky) {
+        if (fs.existsSync(`${flaky}.ok`) && !fs.existsSync(`${flaky}.failed`)) {
+          fs.writeFileSync(`${flaky}.failed`, '1');
+          out({ type: 'control_response', response: { subtype: 'error', request_id: msg.request_id, error: 'bridge not ready' } });
+          return;
+        }
+        fs.writeFileSync(`${flaky}.ok`, '1');
+      }
       out({
         type: 'control_response',
         response: {

@@ -56,6 +56,8 @@ const MAX_PARTIAL = 20_000;
 
 let initSeq = 0;
 let remoteReqSeq = 0;
+const RESYNC_ATTEMPTS = 4;
+const RESYNC_DELAY_MS = 2000;
 
 export class DaemonSession {
   readonly id: string;
@@ -89,7 +91,7 @@ export class DaemonSession {
   private remoteOn = false;
   private remoteUrl?: string;
   private autoCompact: string;
-  private remotePending = new Map<string, { client?: SessionClient; reqId?: string; on: boolean }>();
+  private remotePending = new Map<string, { client?: SessionClient; reqId?: string; on: boolean; attempt?: number }>();
 
   constructor(data: PersistedSession, hooks: DaemonSessionHooks) {
     this.id = data.id;
@@ -279,10 +281,11 @@ export class DaemonSession {
   }
 
   /** The process (re)started with Remote Control already on: re-enables it, nobody waiting. */
-  private resyncRemote(): void {
-    if (!this.remoteOn) return;
+  private resyncRemote(attempt = 1): void {
+    if (!this.remoteOn || !this.proc) return;
     const requestId = `daemon-remote-${++remoteReqSeq}`;
-    this.remotePending.set(requestId, { on: true });
+    this.remotePending.set(requestId, { on: true, attempt });
+    this.hooks.log(`[${this.id}] remote control: re-enabling after start (attempt ${attempt})`);
     this.write({ type: 'control_request', request_id: requestId, request: { subtype: 'remote_control', enabled: true } });
   }
 
@@ -376,6 +379,17 @@ export class DaemonSession {
           this.remotePending.delete(requestId);
           const r = ev.response as Record<string, unknown> | undefined;
           const ok = r?.subtype === 'success';
+          this.hooks.log(
+            `[${this.id}] remote control ${pend.on ? 'on' : 'off'}${pend.client ? '' : ' (resync)'}: ${ok ? 'ok' : `failed (${String(r?.error ?? 'no reason')})`}`,
+          );
+          if (!ok && !pend.client && pend.on && (pend.attempt ?? 1) < RESYNC_ATTEMPTS) {
+            // The intent survives a failed re-enable (the CLI may not be ready right after
+            // init): try again before giving up and showing it as off.
+            const next = (pend.attempt ?? 1) + 1;
+            const timer = setTimeout(() => this.resyncRemote(next), RESYNC_DELAY_MS * (next - 1));
+            timer.unref?.();
+            return;
+          }
           if (ok) {
             this.remoteOn = pend.on;
             this.remoteUrl = pend.on ? ((r?.response as Record<string, unknown> | undefined)?.session_url as string | undefined) : undefined;

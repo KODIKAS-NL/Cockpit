@@ -10,4 +10,6 @@ Local issue log (no GitHub issue yet). Newest first.
   - Does `resyncRemote` in `src/daemon/DaemonSession.ts` run on every respawn, and is `remote_state` broadcast afterwards?
   - Does a reconnecting window read `DaemonSessionInfo.remote` from the snapshot and apply it in `Session.onSnapshot`, or default to off?
   - The pairing link may change when the bridge is re-enabled; that must not read as off.
-- **Status:** not reproduced or verified yet.
+- **Findings:** the daemon log had no remote-control lines at all, and `sessions.json` held no `remoteOn` for the active conversation, so the intent had been dropped. The real CLI answers `remote_control` right after init fine (probed, fresh and resumed), so the cause is not confirmed. One path clears the intent for good: a single failed re-enable after a respawn.
+- **Change:** the daemon now logs every remote-control request/answer, and retries a failed re-enable up to 4 times (2s, 4s, 6s) before showing it as off. Needs the daemon app rebuilt.
+- **Status:** open. If it recurs, `~/.cockpit/daemon.log` now says why (`remote control on (resync): failed (...)`).
