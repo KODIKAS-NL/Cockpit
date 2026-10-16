@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Translator } from '../i18n';
 import type { SessionConfig } from '../../../shared/protocol';
 import { Icon } from './Icon';
+import { useDismiss } from '../util/useDismiss';
 import { effortLabel, modelLabel, permLabel } from './Controls';
 
 interface Props {
@@ -49,14 +50,7 @@ export function ComposerPicks({
   const [custom, setCustom] = useState('');
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [open]);
+  useDismiss(open, ref, () => setOpen(false));
 
   if (!config) return null;
 
@@ -208,14 +202,7 @@ function ModelEffortPick({
   const index = pending ?? Math.max(0, levels.indexOf(resolved));
   const effortText = pending == null ? effortLabel(config.effort, t, config.defaultEffort) : effortLabel(levels[pending], t);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [open]);
+  useDismiss(open, ref, () => setOpen(false));
   useEffect(() => () => window.clearTimeout(keyTimer.current), []);
 
   const apply = (i: number): void => {
@@ -290,7 +277,7 @@ function ModelEffortPick({
       {open && (
         <div className="mep-pop" role="dialog" aria-label={t('controls.selectModel')}>
           <div className="mep-head">{t('controls.selectModel')}</div>
-          <div role="listbox" aria-label={t('controls.model')}>
+          <div className="mep-list" role="listbox" aria-label={t('controls.model')}>
             {rows.map((m) => {
               const sel = m === config.model;
               const removable = m !== 'default' && !meta?.[m]?.label;

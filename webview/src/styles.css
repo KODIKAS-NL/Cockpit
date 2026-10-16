@@ -5832,25 +5832,67 @@ body {
 .bubble.assistant {
   padding-left: 14px;
 }
-/* Tool calls: a status dot in front of the name (green done, yellow running, red failed). */
+/* Timeline of a reply, like the official panel: every step (text, thinking, tool call) has a
+   dot in the left gutter, and a thin line joins the dots. Tool dots carry the status (green
+   done, yellow running, red failed); text dots are gray. The dot sits outside the card, which
+   clips its own overflow. */
 .tool-card.busy,
 .tool-card.err {
   box-shadow: none;
 }
-.tool-head::before {
+.bubble.assistant.turn {
+  --tl-gutter: 18px;
+  --tl-dot: 7px;
+  padding-left: calc(14px + var(--tl-gutter));
+}
+.tl-step {
+  position: relative;
+  display: flow-root; /* keeps the children's margins inside, so the steps touch */
+  /* Where the dot sits: the middle of the step's first line (tuned per kind below). */
+  --tl-y: 11px;
+}
+.tl-step.tool {
+  --tl-y: 14px;
+}
+.tl-step::before {
   content: '';
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  margin-right: 2px;
+  position: absolute;
+  left: calc(-1 * var(--tl-gutter) + (var(--tl-gutter) - var(--tl-dot)) / 2 - 6px);
+  top: calc(var(--tl-y) - var(--tl-dot) / 2);
+  width: var(--tl-dot);
+  height: var(--tl-dot);
   border-radius: 50%;
+  background: color-mix(in srgb, var(--vscode-foreground, #888) 40%, transparent);
+  z-index: 1;
+}
+.tl-step.tool.ok::before {
   background: var(--vscode-charts-green, #3fb950);
 }
-.tool-card.busy .tool-head::before {
+.tl-step.tool.busy::before {
   background: var(--vscode-charts-yellow, #d29922);
 }
-.tool-card.err .tool-head::before {
+.tl-step.tool.err::before {
   background: var(--vscode-charts-red, #f85149);
+}
+/* The line: each step draws its own stretch, so it runs from the first dot to the last. */
+.tl-step::after {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--tl-gutter) + var(--tl-gutter) / 2 - 6px - 0.5px);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--vscode-foreground, #888) 22%, transparent);
+}
+.tl-step:not(.tl-step ~ .tl-step)::after {
+  top: var(--tl-y); /* the first step: from its dot down */
+}
+.tl-step:not(:has(~ .tl-step))::after {
+  bottom: auto; /* the last step: down to its dot */
+  height: var(--tl-y);
+}
+.tl-step:not(.tl-step ~ .tl-step):not(:has(~ .tl-step))::after {
+  display: none; /* a single step: no line */
 }
 
 /* Composer closer to the official panel: one rounded card, the text on top and a slim toolbar
@@ -6164,14 +6206,15 @@ body {
 /* Prompt markers beside the scrollbar, quieter: a thin muted tick like the editor's overview
    ruler (no orange, no glow), the accent only on hover; the preview follows the popover look. */
 .marker {
-  width: 10px;
-  height: 3px;
-  background: color-mix(in srgb, var(--vscode-foreground) 45%, transparent);
+  width: 8px;
+  height: 2px;
+  background: color-mix(in srgb, var(--vscode-foreground, #888) 22%, transparent);
   box-shadow: none;
-  opacity: 0.9;
+  opacity: 1;
 }
 .marker:hover {
   width: 14px;
+  height: 3px;
   background: var(--vscode-textLink-foreground, var(--vscode-foreground));
   opacity: 1;
 }
@@ -6502,13 +6545,25 @@ body {
   right: 6px;
   bottom: calc(100% + 4px);
   z-index: 50;
-  max-height: 320px;
-  overflow-y: auto;
+  /* A column: only the model list scrolls; the head, effort and pin rows stay in view. */
+  display: flex;
+  flex-direction: column;
+  max-height: 340px;
   padding: 4px;
   border: 1px solid var(--vscode-widget-border, rgba(127, 127, 127, 0.35));
   border-radius: 8px;
   background: var(--vscode-editorWidget-background, var(--vscode-editor-background, #fff));
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+.mep-head,
+.mep-effort-row,
+.mep-pin-row {
+  flex: none;
+}
+.mep-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 .mep-head {
   padding: 4px 8px 6px;

@@ -544,7 +544,9 @@ function ClaudeTurn({
     const grp = group;
     group = [];
     nodes.push(
-      <ToolCard key={grp[0].id} items={grp} t={t} defaultOpen={defaultOpenTools} />,
+      <div key={grp[0].id} className={`tl-step tool ${toolStatus(grp)}`}>
+        <ToolCard items={grp} t={t} defaultOpen={defaultOpenTools} />
+      </div>,
     );
   };
   for (const it of visible) {
@@ -554,7 +556,11 @@ function ClaudeTurn({
     if (it.kind === 'tool' && isTodoToolName(it.name)) {
       flushGroup();
       if (showTodos && !todoShown && todos.length > 0) {
-        nodes.push(<TodoCard key={`todo-${it.id}`} t={t} todos={todos} />);
+        nodes.push(
+          <div key={`todo-${it.id}`} className="tl-step text">
+            <TodoCard t={t} todos={todos} />
+          </div>,
+        );
         todoShown = true;
       }
       continue;
@@ -562,7 +568,11 @@ function ClaudeTurn({
     // AskUserQuestion: its own card (not merged).
     if (it.kind === 'tool' && it.name === 'AskUserQuestion') {
       flushGroup();
-      nodes.push(<AskCard key={it.id} item={it} t={t} answers={answers} />);
+      nodes.push(
+        <div key={it.id} className={`tl-step tool ${toolStatus([it])}`}>
+          <AskCard item={it} t={t} answers={answers} />
+        </div>,
+      );
       continue;
     }
     // Other tools: accumulated in the group while the merge key holds.
@@ -578,8 +588,12 @@ function ClaudeTurn({
     }
     // Assistente (texto/thinking): quebra o grupo.
     flushGroup();
+    // Nothing to show yet (AssistantContent renders nothing): no step, so no dot of its own.
+    if (!it.text && !it.thinking) continue;
     nodes.push(
-      <AssistantContent key={it.id} item={it} t={t} defaultShowThinking={defaultShowThinking} />,
+      <div key={it.id} className="tl-step text">
+        <AssistantContent item={it} t={t} defaultShowThinking={defaultShowThinking} />
+      </div>,
     );
   }
   flushGroup();
@@ -789,6 +803,12 @@ function AssistantContent({
   );
 }
 
+/** Aggregated status of a (merged) tool card: error when any failed, busy while any runs. */
+function toolStatus(items: ToolItem[]): 'ok' | 'busy' | 'err' {
+  if (items.some((i) => i.isError)) return 'err';
+  return items.some((i) => !i.done) ? 'busy' : 'ok';
+}
+
 function ToolCard({ items, t, defaultOpen }: { items: ToolItem[]; t: Translator; defaultOpen: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   // The global default (setting) changed: re-syncs the already mounted cards.
@@ -796,10 +816,7 @@ function ToolCard({ items, t, defaultOpen }: { items: ToolItem[]; t: Translator;
   const item = items[0]; // primary (header)
   const last = items[items.length - 1];
   const merged = items.length > 1;
-  // Aggregated status: error when any failed; busy when any hasn't finished.
-  const anyErr = items.some((i) => i.isError);
-  const anyBusy = items.some((i) => !i.done);
-  const statusCls = anyErr ? 'err' : anyBusy ? 'busy' : 'ok';
+  const statusCls = toolStatus(items);
   const input = (item.input ?? {}) as Record<string, unknown>;
   const filePath = typeof input.file_path === 'string' ? input.file_path : undefined;
   const name = item.name;
@@ -854,7 +871,7 @@ function ToolCard({ items, t, defaultOpen }: { items: ToolItem[]; t: Translator;
           </span>
         )}
         <span className="tool-status">
-          {anyErr ? t('tool.error') : anyBusy ? t('tool.running') : ''}
+          {statusCls === 'err' ? t('tool.error') : statusCls === 'busy' ? t('tool.running') : ''}
         </span>
         <span className="chevron">{open ? '▾' : '▸'}</span>
       </button>

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import type { Translator } from '../i18n';
 import type { SessionConfig, ModelMeta } from '../../../shared/protocol';
 import { Tooltip } from './Tooltip';
+import { useDismiss } from '../util/useDismiss';
 
 const CUSTOM = '__custom__';
 
@@ -198,14 +199,7 @@ export function ModelSelect({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [open]);
+  useDismiss(open, ref, () => setOpen(false));
 
   // Modelo custom aplicado (fora da lista) aparece no topo.
   const rows: string[] = [];
@@ -346,14 +340,7 @@ export function EffortSelect({ t, value, efforts, defaultEffort, onSelect }: Eff
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [open]);
+  useDismiss(open, ref, () => setOpen(false));
 
   const pick = (v: string) => {
     setOpen(false);

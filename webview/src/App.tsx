@@ -42,6 +42,7 @@ import { ImageViewer, ImageViewerContext } from './components/ImageViewer';
 import { buildConversationMd, suggestedFileName } from './util/exportMd';
 import { buildTimelineHtml, suggestedHtmlName } from './util/exportHtml';
 import { resetSpell } from './spell/spell';
+import { useDismiss } from './util/useDismiss';
 
 // Stable empty list for the memoised Timeline: `?? []` would mint a new array on every
 // render and defeat the memo exactly while a turn is streaming.
@@ -78,6 +79,8 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
   // Text (credential value) to inject into the composer. Its ref changes to trigger it.
   const [injectText, setInjectText] = useState<{ text: string } | null>(null);
   const [exportMenu, setExportMenu] = useState(false); // export link expanded (direct/AI)
+  const exportRef = useRef<HTMLDivElement>(null);
+  useDismiss(exportMenu, exportRef, () => setExportMenu(false));
   const [pluginsBusy, setPluginsBusy] = useState(false);
   const [pluginsBusyLabel, setPluginsBusyLabel] = useState<string | undefined>(undefined);
   const [pluginsError, setPluginsError] = useState<string | undefined>(undefined);
@@ -387,7 +390,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
   // conversation is idle and has something to export.
   const exportControl =
     tab?.status !== 'busy' && items.length > 0 ? (
-      <div className="export-ctl">
+      <div className="export-ctl" ref={exportRef}>
         <button
           type="button"
           className="tabstrip-btn"

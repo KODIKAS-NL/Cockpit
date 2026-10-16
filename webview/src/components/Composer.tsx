@@ -152,8 +152,13 @@ export const Composer = memo(function Composer({
   // that small element; the textarea itself is never reset to height:auto (which used to force
   // a full-document reflow on every keystroke, and grew with the transcript). The result is
   // memoised, so the common keystroke (same row count) writes no style at all.
+  //
+  // A layout effect, so the new height is in place before the browser paints. With a plain
+  // effect the new line was first painted in the old height: the textarea scrolled its text up
+  // to keep the caret in view, and that offset stayed after it grew (top line cut off, caret
+  // too high).
   const lastH = useRef(-1);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const hl = hlRef.current;
@@ -169,10 +174,17 @@ export const Composer = memo(function Composer({
     const rows = Math.round((meter.offsetHeight - pad) / lineH);
     const shown = Math.min(Math.max(rows, MIN_ROWS), MAX_ROWS);
     const next = Math.ceil(shown * lineH + pad);
-    if (next === lastH.current) return; // same height: don't touch style, don't invalidate layout
-    lastH.current = next;
-    el.style.height = `${next}px`;
-    el.style.overflowY = rows > MAX_ROWS ? 'auto' : 'hidden';
+    if (next !== lastH.current) {
+      // Same height: don't touch style, don't invalidate layout.
+      lastH.current = next;
+      el.style.height = `${next}px`;
+      el.style.overflowY = rows > MAX_ROWS ? 'auto' : 'hidden';
+    }
+    // While the text fits, nothing may stay scrolled (the box shows all of it).
+    if (rows <= MAX_ROWS && el.scrollTop !== 0) {
+      el.scrollTop = 0;
+      if (hl) hl.scrollTop = 0;
+    }
   }, [text, spellTick, spellCheck]);
 
   // Focus lost when coming back from another app: when the VSCode window is reactivated, the
