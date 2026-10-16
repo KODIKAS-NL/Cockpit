@@ -6265,6 +6265,9 @@ body {
   position: absolute;
   left: 6px;
   right: 6px;
+  max-width: 360px;
+  max-height: min(70vh, 420px);
+  overflow-y: auto;
   bottom: calc(100% + 4px);
   z-index: 40;
   padding: 8px 10px;
@@ -6311,6 +6314,62 @@ body {
 .cog-custom button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+.cog-compact {
+  padding: 4px 0 2px;
+}
+.cog-compact-head {
+  margin-bottom: 4px;
+}
+.cog-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cog-chip {
+  font: inherit;
+  padding: 2px 9px;
+  border: 1px solid var(--vscode-widget-border, rgba(127, 127, 127, 0.35));
+  border-radius: 12px;
+  color: var(--vscode-foreground);
+  background: transparent;
+  cursor: pointer;
+}
+.cog-chip:hover {
+  background: color-mix(in srgb, var(--vscode-foreground) 10%, transparent);
+}
+.cog-chip.on {
+  color: var(--vscode-button-foreground, #fff);
+  background: var(--vscode-button-background, #0e639c);
+  border-color: transparent;
+}
+.cog-compact-custom {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.cog-compact-custom input {
+  width: 72px;
+  font: inherit;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--vscode-widget-border, rgba(127, 127, 127, 0.35)));
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.cog-compact-custom input.bad {
+  border-color: var(--vscode-inputValidation-errorBorder, #f14c4c);
+}
+.cog-compact-status {
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.cog-compact-status.warn {
+  opacity: 1;
+  color: var(--vscode-editorWarning-foreground, #cca700);
 }
 .cog-hint {
   margin-top: 6px;

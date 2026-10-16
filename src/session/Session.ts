@@ -41,6 +41,8 @@ export interface SessionHooks {
   modePin?: (mode: string) => { model?: string; effort?: string } | undefined;
   /** The CLI switched mode on its own (e.g. a plan was approved): the picks changed with it. */
   onModeChanged?: () => void;
+  /** The conversation's auto-compact limit was changed by another window: the picks changed with it. */
+  onCompactChanged?: () => void;
   onInit: (model?: string, slashCommands?: string[]) => void;
   /** The model list the CLI reports in its `initialize` reply (what the account can use). */
   onModels?: (models: DiscoveredModel[]) => void;
@@ -256,6 +258,9 @@ export class Session {
   }
   setAutoCompact(v: string): void {
     this.autoCompactOverride = v;
+    // In daemon mode the limit belongs to the conversation: the daemon keeps it, so it survives a
+    // restart and holds in every window (and under Remote Control). The process reads it at start.
+    if (this.cli instanceof RemoteCliProcess) this.cli.setAutoCompact(v);
     this.stop();
   }
 
@@ -299,6 +304,7 @@ export class Session {
       remote.on('snapshot', (snap: SessionSnapshot) => this.onSnapshot(snap));
       remote.on('settled', (requestId: string) => this.onPromptSettled(requestId));
       remote.on('remoteUser', (message: unknown, uuid?: string) => this.onRemoteUser(message, uuid));
+      remote.on('autoCompact', (value: string) => this.adoptAutoCompact(value));
       remote.on('remoteState', (on: boolean, url?: string) => this.onRemoteState(on, url));
       this.cli = remote;
     } else {
@@ -473,6 +479,7 @@ export class Session {
    * prompts still waiting for an answer.
    */
   private onSnapshot(snap: SessionSnapshot): void {
+    if (snap.session.autoCompact) this.adoptAutoCompact(snap.session.autoCompact);
     const cliId = snap.session.cliSessionId;
     if (cliId && !this.resumeId) this.resumeId = cliId;
     if (snap.session.state === 'busy' && !this.busy) {
@@ -518,6 +525,12 @@ export class Session {
   }
 
   /** Another window sent a prompt: show it, and follow the turn it started. */
+  private adoptAutoCompact(value: string): void {
+    if (this.autoCompact() === value) return;
+    this.autoCompactOverride = value;
+    this.hooks.onCompactChanged?.();
+  }
+
   /** Remote Control in the daemon's process: true when this session can offer it. */
   canRemote(): boolean {
     return this.cli instanceof RemoteCliProcess;

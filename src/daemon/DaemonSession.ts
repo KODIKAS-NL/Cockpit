@@ -41,6 +41,8 @@ export interface PersistedSession {
   lastActivity: number;
   /** Remote Control was on: re-enable it on the process the next time it starts. */
   remoteOn?: boolean;
+  /** The conversation's auto-compact ('auto' | 'off' | tokens): wins over any window's spec. */
+  autoCompact?: string;
 }
 
 export interface DaemonSessionHooks {
@@ -86,6 +88,7 @@ export class DaemonSession {
   // time the process (re)starts, so the pairing survives a daemon restart.
   private remoteOn = false;
   private remoteUrl?: string;
+  private autoCompact: string;
   private remotePending = new Map<string, { client?: SessionClient; reqId?: string; on: boolean }>();
 
   constructor(data: PersistedSession, hooks: DaemonSessionHooks) {
@@ -98,6 +101,7 @@ export class DaemonSession {
     this.createdAt = data.createdAt;
     this.lastActivity = data.lastActivity;
     this.remoteOn = data.remoteOn === true;
+    this.autoCompact = validCompact(data.autoCompact) ?? compactOfSpec(data.spec);
     this.hooks = hooks;
   }
 
@@ -112,6 +116,15 @@ export class DaemonSession {
   }
 
   /** Remote Control on: the idle stop must leave the process running for the phone. */
+  /** Stores the conversation's limit; the CLI only reads it at start, so it applies on the next (re)start. */
+  setAutoCompact(value: string): void {
+    const v = validCompact(value);
+    if (!v || v === this.autoCompact) return;
+    this.autoCompact = v;
+    this.hooks.changed();
+    this.broadcast({ type: 'autocompact_state', sessionId: this.id, value: v });
+  }
+
   hasRemote(): boolean {
     return this.remoteOn;
   }
@@ -137,6 +150,7 @@ export class DaemonSession {
       lastActivity: this.lastActivity,
       createdAt: this.createdAt,
       remote: this.remoteOn ? { on: true, url: this.remoteUrl } : undefined,
+      autoCompact: this.autoCompact,
     };
   }
 
@@ -151,6 +165,7 @@ export class DaemonSession {
       createdAt: this.createdAt,
       lastActivity: this.lastActivity,
       remoteOn: this.remoteOn || undefined,
+      autoCompact: this.autoCompact,
     };
   }
 
@@ -181,7 +196,7 @@ export class DaemonSession {
     this.stopping = false;
     const proc = spawn(this.spec.claudePath, args, {
       cwd: this.cwd,
-      env: { ...process.env, ...(this.spec.env ?? {}) },
+      env: this.processEnv(),
       // Own process group, so stop() ends claude AND its subagents/tools.
       detached: true,
     }) as ChildProcessWithoutNullStreams;
@@ -483,6 +498,13 @@ export class DaemonSession {
     this.proc?.stdin.write(JSON.stringify(obj) + '\n');
   }
 
+  private processEnv(): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = { ...process.env, ...(this.spec.env ?? {}) };
+    delete env.DISABLE_AUTO_COMPACT;
+    if (this.autoCompact === 'off') env.DISABLE_AUTO_COMPACT = '1';
+    return env;
+  }
+
   /** The spec's arguments with file placeholders written out and the right --resume. */
   private resolveArgs(): string[] {
     this.removeTempDir();
@@ -490,8 +512,8 @@ export class DaemonSession {
     const args: string[] = [];
     for (let i = 0; i < this.spec.args.length; i++) {
       const a = this.spec.args[i];
-      if (a === '--resume') {
-        i++; // replaced below by the session id the daemon knows
+      if (a === '--resume' || a === '--autocompact') {
+        i++; // --resume: replaced below by the session id the daemon knows; --autocompact: the daemon's value wins
         continue;
       }
       if (a.startsWith(FILE_ARG_PREFIX)) {
@@ -506,6 +528,7 @@ export class DaemonSession {
     // Once the CLI has named the session, every (re)start continues it: without --resume
     // the CLI would open a NEW transcript and the conversation would split in two.
     if (this.cliSessionId) args.push('--resume', this.cliSessionId);
+    if (/^\d+$/.test(this.autoCompact)) args.push('--autocompact', this.autoCompact);
     return args;
   }
 
@@ -526,6 +549,26 @@ export class DaemonSession {
     }
     this.tempDir = undefined;
   }
+}
+
+const COMPACT_MIN = 100_000;
+const COMPACT_MAX = 1_000_000;
+
+function validCompact(v: unknown): string | undefined {
+  if (v === 'auto' || v === 'off') return v;
+  if (typeof v === 'string' && /^\d+$/.test(v)) {
+    const n = Number(v);
+    if (n >= COMPACT_MIN && n <= COMPACT_MAX) return v;
+  }
+  return undefined;
+}
+
+/** What a window's spawn spec asks for: the seed for a conversation that has no stored value. */
+function compactOfSpec(spec: SpawnSpec): string {
+  const i = spec.args.indexOf('--autocompact');
+  const fromArg = i >= 0 ? validCompact(spec.args[i + 1]) : undefined;
+  if (fromArg) return fromArg;
+  return spec.env?.DISABLE_AUTO_COMPACT === '1' ? 'off' : 'auto';
 }
 
 /** The value after `--resume` in an argument list. */

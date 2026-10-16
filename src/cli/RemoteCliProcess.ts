@@ -7,6 +7,7 @@
 //    prompts still waiting. Always the first thing after start().
 //  - 'settled' (requestId): another window answered this prompt.
 //  - 'remoteUser' (message, uuid?): another window sent this prompt.
+//  - 'autoCompact' (value): the conversation's auto-compact limit changed, in any window.
 //  - 'remoteState' (on, url?): Remote Control's bridge turned on/off, in any window.
 import { EventEmitter } from 'node:events';
 import type { CliProcess } from './CliProcess';
@@ -82,6 +83,11 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
       });
       this.write({ type: 'control_request', request_id: id, request: { ...payload, subtype } });
     });
+  }
+
+  /** Stores the conversation's auto-compact limit in the daemon; the caller restarts the process to apply it. */
+  setAutoCompact(value: string): void {
+    if (this.sessionId) this.client.autoCompact(this.sessionId, value);
   }
 
   /** Turns Remote Control on or off for this session; the daemon owns the bridge. */
@@ -209,6 +215,9 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
         return;
       case 'remote_user':
         this.emit('remoteUser', m.message, m.uuid);
+        return;
+      case 'autocompact_state':
+        this.emit('autoCompact', m.value);
         return;
       case 'remote_state':
         this.emit('remoteState', m.on, m.url);

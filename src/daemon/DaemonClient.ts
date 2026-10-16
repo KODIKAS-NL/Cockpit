@@ -61,6 +61,11 @@ export class DaemonClient {
     this.post({ op: 'send', sessionId, msg });
   }
 
+  /** Sets the conversation's auto-compact limit in the daemon (applies on the process's next start). */
+  autoCompact(sessionId: string, value: string): void {
+    this.post({ op: 'autocompact', sessionId, value });
+  }
+
   /** Turns the session's Remote Control bridge on or off; `url` is the pairing link once on. */
   async remote(sessionId: string, on: boolean): Promise<{ ok: boolean; url?: string; error?: string }> {
     const m = await this.request({ op: 'remote', sessionId, on, reqId: this.nextId('r') });

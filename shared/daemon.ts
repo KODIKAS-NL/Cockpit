@@ -34,6 +34,8 @@ export interface DaemonSessionInfo {
   createdAt: number;
   /** Remote Control's bridge is on for this session (phone / claude.ai/code share it). */
   remote?: { on: boolean; url?: string };
+  /** The conversation's auto-compact: 'auto' | 'off' | window in tokens. Kept by the daemon. */
+  autoCompact?: string;
 }
 
 /**
@@ -73,6 +75,8 @@ export type ClientMessage =
   | { op: 'detach'; sessionId: string }
   /** Turns Remote Control on/off inside the session's own process. Answered with `remote_result`. */
   | { op: 'remote'; sessionId: string; on: boolean; reqId: string }
+  /** Sets the conversation's auto-compact limit; it applies from the next (re)start of the process. */
+  | { op: 'autocompact'; sessionId: string; value: string }
   /** One JSON line for the CLI's stdin (the same objects the CLI's stream-json takes). */
   | { op: 'send'; sessionId: string; msg: Record<string, unknown> }
   /** Ends the CLI process; the session stays listed (idle) and restarts on the next send. */
@@ -98,6 +102,8 @@ export type DaemonMessage =
   /** Answers the window's own `remote` op (not broadcast: only that window gets it). */
   | { type: 'remote_result'; sessionId: string; reqId: string; ok: boolean; url?: string; error?: string }
   /** Remote Control's bridge state, to every window: on/off, and the pairing link once known. */
+  /** The conversation's auto-compact limit changed (any window). */
+  | { type: 'autocompact_state'; sessionId: string; value: string }
   | { type: 'remote_state'; sessionId: string; on: boolean; url?: string }
   | { type: 'exit'; sessionId: string; code: number | null }
   | { type: 'stderr'; sessionId: string; text: string }

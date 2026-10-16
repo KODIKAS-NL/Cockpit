@@ -189,6 +189,9 @@ export class Daemon {
       case 'remote':
         this.need(msg.sessionId).setRemote(conn, msg.on, msg.reqId);
         return;
+      case 'autocompact':
+        this.need(msg.sessionId).setAutoCompact(msg.value);
+        return;
       case 'send':
         this.need(msg.sessionId).send(conn, msg.msg);
         return;

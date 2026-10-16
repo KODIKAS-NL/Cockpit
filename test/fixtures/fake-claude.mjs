@@ -25,7 +25,7 @@ const logFile = process.env.FAKE_LOG;
 const record = (obj) => {
   if (logFile) fs.appendFileSync(logFile, JSON.stringify(obj) + '\n');
 };
-record({ argv: process.argv.slice(2), cwd: process.cwd(), env: { FAKE_FLAG: process.env.FAKE_FLAG } });
+record({ argv: process.argv.slice(2), cwd: process.cwd(), env: { FAKE_FLAG: process.env.FAKE_FLAG, DISABLE_AUTO_COMPACT: process.env.DISABLE_AUTO_COMPACT } });
 
 const out = (obj) => process.stdout.write(JSON.stringify(obj) + '\n');
 const resumeAt = process.argv.indexOf('--resume');

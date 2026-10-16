@@ -2,7 +2,7 @@
 // the rarer per-conversation options (agents, engine, auto-compact, a custom model id). The
 // choices are for the conversation being typed in (the one the chat shows), not global dashboard
 // settings. The lists and the host messages are the ones the dashboard controls used before.
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Translator } from '../i18n';
 import type { SessionConfig } from '../../../shared/protocol';
 import { Icon } from './Icon';
@@ -26,7 +26,7 @@ interface Props {
 }
 
 /** Auto-compact windows offered (tokens); the CLI accepts 100K to 1M. */
-const COMPACT_WINDOWS = [100_000, 150_000, 200_000, 300_000, 500_000, 1_000_000];
+const COMPACT_WINDOWS = [100_000, 200_000, 300_000, 500_000, 1_000_000];
 
 function windowLabel(tokens: number): string {
   return tokens >= 1_000_000 ? `${tokens / 1_000_000}M` : `${tokens / 1000}K`;
@@ -49,8 +49,29 @@ export function ComposerPicks({
   const [open, setOpen] = useState(false);
   const [custom, setCustom] = useState('');
   const ref = useRef<HTMLDivElement>(null);
+  // The free-form size, in thousands of tokens; follows the value the conversation really has.
+  const [compactDraft, setCompactDraft] = useState('');
+  const currentCompact = config?.autoCompact ?? 'auto';
+  useEffect(() => {
+    setCompactDraft(/^\d+$/.test(currentCompact) ? String(Number(currentCompact) / 1000) : '');
+  }, [currentCompact]);
 
   useDismiss(open, ref, () => setOpen(false));
+
+  // The popup is anchored to the toolbar row; lift it by the prompt box above that row so it opens
+  // over the conversation instead of covering what is being typed.
+  const [lift, setLift] = useState(0);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const measure = () => {
+      const side = ref.current?.closest('.composer-side');
+      const box = side?.closest('.composer');
+      if (side && box) setLift(Math.max(0, Math.round(side.getBoundingClientRect().top - box.getBoundingClientRect().top)));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [open]);
 
   if (!config) return null;
 
@@ -61,12 +82,31 @@ export function ComposerPicks({
       ? config.modelMeta?.[(config.defaultModel ?? activeModel) as string]?.contextTokens
       : undefined);
   const windows = COMPACT_WINDOWS.filter((w) => !ctx || w <= ctx);
-  const current = config.autoCompact ?? 'auto';
-  const values = [...windows.map(String), 'auto', 'off'];
-  if (!values.includes(current)) values.unshift(current); // a window set elsewhere still shows
+  const current = currentCompact;
+  const chips = ['auto', ...windows.map(String), 'off'];
+  const maxK = Math.floor(Math.min(ctx ?? 1_000_000, 1_000_000) / 1000);
+  const draftK = Number(compactDraft);
+  const draftBad = compactDraft.trim() !== '' && !(Number.isFinite(draftK) && draftK >= 100 && draftK <= maxK);
+  const applyDraft = (): void => {
+    if (!compactDraft.trim()) return;
+    if (draftBad) {
+      setCompactDraft(/^\d+$/.test(current) ? String(Number(current) / 1000) : '');
+      return;
+    }
+    const v = String(Math.round(draftK * 1000));
+    if (v !== current) onAutoCompact(v);
+  };
 
   const compactLabel = (v: string): string =>
     v === 'auto' ? t('compact.auto') : v === 'off' ? t('compact.off') : windowLabel(Number(v));
+  const compactStatus =
+    current === 'auto'
+      ? t('compact.statusAuto')
+      : current === 'off'
+        ? t('compact.statusOff')
+        : ctx && Number(current) > ctx
+          ? t('compact.statusOver', windowLabel(Number(current)), windowLabel(ctx))
+          : t('compact.statusAt', windowLabel(Number(current)));
 
   const applyCustom = (): void => {
     const v = custom.trim();
@@ -112,7 +152,12 @@ export function ComposerPicks({
         <Icon name="settings" />
       </button>
       {open && (
-        <div className="composer-cog-pop" role="dialog" aria-label={t('chatSettings.title')}>
+        <div
+          className="composer-cog-pop"
+          role="dialog"
+          aria-label={t('chatSettings.title')}
+          style={{ bottom: `calc(100% + ${lift + 4}px)` }}
+        >
           <div className="cog-title">{t('chatSettings.title')}</div>
 
           {(config.engines?.length ?? 1) > 1 && (
@@ -133,16 +178,45 @@ export function ComposerPicks({
             <input type="checkbox" checked={config.allowAgents} onChange={(e) => onAllowAgents(e.target.checked)} />
           </label>
 
-          <label className="cog-row" title={t('compact.tip')}>
-            <span>{t('compact.label')}</span>
-            <select value={current} onChange={(e) => onAutoCompact(e.target.value)}>
-              {values.map((v) => (
-                <option key={v} value={v}>
+          <div className="cog-compact" title={t('compact.tip')}>
+            <div className="cog-compact-head">{t('compact.label')}</div>
+            <div className="cog-chips" role="radiogroup" aria-label={t('compact.label')}>
+              {chips.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="radio"
+                  aria-checked={current === v}
+                  className={`cog-chip${current === v ? ' on' : ''}`}
+                  onClick={() => current !== v && onAutoCompact(v)}
+                >
                   {compactLabel(v)}
-                </option>
+                </button>
               ))}
-            </select>
-          </label>
+            </div>
+            <label className="cog-compact-custom">
+              <span>{t('compact.custom')}</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={100}
+                max={maxK}
+                step={50}
+                className={draftBad ? 'bad' : undefined}
+                value={compactDraft}
+                placeholder="350"
+                onChange={(e) => setCompactDraft(e.target.value)}
+                onBlur={applyDraft}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') applyDraft();
+                }}
+              />
+              <span className="cog-compact-unit">K</span>
+            </label>
+            <div className={`cog-compact-status${ctx && /^\d+$/.test(current) && Number(current) > ctx ? ' warn' : ''}`}>
+              {compactStatus}
+            </div>
+          </div>
 
           <div className="cog-row cog-custom" title={t('chatSettings.customModel.tip')}>
             <span>{t('chatSettings.customModel')}</span>

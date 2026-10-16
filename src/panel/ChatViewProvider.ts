@@ -375,6 +375,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         if (s) this.saveSessionModel(s);
         if (tabId === this.activeTab) this.sendConfig();
       },
+      onCompactChanged: () => {
+        if (tabId === this.activeTab) this.sendConfig();
+      },
       onInit: (model, cmds) => this.onSessionInit(model, cmds, tabId),
       onModels: (models) => this.onCliModels(models),
       onAuthRequired: () => this.post({ kind: 'authRequired' }, tabId),

@@ -268,6 +268,43 @@ describe('cockpit-daemon', () => {
     await until(() => cliLog().filter((l) => l.request?.subtype === 'remote_control').length > before);
   });
 
+  it('keeps the conversation\'s auto-compact across restarts, whatever window opens it', async () => {
+    const a = await peer('A');
+    const b = await peer('B');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-c', '--autocompact', '300000'] }));
+    expect(s.session.autoCompact).toBe('300000');
+    await b.open(project, spec(), 'sess-c');
+    a.write({ op: 'autocompact', sessionId: s.session.id, value: '500000' });
+    const seen = (await b.wait((m) => m.type === 'autocompact_state')) as any;
+    expect(seen.value).toBe('500000');
+    // The process stops; a window with another setting opens it again: the stored value still wins.
+    a.write({ op: 'stop', sessionId: s.session.id });
+    await a.wait((m) => m.type === 'exit');
+    const before = cliLog().filter((l) => l.argv).length;
+    const snap = await b.open(project, spec({ args: ['--autocompact', '150000'] }), 'sess-c');
+    expect(snap.session.autoCompact).toBe('500000');
+    await until(() => cliLog().filter((l) => l.argv).length > before);
+    const argv = cliLog().filter((l) => l.argv).pop().argv as string[];
+    expect(argv.filter((x) => x === '--autocompact').length).toBe(1);
+    expect(argv[argv.indexOf('--autocompact') + 1]).toBe('500000');
+    // Off becomes the environment switch, with no window argument left over.
+    a.write({ op: 'autocompact', sessionId: s.session.id, value: 'off' });
+    await b.wait((m) => m.type === 'autocompact_state' && (m as any).value === 'off');
+    b.write({ op: 'stop', sessionId: s.session.id });
+    await until(() => b.msgs.filter((m) => m.type === 'exit').length >= 2);
+    const n = cliLog().filter((l) => l.argv).length;
+    b.write({ op: 'detach', sessionId: s.session.id });
+    await b.open(project, spec({ args: ['--autocompact', '200000'] }), 'sess-c');
+    await until(() => cliLog().filter((l) => l.argv).length > n);
+    const rec = cliLog().filter((l) => l.argv).pop();
+    expect(rec.argv).not.toContain('--autocompact');
+    expect(rec.env.DISABLE_AUTO_COMPACT).toBe('1');
+    // A value outside the CLI's range is ignored.
+    a.write({ op: 'autocompact', sessionId: s.session.id, value: '5' });
+    await sleep(100);
+    expect((await a.list()).find((x) => x.id === s.session.id).autoCompact).toBe('off');
+  });
+
   it('lets the first answer win and tells the other windows', async () => {
     const a = await peer('A');
     const b = await peer('B');

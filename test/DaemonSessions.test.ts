@@ -251,4 +251,25 @@ describe('two windows on one daemon session', () => {
     });
     a.session.detach();
   });
+
+  it('a conversation\'s auto-compact follows it into other windows and restarts', async () => {
+    const sock = path.join(dir, 'd.sock');
+    const a = makeWindow(sock);
+    a.session.send('hello');
+    await until(() => kinds(a, 'turnComplete').length === 1, 'turn ends');
+    const cliId = a.session.sessionId!;
+    a.session.setAutoCompact('300000');
+    const b = makeWindow(sock);
+    b.session.resume(cliId);
+    b.session.ensureCli();
+    await until(() => b.session.autoCompact() === '300000', 'B adopts the daemon\'s value');
+    // B restarts the process: it comes up with the conversation's value, not B's own setting.
+    const from = cliLines().length;
+    b.session.send('again');
+    await until(() => kinds(b, 'turnComplete').length >= 1, 'B\'s turn ends');
+    const argv = cliLines(from).find((l) => l.argv)!.argv as string[];
+    expect(argv[argv.indexOf('--autocompact') + 1]).toBe('300000');
+    a.session.detach();
+    b.session.detach();
+  });
 });
