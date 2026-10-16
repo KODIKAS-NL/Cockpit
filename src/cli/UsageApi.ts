@@ -8,6 +8,7 @@
 // minutes ago. So a failed fetch retries once and then falls back to the last good reading
 // while it is still meaningful (STALE_OK_MS).
 import * as https from 'node:https';
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -36,15 +37,47 @@ export function usageDiagnostics(): { lastError?: string; lastGoodAgeMs?: number
   return { lastError, lastGoodAgeMs: lastGood ? Date.now() - lastGood.at : undefined };
 }
 
-/** OAuth accessToken (read-only). The server is the authority on validity. */
-function readToken(): string | undefined {
+/** The accessToken inside a credentials JSON blob (file or keychain entry). */
+function tokenOf(raw: string): string | undefined {
   try {
-    const o = JSON.parse(fs.readFileSync(CREDS, 'utf8'));
-    const tok = o?.claudeAiOauth?.accessToken;
+    const tok = JSON.parse(raw)?.claudeAiOauth?.accessToken;
     return typeof tok === 'string' && tok ? tok : undefined;
   } catch {
     return undefined;
   }
+}
+
+// macOS: the CLI keeps its login in the login keychain, not in the file. A locked keychain
+// (SSH / headless session) just yields nothing, so a failed read is not retried for a while.
+const KEYCHAIN_RETRY_MS = 60_000;
+let keychainFailedAt = 0;
+
+function readKeychainToken(): string | undefined {
+  if (process.platform !== 'darwin' || Date.now() - keychainFailedAt < KEYCHAIN_RETRY_MS) return undefined;
+  try {
+    const out = execFileSync('security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'], {
+      encoding: 'utf8',
+      timeout: 3000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const tok = tokenOf(out);
+    if (!tok) keychainFailedAt = Date.now();
+    return tok;
+  } catch {
+    keychainFailedAt = Date.now();
+    return undefined;
+  }
+}
+
+/** OAuth accessToken (read-only): the credentials file, else the macOS keychain. The server is the authority on validity. */
+function readToken(): string | undefined {
+  try {
+    const tok = tokenOf(fs.readFileSync(CREDS, 'utf8'));
+    if (tok) return tok;
+  } catch {
+    /* no file: try the keychain */
+  }
+  return readKeychainToken();
 }
 
 /** API window ({utilization|percent:0..100, resets_at}) -> LimitWindow (usedPct 0..1). */
@@ -168,7 +201,7 @@ export async function fetchAccountUsage(force = false): Promise<ApiUsage | undef
   }
   const token = readToken();
   if (!token) {
-    lastError = 'no OAuth accessToken in ~/.claude/.credentials.json';
+    lastError = 'no OAuth accessToken (~/.claude/.credentials.json or the macOS keychain)';
     dlog('usage-api', lastError);
     cache = { at: Date.now(), data: undefined };
     return staleFallback();
