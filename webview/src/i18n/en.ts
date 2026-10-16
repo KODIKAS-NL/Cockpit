@@ -632,6 +632,8 @@ export const en = {
   'permission.planTitle': 'Plan ready for review',
   'permission.planSubtitle': 'Approve to start executing',
   'permission.approvePlan': 'Approve & run',
+  'permission.approvePlanAuto': 'Approve, run in Auto',
+  'permission.approvePlanEdits': 'Approve, accept edits',
   'permission.keepPlanning': 'Keep planning',
   'permission.planEdit': 'Edit',
   'permission.planPreview': 'Preview',

@@ -299,6 +299,7 @@ export class Session {
       remote.on('snapshot', (snap: SessionSnapshot) => this.onSnapshot(snap));
       remote.on('settled', (requestId: string) => this.onPromptSettled(requestId));
       remote.on('remoteUser', (message: unknown, uuid?: string) => this.onRemoteUser(message, uuid));
+      remote.on('remoteState', (on: boolean, url?: string) => this.onRemoteState(on, url));
       this.cli = remote;
     } else {
       this.cli = new CliProcessManager(opts);
@@ -478,6 +479,7 @@ export class Session {
       this.setBusy(true);
       this.stats.beginTurn();
     }
+    if (snap.session.remote?.on) this.onRemoteState(true, snap.session.remote.url);
     this.replaying = true;
     try {
       for (const ev of [...snap.partial, ...snap.pendingControl]) this.onCliEvent(ev as ClaudeEvent);
@@ -516,6 +518,25 @@ export class Session {
   }
 
   /** Another window sent a prompt: show it, and follow the turn it started. */
+  /** Remote Control in the daemon's process: true when this session can offer it. */
+  canRemote(): boolean {
+    return this.cli instanceof RemoteCliProcess;
+  }
+
+  /** Turns Remote Control on or off; the state itself comes back through `onRemoteState`. */
+  async setRemote(on: boolean): Promise<{ ok: boolean; url?: string; error?: string }> {
+    this.ensureCli();
+    if (!(this.cli instanceof RemoteCliProcess)) return { ok: false, error: 'daemon mode is off' };
+    return this.cli.setRemote(on);
+  }
+
+  remoteActive = false;
+
+  private onRemoteState(on: boolean, url?: string): void {
+    this.remoteActive = on;
+    this.emit({ kind: 'remoteState', active: on, phase: on ? (url ? 'active' : 'connecting') : undefined, url });
+  }
+
   private onRemoteUser(message: unknown, uuid?: string): void {
     const content = (message as { content?: unknown })?.content;
     let text = '';
@@ -652,7 +673,7 @@ export class Session {
 
   // ---- control protocol (permission / AskUserQuestion) ----
 
-  decide(requestId: string, decision: 'allow' | 'deny' | 'allow_always', message?: string): void {
+  decide(requestId: string, decision: 'allow' | 'deny' | 'allow_always', message?: string, mode?: string): void {
     const pend = this.pendingPerm.get(requestId);
     this.pendingPerm.delete(requestId);
     this.pendingPromptMsg.delete(requestId);
@@ -671,9 +692,11 @@ export class Session {
       return;
     }
     const resp: Record<string, unknown> = { behavior: 'allow', updatedInput: pend?.input ?? {} };
-    if (decision === 'allow_always' && pend?.suggestions?.length) {
-      resp.updatedPermissions = pend.suggestions;
-    }
+    const updates: unknown[] = [];
+    if (decision === 'allow_always' && pend?.suggestions?.length) updates.push(...pend.suggestions);
+    // Plan approval in a chosen mode: the CLI reports the new mode, which applies its pin.
+    if (mode && KNOWN_MODES.has(mode)) updates.push({ type: 'setMode', mode, destination: 'session' });
+    if (updates.length) resp.updatedPermissions = updates;
     this.cli?.sendControlResponse(requestId, resp);
   }
 

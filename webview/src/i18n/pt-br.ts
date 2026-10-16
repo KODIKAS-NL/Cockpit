@@ -569,6 +569,8 @@ export const ptBR: Partial<Strings> = {
   'permission.planTitle': 'Plano pronto para revisão',
   'permission.planSubtitle': 'Aprove para começar a executar',
   'permission.approvePlan': 'Aprovar e executar',
+  'permission.approvePlanAuto': 'Aprovar, executar em Auto',
+  'permission.approvePlanEdits': 'Aprovar, aceitar edições',
   'permission.keepPlanning': 'Continuar planejando',
   'permission.planEdit': 'Editar',
   'permission.planPreview': 'Visualizar',

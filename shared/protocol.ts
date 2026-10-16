@@ -595,6 +595,7 @@ type HostMsg =
       active: boolean;
       phase?: 'connecting' | 'active' | 'failed' | 'cloud' | 'offline';
       detail?: string;
+      url?: string; // the pairing link, once the daemon's bridge is up
     }
   | { kind: 'mcpData'; data: McpData } // servidores MCP + tools (modal)
   | { kind: 'mcpBusy'; busy: boolean } // health-check do `claude mcp list` em curso
@@ -668,6 +669,9 @@ export type WebviewToHost =
       requestId: string;
       decision: 'allow' | 'deny' | 'allow_always';
       message?: string; // feedback (plan mode editável: notas ao "manter planejando")
+      // Plan approval ("Approve, run in Auto"): switches the session to this mode as part of
+      // the same allow answer, so the pinned model for it applies before the plan's work starts.
+      mode?: string;
     }
   | { kind: 'askResponse'; requestId: string; answers: Record<string, string> }
   | { kind: 'setModel'; model: string }

@@ -373,9 +373,9 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
     send({ kind: 'deleteAllSessions' });
     setConfirmDeleteAll(false);
   };
-  const onPermission = (d: 'allow' | 'deny' | 'allow_always', message?: string) => {
+  const onPermission = (d: 'allow' | 'deny' | 'allow_always', message?: string, mode?: string) => {
     if (tab?.permission) {
-      send({ kind: 'permissionDecision', requestId: tab.permission.requestId, decision: d, message });
+      send({ kind: 'permissionDecision', requestId: tab.permission.requestId, decision: d, message, mode });
       dispatch({ type: 'clearPermission' });
     }
   };

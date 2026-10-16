@@ -11,7 +11,7 @@ import { splitInvisible, hasInvisible, codeLabel, codeMark } from '../invisible'
 interface Props {
   t: Translator;
   req: PermissionRequest;
-  onDecision: (d: 'allow' | 'deny' | 'allow_always', message?: string) => void;
+  onDecision: (d: 'allow' | 'deny' | 'allow_always', message?: string, mode?: string) => void;
 }
 
 // Line icon per tool.
@@ -308,6 +308,12 @@ function PlanModal({ t, req, onDecision }: Props) {
               {(planFile ? notes.trim() : edited)
                 ? t('permission.planSendNotes')
                 : t('permission.keepPlanning')}
+            </button>
+            <button type="button" className="btn" onClick={() => onDecision('allow', undefined, 'acceptEdits')}>
+              {t('permission.approvePlanEdits')}
+            </button>
+            <button type="button" className="btn" onClick={() => onDecision('allow', undefined, 'auto')}>
+              {t('permission.approvePlanAuto')}
             </button>
             <button type="button" className="btn send" onClick={() => onDecision('allow')}>
               {t('permission.approvePlan')}

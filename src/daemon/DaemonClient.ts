@@ -61,6 +61,13 @@ export class DaemonClient {
     this.post({ op: 'send', sessionId, msg });
   }
 
+  /** Turns the session's Remote Control bridge on or off; `url` is the pairing link once on. */
+  async remote(sessionId: string, on: boolean): Promise<{ ok: boolean; url?: string; error?: string }> {
+    const m = await this.request({ op: 'remote', sessionId, on, reqId: this.nextId('r') });
+    if (m.type !== 'remote_result') throw new Error('unexpected reply to remote');
+    return { ok: m.ok, url: m.url, error: m.error };
+  }
+
   stop(sessionId: string): void {
     this.post({ op: 'stop', sessionId });
   }

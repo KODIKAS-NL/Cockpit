@@ -12,7 +12,10 @@
 //    `get_context_usage` → a small answer; `set_model`, `set_permission_mode` and
 //    `apply_flag_settings` → success (recorded in the log like every line);
 //  - a text containing EXITPLAN reports a switch to the default mode mid-turn
-//    (`system/status` with `permissionMode`), as the CLI does when a plan is approved.
+//    (`system/status` with `permissionMode`), as the CLI does when a plan is approved;
+//  - `remote_control` {enabled} → success with a pairing link; once on, a prompt typed on the
+//    phone (`PHONE` in $FAKE_PHONE) starts a turn that no window sent, as a plain user event;
+//  - an allow answer carrying a `setMode` update reports that mode (`system/status`).
 // Every line it receives is appended to $FAKE_LOG (argv first), so tests can check what
 // actually reached the CLI.
 import * as fs from 'node:fs';
@@ -58,6 +61,22 @@ rl.on('line', async (line) => {
     } else if (sub === 'set_permission_mode') {
       out({ type: 'control_response', response: { subtype: 'success', request_id: msg.request_id, response: { mode: msg.request.mode } } });
       out({ type: 'system', subtype: 'status', status: null, permissionMode: msg.request.mode });
+    } else if (sub === 'remote_control') {
+      const on = msg.request.enabled === true;
+      out({
+        type: 'control_response',
+        response: {
+          subtype: 'success',
+          request_id: msg.request_id,
+          response: on ? { session_url: `https://claude.ai/code/${sessionId}`, environment_id: 'env-1' } : {},
+        },
+      });
+      if (on && process.env.FAKE_PHONE) {
+        await sleep(100);
+        out({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: process.env.FAKE_PHONE }] } });
+        await sleep(100);
+        reply('from the phone');
+      }
     } else if (sub === 'set_model' || sub === 'apply_flag_settings') {
       out({ type: 'control_response', response: { subtype: 'success', request_id: msg.request_id } });
     }
@@ -67,6 +86,9 @@ rl.on('line', async (line) => {
     if (waitingPerm && msg.response?.request_id === waitingPerm.id) {
       const done = waitingPerm.done;
       waitingPerm = null;
+      for (const u of msg.response.response?.updatedPermissions ?? []) {
+        if (u.type === 'setMode') out({ type: 'system', subtype: 'status', status: null, permissionMode: u.mode });
+      }
       done(msg.response.response);
     }
     return;

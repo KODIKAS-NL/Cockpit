@@ -7,6 +7,7 @@
 //    prompts still waiting. Always the first thing after start().
 //  - 'settled' (requestId): another window answered this prompt.
 //  - 'remoteUser' (message, uuid?): another window sent this prompt.
+//  - 'remoteState' (on, url?): Remote Control's bridge turned on/off, in any window.
 import { EventEmitter } from 'node:events';
 import type { CliProcess } from './CliProcess';
 import { buildClaudeArgs, engineEnvOverrides, type CliOptions } from './CliProcessManager';
@@ -81,6 +82,16 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
       });
       this.write({ type: 'control_request', request_id: id, request: { ...payload, subtype } });
     });
+  }
+
+  /** Turns Remote Control on or off for this session; the daemon owns the bridge. */
+  async setRemote(on: boolean): Promise<{ ok: boolean; url?: string; error?: string }> {
+    if (!this.attached) {
+      this.start();
+      if (this.opening) await this.opening;
+    }
+    if (!this.sessionId) return { ok: false, error: 'session not open' };
+    return this.client.remote(this.sessionId, on);
   }
 
   interrupt(): void {
@@ -198,6 +209,9 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
         return;
       case 'remote_user':
         this.emit('remoteUser', m.message, m.uuid);
+        return;
+      case 'remote_state':
+        this.emit('remoteState', m.on, m.url);
         return;
       case 'stderr':
         this.emit('stderr', m.text);

@@ -222,6 +222,52 @@ describe('cockpit-daemon', () => {
     expect((await a.list(project))[0].state).toBe('running');
   });
 
+  it('turns Remote Control on inside the session and tells every window', async () => {
+    const a = await peer('A');
+    const b = await peer('B');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-r'] }));
+    await b.open(project, spec(), 'sess-r');
+    a.write({ op: 'remote', sessionId: s.session.id, on: true, reqId: 'rr1' });
+    const res = (await a.wait((m) => m.type === 'remote_result')) as any;
+    expect(res.ok).toBe(true);
+    expect(res.url).toContain('claude.ai/code');
+    const seen = (await b.wait((m) => m.type === 'remote_state')) as any;
+    expect(seen.on).toBe(true);
+    expect(seen.url).toBe(res.url);
+    expect(b.msgs.some((m) => m.type === 'remote_result')).toBe(false);
+    expect(cliLog().some((l) => l.request?.subtype === 'remote_control' && l.request.enabled === true)).toBe(true);
+    // A window attaching later sees it in the snapshot, and sending still works.
+    const c = await peer('C');
+    const snap = await c.open(project, spec(), 'sess-r');
+    expect(snap.session.remote).toEqual({ on: true, url: res.url });
+    c.user(s.session.id, 'hello');
+    await c.wait((m) => m.type === 'event' && (m as any).event.type === 'result');
+    a.write({ op: 'remote', sessionId: s.session.id, on: false, reqId: 'rr2' });
+    await b.wait((m) => m.type === 'remote_state' && (m as any).on === false);
+  });
+
+  it('marks a turn started from the phone as busy and keeps the process alive', async () => {
+    const a = await peer('A');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-p'], env: { FAKE_PHONE: 'typed on phone' } }));
+    a.write({ op: 'remote', sessionId: s.session.id, on: true, reqId: 'rp1' });
+    await a.wait((m) => m.type === 'remote_result');
+    await a.wait((m) => m.type === 'event' && (m as any).event.type === 'user');
+    expect((await a.list()).find((x) => x.id === s.session.id).state).toBe('busy');
+    await a.wait((m) => m.type === 'event' && (m as any).event.type === 'result');
+  });
+
+  it('turns Remote Control on again when the process restarts', async () => {
+    const a = await peer('A');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-s'] }));
+    a.write({ op: 'remote', sessionId: s.session.id, on: true, reqId: 'rs1' });
+    await a.wait((m) => m.type === 'remote_result');
+    a.write({ op: 'stop', sessionId: s.session.id });
+    await a.wait((m) => m.type === 'exit');
+    const before = cliLog().filter((l) => l.request?.subtype === 'remote_control').length;
+    a.user(s.session.id, 'again');
+    await until(() => cliLog().filter((l) => l.request?.subtype === 'remote_control').length > before);
+  });
+
   it('lets the first answer win and tells the other windows', async () => {
     const a = await peer('A');
     const b = await peer('B');

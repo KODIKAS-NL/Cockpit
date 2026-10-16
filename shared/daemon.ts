@@ -32,6 +32,8 @@ export interface DaemonSessionInfo {
   clients: number;
   lastActivity: number;
   createdAt: number;
+  /** Remote Control's bridge is on for this session (phone / claude.ai/code share it). */
+  remote?: { on: boolean; url?: string };
 }
 
 /**
@@ -69,6 +71,8 @@ export type ClientMessage =
    */
   | { op: 'open'; reqId: string; cwd: string; cliSessionId?: string; spawn: SpawnSpec }
   | { op: 'detach'; sessionId: string }
+  /** Turns Remote Control on/off inside the session's own process. Answered with `remote_result`. */
+  | { op: 'remote'; sessionId: string; on: boolean; reqId: string }
   /** One JSON line for the CLI's stdin (the same objects the CLI's stream-json takes). */
   | { op: 'send'; sessionId: string; msg: Record<string, unknown> }
   /** Ends the CLI process; the session stays listed (idle) and restarts on the next send. */
@@ -91,6 +95,10 @@ export type DaemonMessage =
   | { type: 'control_settled'; sessionId: string; requestId: string }
   /** Another window sent this prompt: show it, the turn is now running. */
   | { type: 'remote_user'; sessionId: string; message: unknown; uuid?: string }
+  /** Answers the window's own `remote` op (not broadcast: only that window gets it). */
+  | { type: 'remote_result'; sessionId: string; reqId: string; ok: boolean; url?: string; error?: string }
+  /** Remote Control's bridge state, to every window: on/off, and the pairing link once known. */
+  | { type: 'remote_state'; sessionId: string; on: boolean; url?: string }
   | { type: 'exit'; sessionId: string; code: number | null }
   | { type: 'stderr'; sessionId: string; text: string }
   | { type: 'error'; reqId?: string; sessionId?: string; message: string };

@@ -229,4 +229,26 @@ describe('two windows on one daemon session', () => {
     expect(a.errors).toEqual([]);
     a.session.detach();
   });
+
+  it('approving with a mode sends setMode and applies that mode\'s pin live', async () => {
+    const sock = path.join(dir, 'd.sock');
+    const a = makeWindow(sock, { auto: { model: 'claude-sonnet-x', effort: 'low' } });
+    const from = cliLines().length;
+    a.session.send('ASK approve the plan');
+    await until(() => kinds(a, 'permissionRequest').length === 1, 'the prompt shows');
+    a.session.decide(kinds(a, 'permissionRequest')[0].requestId, 'allow', undefined, 'auto');
+    await until(() => a.modeChanges === 1, 'the mode change is seen');
+    expect(a.session.permission()).toBe('auto');
+    expect(a.session.modelOverride).toBe('claude-sonnet-x');
+    await until(() => kinds(a, 'turnComplete').length === 1, 'the turn ends');
+    const lines = cliLines(from);
+    const answer = lines.find((l) => l.type === 'control_response' && l.response?.response?.behavior === 'allow');
+    expect(answer.response.response.updatedPermissions).toEqual([{ type: 'setMode', mode: 'auto', destination: 'session' }]);
+    expect(lines.filter((l) => l.argv).length).toBe(1);
+    expect(lines.filter((l) => l.type === 'control_request').map((l) => l.request)).toContainEqual({
+      subtype: 'set_model',
+      model: 'claude-sonnet-x',
+    });
+    a.session.detach();
+  });
 });

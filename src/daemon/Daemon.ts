@@ -186,6 +186,9 @@ export class Daemon {
         }
         return;
       }
+      case 'remote':
+        this.need(msg.sessionId).setRemote(conn, msg.on, msg.reqId);
+        return;
       case 'send':
         this.need(msg.sessionId).send(conn, msg.msg);
         return;
@@ -268,7 +271,7 @@ export class Daemon {
   private stopIdle(maxIdleMs: number): void {
     const now = Date.now();
     for (const s of this.sessions.values()) {
-      if (!s.isRunning() || s.isBusy() || s.pendingCount() > 0 || s.clientCount() > 0) continue;
+      if (!s.isRunning() || s.isBusy() || s.pendingCount() > 0 || s.clientCount() > 0 || s.hasRemote()) continue;
       if (now - s.lastActivity < maxIdleMs) continue;
       this.log(`[${s.id}] idle for ${Math.round((now - s.lastActivity) / 60_000)} min: stopping`);
       s.stop();

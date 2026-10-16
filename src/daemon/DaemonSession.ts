@@ -39,6 +39,8 @@ export interface PersistedSession {
   title?: string;
   createdAt: number;
   lastActivity: number;
+  /** Remote Control was on: re-enable it on the process the next time it starts. */
+  remoteOn?: boolean;
 }
 
 export interface DaemonSessionHooks {
@@ -51,6 +53,7 @@ export interface DaemonSessionHooks {
 const MAX_PARTIAL = 20_000;
 
 let initSeq = 0;
+let remoteReqSeq = 0;
 
 export class DaemonSession {
   readonly id: string;
@@ -74,8 +77,16 @@ export class DaemonSession {
   private initRequestId?: string;
   private initResponse?: { response?: Record<string, unknown> };
   private initWaiters: { client: SessionClient; requestId: string }[] = [];
+  /** Work queued for once the process has completed its init handshake. */
+  private afterInit: Array<() => void> = [];
   private clients = new Map<string, SessionClient>();
   private tempDir?: string;
+  // Remote Control: a phone / claude.ai/code pairs with THIS process (no handover, no second
+  // process). `remoteOn` is what the user asked for — persisted, and re-sent to the CLI every
+  // time the process (re)starts, so the pairing survives a daemon restart.
+  private remoteOn = false;
+  private remoteUrl?: string;
+  private remotePending = new Map<string, { client?: SessionClient; reqId?: string; on: boolean }>();
 
   constructor(data: PersistedSession, hooks: DaemonSessionHooks) {
     this.id = data.id;
@@ -86,6 +97,7 @@ export class DaemonSession {
     this.title = data.title;
     this.createdAt = data.createdAt;
     this.lastActivity = data.lastActivity;
+    this.remoteOn = data.remoteOn === true;
     this.hooks = hooks;
   }
 
@@ -97,6 +109,11 @@ export class DaemonSession {
 
   isBusy(): boolean {
     return this.busy;
+  }
+
+  /** Remote Control on: the idle stop must leave the process running for the phone. */
+  hasRemote(): boolean {
+    return this.remoteOn;
   }
 
   clientCount(): number {
@@ -119,6 +136,7 @@ export class DaemonSession {
       clients: this.clients.size,
       lastActivity: this.lastActivity,
       createdAt: this.createdAt,
+      remote: this.remoteOn ? { on: true, url: this.remoteUrl } : undefined,
     };
   }
 
@@ -132,6 +150,7 @@ export class DaemonSession {
       title: this.title,
       createdAt: this.createdAt,
       lastActivity: this.lastActivity,
+      remoteOn: this.remoteOn || undefined,
     };
   }
 
@@ -227,6 +246,31 @@ export class DaemonSession {
     return this.spec.args.includes('--replay-user-messages');
   }
 
+  /**
+   * A phone / claude.ai/code shares THIS process — no handover, no second process. The CLI's
+   * own bridge accepts this on a running `-p` session: `remote_control { enabled }`, answered
+   * with the pairing link. Queued until the process has completed its init handshake (sending
+   * it any earlier races the CLI's own startup).
+   */
+  setRemote(client: SessionClient, on: boolean, reqId: string): void {
+    this.ensureRunning();
+    const go = (): void => {
+      const requestId = `daemon-remote-${++remoteReqSeq}`;
+      this.remotePending.set(requestId, { client, reqId, on });
+      this.write({ type: 'control_request', request_id: requestId, request: { subtype: 'remote_control', enabled: on } });
+    };
+    if (this.initResponse) go();
+    else this.afterInit.push(go);
+  }
+
+  /** The process (re)started with Remote Control already on: re-enables it, nobody waiting. */
+  private resyncRemote(): void {
+    if (!this.remoteOn) return;
+    const requestId = `daemon-remote-${++remoteReqSeq}`;
+    this.remotePending.set(requestId, { on: true });
+    this.write({ type: 'control_request', request_id: requestId, request: { subtype: 'remote_control', enabled: true } });
+  }
+
   // ---- from a window ----
 
   send(client: SessionClient, msg: Record<string, any>): void {
@@ -306,6 +350,37 @@ export class DaemonSession {
           const waiters = this.initWaiters;
           this.initWaiters = [];
           for (const w of waiters) this.answerInit(w.client, w.requestId);
+          const queued = this.afterInit;
+          this.afterInit = [];
+          for (const fn of queued) fn();
+          this.resyncRemote();
+          return;
+        }
+        if (requestId && this.remotePending.has(requestId)) {
+          const pend = this.remotePending.get(requestId)!;
+          this.remotePending.delete(requestId);
+          const r = ev.response as Record<string, unknown> | undefined;
+          const ok = r?.subtype === 'success';
+          if (ok) {
+            this.remoteOn = pend.on;
+            this.remoteUrl = pend.on ? ((r?.response as Record<string, unknown> | undefined)?.session_url as string | undefined) : undefined;
+          } else if (!pend.client) {
+            // A resync (nobody waiting) failed: reflect that it really is off now.
+            this.remoteOn = false;
+            this.remoteUrl = undefined;
+          }
+          this.hooks.changed();
+          if (pend.client && pend.reqId) {
+            pend.client.send({
+              type: 'remote_result',
+              sessionId: this.id,
+              reqId: pend.reqId,
+              ok,
+              url: this.remoteUrl,
+              error: ok ? undefined : String(r?.error ?? 'remote control failed'),
+            });
+          }
+          this.broadcast({ type: 'remote_state', sessionId: this.id, on: this.remoteOn, url: this.remoteUrl });
           return;
         }
         // Answers to a window's own requests (context usage, …) go to that window only:
@@ -338,13 +413,15 @@ export class DaemonSession {
         break;
       case 'user':
         // A queued message the CLI just took in: when the previous turn already ended, it
-        // opens the next one.
-        if (ev.isReplay === true) {
-          if (this.unconsumed > 0) this.unconsumed--;
+        // opens the next one. Any top-level user event (not a tool result) starts/continues a
+        // turn — including one neither we nor another window sent: Remote Control lets a
+        // phone / claude.ai/code start a turn directly in the CLI, which we only see on the
+        // stream, never on our stdin.
+        if (ev.isReplay === true && this.unconsumed > 0) this.unconsumed--;
+        if (!ev.parent_tool_use_id) {
           this.busy = true;
+          this.partial = [];
         }
-        // The message is complete, so it is in the transcript now.
-        if (!ev.parent_tool_use_id) this.partial = [];
         break;
       case 'assistant':
         if (!ev.parent_tool_use_id) this.partial = [];
@@ -370,7 +447,17 @@ export class DaemonSession {
     this.initResponse = undefined;
     this.initRequestId = undefined;
     this.initWaiters = [];
+    this.afterInit = [];
+    // remoteOn itself is left alone: a window's intent, resynced the next time this starts.
+    this.remoteUrl = undefined;
+    for (const pend of this.remotePending.values()) {
+      if (pend.client && pend.reqId) {
+        pend.client.send({ type: 'remote_result', sessionId: this.id, reqId: pend.reqId, ok: false, error: 'process exited' });
+      }
+    }
+    this.remotePending.clear();
     this.removeTempDir();
+    if (this.remoteOn) this.broadcast({ type: 'remote_state', sessionId: this.id, on: true, url: undefined });
     this.broadcast({ type: 'exit', sessionId: this.id, code });
     const waiters = this.exitWaiters;
     this.exitWaiters = [];
