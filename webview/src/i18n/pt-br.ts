@@ -432,6 +432,10 @@ export const ptBR: Partial<Strings> = {
 
   'controls.model': 'Modelo',
   'controls.selectModel': 'Selecione um modelo',
+  'pin.pinTo': 'Fixar em {0}',
+  'pin.pinnedTo': 'Fixado em {0}',
+  'pin.unpin': 'Desafixar',
+  'pin.hint': 'Usar este modelo e esforço sempre que uma conversa mudar para {0}',
   'controls.model.remove': 'Remover modelo',
   'controls.context': 'Contexto',
   'controls.price': 'Preço',

@@ -37,6 +37,7 @@
   "cfg.spellCheck": "Check spelling as you type in the composer, underlining misspelled words. Never auto-corrects — click an underlined word to see suggestions. Off by default.",
   "cfg.expandToolCards": "Expand tool call cards by default in the timeline.",
   "cfg.scrollOnSend": "Scroll the conversation to the end when you send a message.",
+  "cfg.modePins": "Model and effort per permission mode: switching to a mode switches to its model and effort, also when Claude leaves plan mode after you approve a plan. Set with the pin in the model popup, or here, for example `{ \"plan\": { \"model\": \"claude-opus-5-5\", \"effort\": \"default\" }, \"auto\": { \"model\": \"claude-sonnet-5-5\" } }`.",
   "cfg.userName": "Name shown for your messages instead of 'You'. Empty = your OS username.",
   "cfg.ffmpegPath": "Path to the ffmpeg executable used for voice dictation capture. Empty = use 'ffmpeg' from PATH.",
   "cfg.voiceLanguage": "Language for voice dictation (speech-to-text). Empty = follow the Cockpit UI language.",

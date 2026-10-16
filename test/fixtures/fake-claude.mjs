@@ -9,7 +9,10 @@
 //    and runs as the next turn; with --replay-user-messages each one is echoed back
 //    (`isReplay: true`, its `uuid`) when its turn starts;
 //  - `interrupt` → ends the running turn with an error result, keeps the queue;
-//    `get_context_usage` → a small answer.
+//    `get_context_usage` → a small answer; `set_model`, `set_permission_mode` and
+//    `apply_flag_settings` → success (recorded in the log like every line);
+//  - a text containing EXITPLAN reports a switch to the default mode mid-turn
+//    (`system/status` with `permissionMode`), as the CLI does when a plan is approved.
 // Every line it receives is appended to $FAKE_LOG (argv first), so tests can check what
 // actually reached the CLI.
 import * as fs from 'node:fs';
@@ -52,6 +55,11 @@ rl.on('line', async (line) => {
       else out({ type: 'result', subtype: 'error_during_execution', is_error: true, result: 'interrupted' });
     } else if (sub === 'get_context_usage') {
       out({ type: 'control_response', response: { subtype: 'success', request_id: msg.request_id, response: { used: 42 } } });
+    } else if (sub === 'set_permission_mode') {
+      out({ type: 'control_response', response: { subtype: 'success', request_id: msg.request_id, response: { mode: msg.request.mode } } });
+      out({ type: 'system', subtype: 'status', status: null, permissionMode: msg.request.mode });
+    } else if (sub === 'set_model' || sub === 'apply_flag_settings') {
+      out({ type: 'control_response', response: { subtype: 'success', request_id: msg.request_id } });
     }
     return;
   }
@@ -82,6 +90,12 @@ async function turn(msg) {
     out({ type: 'system', subtype: 'init', session_id: sessionId, model: 'fake', slash_commands: ['help'] });
   }
   const text = msg.message?.content?.find?.((b) => b.type === 'text')?.text ?? '';
+  if (text.includes('EXITPLAN')) {
+    out({ type: 'system', subtype: 'status', status: null, permissionMode: 'default' });
+    await sleep(150);
+    reply('executing the plan');
+    return;
+  }
   if (text.includes('ASK')) {
     const id = `perm-${Date.now()}`;
     const decision = await new Promise((done) => {

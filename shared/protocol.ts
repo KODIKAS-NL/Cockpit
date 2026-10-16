@@ -334,6 +334,12 @@ export interface McpData {
   generatedAt: string; // ISO 8601
 }
 
+/** The model and/or effort a permission mode switches to (setting cockpitDaemon.modePins). */
+export interface ModePin {
+  model?: string;
+  effort?: string;
+}
+
 export interface SessionConfig {
   engine: string; // 'claude' | 'tootega' — which binary backs the session
   engines: string[];
@@ -353,6 +359,7 @@ export interface SessionConfig {
   spellCheck: boolean; // spell-check while typing (composer overlay)
   expandToolCards: boolean; // expand tool cards by default in the timeline
   scrollOnSend: boolean; // sending a message scrolls the conversation to the end
+  modePins?: Record<string, ModePin>; // model/effort pinned to a permission mode
   pendingRestart: boolean; // model/effort/permission changed and restarts on the next send
   userName: string; // nome do assinante para o rótulo "You" (vazio = usa o padrão)
   voiceCorrect: boolean; // correct the dictated text via Haiku when dictation stops
@@ -667,6 +674,9 @@ export type WebviewToHost =
   | { kind: 'removeModel'; model: string }
   | { kind: 'setEffort'; effort: string }
   | { kind: 'setPermissionMode'; mode: string }
+  // Pin the current model/effort to a permission mode (or remove its pin), for all conversations.
+  | { kind: 'pinMode'; mode: string; model?: string; effort?: string }
+  | { kind: 'unpinMode'; mode: string }
   | { kind: 'setEngine'; engine: string }
   | { kind: 'setAllowAgents'; value: boolean }
   | { kind: 'renameSession'; sessionId: string; name: string }

@@ -19,6 +19,7 @@ All under **Settings → Extensions → Cockpit for Claude Code** (prefix `cockp
 | `verbosity` | enum | `verbose` | Timeline display level — `verbose` / `necessary` / `dialogo` / `quiet` (display only; see [Timeline verbosity](features.md#timeline-verbosity)) |
 | `expandToolCards` | boolean | `false` | Expand tool cards by default in the timeline |
 | `scrollOnSend` | boolean | `true` | Scroll the conversation to the end when you send a message |
+| `modePins` | object | `{}` | Model and effort per permission mode, e.g. `{ "plan": { "model": "claude-opus-5-5" }, "auto": { "model": "claude-sonnet-5-5" } }`. Switching to a mode switches to its model and effort, also when Claude leaves plan mode after a plan is approved (switched live, no restart). Set with the pin in the model popup |
 | `spellCheck` | boolean | `false` | Inline PT-BR + EN spell-checker in the composer — **marks only, never auto-corrects**; click an underlined word for suggestions |
 | `userName` | string | `""` | Name shown on your messages; empty = OS user |
 | `internalModel` | enum | `claude-haiku-4-5` | Model for the Cockpit's internal AI calls (dictation correction, slash-command research) — clean, isolated calls; Haiku is fastest/cheapest |

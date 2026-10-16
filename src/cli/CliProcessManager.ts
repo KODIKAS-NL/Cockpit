@@ -338,7 +338,7 @@ export class CliProcessManager extends EventEmitter implements CliProcess {
    * Resolve `undefined` no timeout ou quando o CLI responde erro — nunca rejeita, para
    * que uma versão de CLI sem esse subtype não derrube nada.
    */
-  requestControl(subtype: string, timeoutMs = 5000): Promise<unknown> {
+  requestControl(subtype: string, timeoutMs = 5000, payload?: Record<string, unknown>): Promise<unknown> {
     const id = `${subtype}_${++this.reqSeq}`;
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
@@ -350,7 +350,7 @@ export class CliProcessManager extends EventEmitter implements CliProcess {
         clearTimeout(timer);
         resolve(payload);
       });
-      this.writeLine({ type: 'control_request', request_id: id, request: { subtype } });
+      this.writeLine({ type: 'control_request', request_id: id, request: { ...payload, subtype } });
     });
   }
 

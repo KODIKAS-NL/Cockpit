@@ -32,3 +32,8 @@ mac/**
 
 # Personal session notes, never shipped
 HANDOFF.md
+
+# Local, never shipped: Claude Code's per-project settings, plans saved by plan mode, screenshots
+.claude/**
+Planing/**
+tmp-img/**

@@ -27,9 +27,10 @@ const TOOL_ICON: Record<string, IconName> = {
 
 export function PermissionModal({ t, req, onDecision }: Props) {
   useEffect(() => {
+    // Only Ctrl/Cmd+Enter decides anything here: a stray Escape (or a click outside the
+    // dialog, see the overlay below) must not silently deny a tool the user meant to allow.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onDecision('deny');
-      else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) onDecision('allow');
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) onDecision('allow');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -49,7 +50,9 @@ export function PermissionModal({ t, req, onDecision }: Props) {
 
   return (
     <Portal>
-      <div className="modal-overlay" onClick={() => onDecision('deny')}>
+      {/* No onClick here on purpose: a stray click outside the dialog must not deny the
+          request. The decision is only made by the explicit buttons below. */}
+      <div className="modal-overlay">
         <div
           className={`modal perm ${preview?.kind === 'diff' ? 'has-diff' : ''}`}
           onClick={(e) => e.stopPropagation()}
@@ -233,7 +236,9 @@ function PlanModal({ t, req, onDecision }: Props) {
 
   return (
     <Portal>
-      <div className="modal-overlay" onClick={keepPlanning}>
+      {/* No onClick here on purpose: a stray click outside the dialog must not deny the plan
+          (or discard notes/edits). The decision is only made by the explicit buttons below. */}
+      <div className="modal-overlay">
         <div
           className={`modal perm plan ${maximized ? 'maximized' : ''}`}
           onClick={(e) => e.stopPropagation()}

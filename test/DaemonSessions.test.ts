@@ -30,9 +30,12 @@ interface Window {
   session: SessionT;
   ui: HostToWebview[];
   errors: unknown[];
+  modeChanges: number;
 }
 
-function makeWindow(sock: string): Window {
+type Pins = Record<string, { model?: string; effort?: string }>;
+
+function makeWindow(sock: string, pins: Pins = {}): Window {
   const client = new mods.DaemonClient(sock);
   clients.push(client);
   const ui: HostToWebview[] = [];
@@ -54,8 +57,21 @@ function makeWindow(sock: string): Window {
     quietPrompt: () => undefined,
     daemon: () => client,
     onTurnError: (e) => errors.push(e),
+    modePin: (mode) => pins[mode],
+    onModeChanged: () => win.modeChanges++,
   };
-  return { session: new mods.Session(hooks), ui, errors };
+  const win: Window = { session: new mods.Session(hooks), ui, errors, modeChanges: 0 };
+  return win;
+}
+
+/** What the fake CLI received from line `from` on (argv records mark a spawn). */
+function cliLines(from = 0): any[] {
+  return fs
+    .readFileSync(process.env.FAKE_LOG!, 'utf8')
+    .trim()
+    .split('\n')
+    .map((l) => JSON.parse(l))
+    .slice(from);
 }
 
 async function until(cond: () => boolean, what: string, ms = 5000): Promise<void> {
@@ -170,6 +186,47 @@ describe('two windows on one daemon session', () => {
       'SLOW long one',
       'do this instead',
     ]);
+    a.session.detach();
+  });
+
+  it('picking a mode by hand starts the process on its pinned model and effort', async () => {
+    const sock = path.join(dir, 'd.sock');
+    const pins: Pins = { plan: { model: 'claude-opus-x', effort: 'max' }, default: { model: 'claude-sonnet-x' } };
+    const a = makeWindow(sock, pins);
+    a.session.setPermission('plan');
+    expect(a.session.modelOverride).toBe('claude-opus-x');
+    expect(a.session.effortOverride).toBe('max');
+    const from = cliLines().length;
+    a.session.send('plan something');
+    await until(() => kinds(a, 'turnComplete').length === 1, 'turn ends');
+    const argv = cliLines(from).find((l) => l.argv)!.argv as string[];
+    expect(argv[argv.indexOf('--model') + 1]).toBe('claude-opus-x');
+    expect(argv[argv.indexOf('--effort') + 1]).toBe('max');
+    expect(argv[argv.indexOf('--permission-mode') + 1]).toBe('plan');
+    // A model picked by hand is the conversation's; the pin stays and applies on the next switch.
+    a.session.setModel('claude-haiku-x');
+    expect(pins.plan.model).toBe('claude-opus-x');
+    a.session.setPermission('default');
+    expect(a.session.modelOverride).toBe('claude-sonnet-x');
+    a.session.detach();
+  });
+
+  it('follows a mode switch by the CLI mid-turn, switching model and effort live', async () => {
+    const sock = path.join(dir, 'd.sock');
+    const a = makeWindow(sock, { default: { model: 'claude-sonnet-x', effort: 'low' } });
+    a.session.permissionOverride = 'plan';
+    const from = cliLines().length;
+    a.session.send('EXITPLAN approved');
+    await until(() => a.modeChanges === 1, 'the mode change is seen');
+    expect(a.session.permission()).toBe('default');
+    expect(a.session.modelOverride).toBe('claude-sonnet-x');
+    await until(() => kinds(a, 'turnComplete').length === 1, 'the turn goes on and ends');
+    const lines = cliLines(from);
+    expect(lines.filter((l) => l.argv).length).toBe(1); // started once, never restarted
+    const requests = lines.filter((l) => l.type === 'control_request').map((l) => l.request);
+    expect(requests).toContainEqual({ subtype: 'set_model', model: 'claude-sonnet-x' });
+    expect(requests).toContainEqual({ subtype: 'apply_flag_settings', settings: { effortLevel: 'low' } });
+    expect(a.errors).toEqual([]);
     a.session.detach();
   });
 });

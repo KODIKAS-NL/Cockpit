@@ -25,9 +25,17 @@ export type IconName =
   | 'globe'
   | 'search'
   | 'diamond'
-  | 'plan';
+  | 'plan'
+  | 'pin';
 
 const PATHS: Record<IconName, ReactElement> = {
+  // A push pin: a model/effort pinned to a permission mode.
+  pin: (
+    <>
+      <path d="M9 3h6l-1 6 3 3H7l3-3z" />
+      <path d="M12 12v9" />
+    </>
+  ),
   usage: <path d="M3 21h18M6 17v-5M11 17V6M16 17v-8M21 17v-3" />,
   signOut: <path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M15 8l4 4-4 4M19 12H9" />,
   signIn: <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5M9 8l-4 4 4 4M5 12h10" />,

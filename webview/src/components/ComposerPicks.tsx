@@ -19,6 +19,9 @@ interface Props {
   onAllowAgents: (value: boolean) => void;
   onEngine: (engine: string) => void;
   onAutoCompact: (value: string) => void;
+  /** Pin the current model/effort to a permission mode, for every conversation. */
+  onPin: (mode: string, model: string, effort: string) => void;
+  onUnpin: (mode: string) => void;
 }
 
 /** Auto-compact windows offered (tokens); the CLI accepts 100K to 1M. */
@@ -39,6 +42,8 @@ export function ComposerPicks({
   onAllowAgents,
   onEngine,
   onAutoCompact,
+  onPin,
+  onUnpin,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [custom, setCustom] = useState('');
@@ -86,6 +91,8 @@ export function ComposerPicks({
         onModel={onModel}
         onRemoveModel={onRemoveModel}
         onEffort={onEffort}
+        onPin={onPin}
+        onUnpin={onUnpin}
       />
       <select
         className="composer-pick-mode"
@@ -176,6 +183,8 @@ function ModelEffortPick({
   onModel,
   onRemoveModel,
   onEffort,
+  onPin,
+  onUnpin,
 }: {
   t: Translator;
   config: SessionConfig;
@@ -183,6 +192,8 @@ function ModelEffortPick({
   onModel: (model: string) => void;
   onRemoveModel: (model: string) => void;
   onEffort: (effort: string) => void;
+  onPin: (mode: string, model: string, effort: string) => void;
+  onUnpin: (mode: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -233,6 +244,32 @@ function ModelEffortPick({
   );
   const chipEffort = effortLabel(resolved || config.effort, t);
 
+  // The pin of the current permission mode, and whether the picks are the pinned ones. Pin/unpin
+  // show at once (optimistic, like a sent message): the real value comes back from the host
+  // over a postMessage round trip (write the setting, re-send the config), which the user
+  // would otherwise see as a lag — or, clicked twice quickly, as the first click doing nothing.
+  const mode = config.permissionMode;
+  const modeName = permLabel(mode, t);
+  const [optimisticPin, setOptimisticPin] = useState<{ mode: string; pin: { model?: string; effort?: string } | null } | null>(
+    null,
+  );
+  useEffect(() => {
+    // Stop overriding once this mode's real pin matches what we asked for, or the mode moved on.
+    if (!optimisticPin || optimisticPin.mode !== mode) {
+      if (optimisticPin) setOptimisticPin(null);
+      return;
+    }
+    const real = config.modePins?.[mode] ?? null;
+    const same =
+      (real === null && optimisticPin.pin === null) ||
+      (real !== null && optimisticPin.pin !== null && real.model === optimisticPin.pin.model && real.effort === optimisticPin.pin.effort);
+    if (same) setOptimisticPin(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.modePins, mode]);
+  const pin = optimisticPin?.mode === mode ? optimisticPin.pin : (config.modePins?.[mode] ?? null);
+  const pinned =
+    !!pin && (pin.model === undefined || pin.model === config.model) && (pin.effort === undefined || pin.effort === config.effort);
+
   return (
     <div className="mep" ref={ref}>
       <button
@@ -242,6 +279,11 @@ function ModelEffortPick({
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
+        {pinned && (
+          <span className="mep-pin-mark" title={t('pin.pinnedTo', modeName)}>
+            <Icon name="pin" size={11} />
+          </span>
+        )}
         <span className="mep-model">{name}</span>
         <span className="mep-effort">{chipEffort}</span>
       </button>
@@ -316,6 +358,36 @@ function ModelEffortPick({
               </div>
             </div>
           )}
+          <div className="mep-pin-row">
+            <Icon name="pin" size={12} />
+            {pinned ? (
+              <>
+                <span className="mep-pin-text">{t('pin.pinnedTo', modeName)}</span>
+                <button
+                  type="button"
+                  className="mep-pin-btn"
+                  onClick={() => {
+                    setOptimisticPin({ mode, pin: null });
+                    onUnpin(mode);
+                  }}
+                >
+                  {t('pin.unpin')}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="mep-pin-btn"
+                title={t('pin.hint', modeName)}
+                onClick={() => {
+                  setOptimisticPin({ mode, pin: { model: config.model, effort: config.effort } });
+                  onPin(mode, config.model, config.effort);
+                }}
+              >
+                {t('pin.pinTo', modeName)}
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

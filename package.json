@@ -3,7 +3,7 @@
   "displayName": "Cockpit for Claude Code",
   "description": "%ext.description%",
   "icon": "media/icon.png",
-  "version": "1.0.282",
+  "version": "1.0.283",
   "publisher": "KODIKAS",
   "license": "MIT",
   "author": {
@@ -386,6 +386,41 @@
           ],
           "default": "default",
           "description": "%cfg.permissionMode%"
+        },
+        "cockpitDaemon.modePins": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "%cfg.modePins%",
+          "propertyNames": {
+            "enum": [
+              "default",
+              "plan",
+              "acceptEdits",
+              "auto",
+              "dontAsk",
+              "bypassPermissions"
+            ]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string"
+              },
+              "effort": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "cockpitDaemon.allowAgents": {
           "type": "boolean",

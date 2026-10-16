@@ -16,7 +16,8 @@ export interface CliProcess extends EventEmitter {
   /** `uuid`: with --replay-user-messages the CLI echoes it back when it takes the message in. */
   sendUserMessage(text: string, images?: { mediaType: string; data: string }[], uuid?: string): void;
   sendControlResponse(requestId: string, response: Record<string, unknown>): void;
-  requestControl(subtype: string, timeoutMs?: number): Promise<unknown>;
+  /** `payload`: the request's other fields (`set_model` → `{ model }`). */
+  requestControl(subtype: string, timeoutMs?: number, payload?: Record<string, unknown>): Promise<unknown>;
   interrupt(): void;
   /** Ends the engine process. The next message starts it again (with --resume). */
   stop(): void;

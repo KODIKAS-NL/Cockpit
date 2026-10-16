@@ -37,6 +37,10 @@ export interface SessionHooks {
    */
   onPermissionPrompt?: (p: { requestId: string; title: string; detail: string; canAlways: boolean }) => void;
   onPromptClosed?: (requestId: string) => void;
+  /** The model and effort pinned to a permission mode, if any (setting cockpitDaemon.modePins). */
+  modePin?: (mode: string) => { model?: string; effort?: string } | undefined;
+  /** The CLI switched mode on its own (e.g. a plan was approved): the picks changed with it. */
+  onModeChanged?: () => void;
   onInit: (model?: string, slashCommands?: string[]) => void;
   /** The model list the CLI reports in its `initialize` reply (what the account can use). */
   onModels?: (models: DiscoveredModel[]) => void;
@@ -221,7 +225,30 @@ export class Session {
   }
   setPermission(p: string): void {
     this.permissionOverride = p;
+    this.applyModePin(p, false); // the restart below starts on the pinned model/effort
     this.stop();
+  }
+
+  /**
+   * Takes the model/effort pinned to `mode`, if there is one. `live`: the process keeps running
+   * (the CLI changed mode mid-turn), so it is switched in place, without a restart.
+   */
+  applyModePin(mode: string, live: boolean): boolean {
+    const pin = this.hooks.modePin?.(mode);
+    if (!pin || (!pin.model && !pin.effort)) return false;
+    if (pin.model) this.modelOverride = pin.model;
+    if (pin.effort) this.effortOverride = pin.effort;
+    if (live && this.cli?.isRunning()) {
+      // 'default' = back to what the CLI would use without a flag.
+      if (pin.model) void this.cli.requestControl('set_model', 5000, { model: pin.model === 'default' ? null : pin.model });
+      if (pin.effort) {
+        void this.cli.requestControl('apply_flag_settings', 5000, {
+          settings: { effortLevel: pin.effort === 'default' ? null : pin.effort },
+        });
+      }
+    }
+    dlog('session', `mode ${mode}: pinned model=${pin.model ?? '-'} effort=${pin.effort ?? '-'}${live ? ' (live)' : ''}`);
+    return true;
   }
   setAllowAgents(v: boolean): void {
     this.allowAgentsOverride = v;
@@ -807,6 +834,14 @@ export class Session {
         // carrying how much context was condensed. 2.1.224 started showing both to its own
         // attached clients; here they are the S11 event and the reason the turn stalls.
         if (s.subtype === 'status') {
+          // The CLI reports its mode here; a different one than ours means it switched on its
+          // own (a plan approved). Follow it, with the model/effort pinned to the new mode.
+          const mode = cliMode(s.permissionMode);
+          if (mode && mode !== cliMode(this.permission())) {
+            this.permissionOverride = mode;
+            this.applyModePin(mode, !this.replaying);
+            this.hooks.onModeChanged?.();
+          }
           const status = String(s.status ?? '');
           if (status === 'compacting') this.setCompacting(true);
           else if (s.compact_result !== undefined || s.compact_error !== undefined) {
@@ -1207,6 +1242,15 @@ export class Session {
     this.emittedTools.clear();
     this.subagentStreamed.clear();
   }
+}
+
+// The permission modes the picker knows; since CLI 2.1.285 the default one may be called
+// `manual`. Anything else (an internal mode) is not followed.
+const KNOWN_MODES = new Set(['default', 'plan', 'acceptEdits', 'auto', 'dontAsk', 'bypassPermissions']);
+function cliMode(mode: unknown): string | undefined {
+  if (typeof mode !== 'string') return undefined;
+  const m = mode === 'manual' ? 'default' : mode;
+  return KNOWN_MODES.has(m) ? m : undefined;
 }
 
 // Tool label from the engine's `task_type`. Used only when the task shows up

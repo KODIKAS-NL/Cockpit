@@ -70,7 +70,7 @@ import { fetchAccountUsage, usageDiagnostics } from '../cli/UsageApi';
 import { OtelReceiver } from '../cli/OtelReceiver';
 import { CredentialsStore } from '../secrets/CredentialsStore';
 import { buildSystemPrompt } from '../cli/SystemPromptTemplate';
-import type { LimitWindow, HostToWebview, WebviewToHost, TabInfo, UsageBucket, ScopedBucket, VoiceReplacement, ModelMeta, SkillOverride, MentionItem } from '../../shared/protocol';
+import type { LimitWindow, HostToWebview, WebviewToHost, TabInfo, UsageBucket, ScopedBucket, VoiceReplacement, ModelMeta, SkillOverride, MentionItem, ModePin } from '../../shared/protocol';
 import { Session, type SessionHooks } from '../session/Session';
 import { chooseLocation, type Surface } from './location';
 import { resolveLocale } from '../i18n/host';
@@ -388,6 +388,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       },
       onPermissionPrompt: (p) => this.offerPermissionNotice(tabId, p),
       onPromptClosed: (requestId) => this.closePermissionNotice(requestId),
+      modePin: (mode) => this.modePins()[mode],
+      onModeChanged: () => {
+        const s = this.sessions.get(tabId);
+        if (s) this.saveSessionModel(s);
+        if (tabId === this.activeTab) this.sendConfig();
+      },
       onInit: (model, cmds) => this.onSessionInit(model, cmds, tabId),
       onModels: (models) => this.onCliModels(models),
       onAuthRequired: () => this.post({ kind: 'authRequired' }, tabId),
@@ -514,6 +520,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const s = new Session(this.hooksFor(id));
     if (this.lastLimits) s.applyLimits(this.lastLimits, this.lastLimitsSource);
     this.applySkillOverrides(s);
+    // A new conversation starts on the model/effort pinned to its mode; a resumed one then
+    // restores its own saved picks over it.
+    s.applyModePin(s.permission(), false);
     this.sessions.set(id, s);
     this.tabMeta.set(id, { title: '', status: 'idle' });
     this.tabOrder.push(id);
@@ -581,6 +590,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       s.permissionOverride = inherited.permission;
       s.allowAgentsOverride = inherited.allowAgents;
       s.autoCompactOverride = inherited.autoCompact;
+      // What the previous tab left on the CLI default comes from the inherited mode's pin.
+      const pin = this.modePins()[s.permission()];
+      if (pin?.model && inherited.model === undefined) s.modelOverride = pin.model;
+      if (pin?.effort && inherited.effort === undefined) s.effortOverride = pin.effort;
       this.saveSessionModel(s);
     }
     this.openSessionPanel(id);
@@ -2522,6 +2535,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         spellCheck: this.cfg().get<boolean>('spellCheck', false),
         expandToolCards: this.cfg().get<boolean>('expandToolCards', false),
         scrollOnSend: this.cfg().get<boolean>('scrollOnSend', true),
+        modePins: this.modePins(),
         pendingRestart: this.pendingRestart,
         userName: this.userName(),
         voiceCorrect: this.cfg().get<boolean>('voiceCorrect', false),
@@ -3024,6 +3038,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.pendingRestart = true;
         this.sendConfig();
         break;
+      case 'pinMode': {
+        // Pins the current model/effort to a mode for every conversation (user setting).
+        if (!PERMISSION_MODES.includes(m.mode)) break;
+        const pins = { ...this.modePins(), [m.mode]: { model: m.model, effort: m.effort } };
+        void this.cfg().update('modePins', pins, vscode.ConfigurationTarget.Global).then(() => this.sendConfig());
+        break;
+      }
+      case 'unpinMode': {
+        const pins = { ...this.modePins() };
+        delete pins[m.mode];
+        void this.cfg().update('modePins', pins, vscode.ConfigurationTarget.Global).then(() => this.sendConfig());
+        break;
+      }
       case 'setEngine':
         this.setTabEngine(srcTab, m.engine === 'tootega' ? 'tootega' : 'claude');
         break;
@@ -3335,6 +3362,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   // ---- CLI ----
+
+  /** The model/effort pinned to each permission mode (setting cockpitDaemon.modePins). */
+  private modePins(): Record<string, ModePin> {
+    const raw = this.cfg().get<Record<string, ModePin>>('modePins', {}) ?? {};
+    const out: Record<string, ModePin> = {};
+    for (const [mode, pin] of Object.entries(raw)) {
+      if (!PERMISSION_MODES.includes(mode) || !pin || typeof pin !== 'object') continue;
+      const model = typeof pin.model === 'string' && pin.model.trim() ? pin.model.trim() : undefined;
+      const effort = typeof pin.effort === 'string' && pin.effort.trim() ? pin.effort.trim() : undefined;
+      if (model || effort) out[mode] = { model, effort };
+    }
+    return out;
+  }
 
   private cfg() {
     return vscode.workspace.getConfiguration('cockpitDaemon');

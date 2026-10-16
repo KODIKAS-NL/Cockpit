@@ -753,6 +753,8 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
             onAllowAgents={onAllowAgents}
             onEngine={onEngine}
             onAutoCompact={(value) => send({ kind: 'setAutoCompact', value })}
+            onPin={(mode, model, effort) => send({ kind: 'pinMode', mode, model, effort })}
+            onUnpin={(mode) => send({ kind: 'unpinMode', mode })}
           />
         }
       />

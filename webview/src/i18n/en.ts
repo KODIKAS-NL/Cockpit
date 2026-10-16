@@ -495,6 +495,10 @@ export const en = {
 
   'controls.model': 'Model',
   'controls.selectModel': 'Select a model',
+  'pin.pinTo': 'Pin to {0}',
+  'pin.pinnedTo': 'Pinned to {0}',
+  'pin.unpin': 'Unpin',
+  'pin.hint': 'Use this model and effort whenever a conversation switches to {0}',
   'controls.model.remove': 'Remove model',
   'controls.context': 'Context',
   'controls.price': 'Price',

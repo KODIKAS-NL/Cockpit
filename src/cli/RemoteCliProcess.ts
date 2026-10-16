@@ -66,7 +66,7 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
     this.write({ type: 'control_response', response: { subtype: 'success', request_id: requestId, response } });
   }
 
-  requestControl(subtype: string, timeoutMs = 5000): Promise<unknown> {
+  requestControl(subtype: string, timeoutMs = 5000, payload?: Record<string, unknown>): Promise<unknown> {
     // Prefixed with the window's id: the daemon sends the answer back to this window only.
     const id = `${this.client.clientId}:${subtype}_${++this.reqSeq}`;
     return new Promise((resolve) => {
@@ -79,7 +79,7 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
         clearTimeout(timer);
         resolve(payload);
       });
-      this.write({ type: 'control_request', request_id: id, request: { subtype } });
+      this.write({ type: 'control_request', request_id: id, request: { ...payload, subtype } });
     });
   }
 
