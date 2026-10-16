@@ -282,9 +282,18 @@ export class Daemon {
     if (!file || !fs.existsSync(file)) return;
     try {
       const data = JSON.parse(fs.readFileSync(file, 'utf8')) as { sessions?: PersistedSession[] };
+      let dropped = 0;
       for (const p of data.sessions ?? []) {
-        if (p?.id && p.cwd && p.spec?.claudePath) this.sessions.set(p.id, this.makeSession(p));
+        if (!p?.id || !p.cwd || !p.spec?.claudePath) continue;
+        // Never got a message (saved while a window still held it): nothing could find it
+        // again, and no window is left to release it. See releaseIfUnused.
+        if (!p.cliSessionId) {
+          dropped++;
+          continue;
+        }
+        this.sessions.set(p.id, this.makeSession(p));
       }
+      if (dropped) this.scheduleSave();
     } catch (e) {
       this.log(`state file unreadable, starting empty: ${String(e)}`);
     }

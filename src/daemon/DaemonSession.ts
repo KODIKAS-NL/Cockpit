@@ -5,7 +5,9 @@
 //  - one `initialize` handshake per process, answered from cache to every window;
 //  - the prompts (`control_request`) still waiting, so a window attaching later sees them,
 //    and first-answer-wins arbitration between windows;
-//  - a busy flag: a user message arriving mid-turn is refused instead of queued;
+//  - a busy flag. A user message arriving mid-turn goes to the CLI anyway: the CLI queues it
+//    and folds it into the turn, or runs it as the next turn. With --replay-user-messages the
+//    CLI echoes each message when it takes it in, so busy holds until none is left waiting;
 //  - the deltas of the message being written right now (`partial`), since the transcript
 //    only gets a message once it is complete.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -64,6 +66,8 @@ export class DaemonSession {
   private proc: ChildProcessWithoutNullStreams | null = null;
   private parser = new StreamParser();
   private busy = false;
+  /** User messages written but not yet echoed back by the CLI (--replay-user-messages only). */
+  private unconsumed = 0;
   private stopping = false;
   private partial: unknown[] = [];
   private pending = new Map<string, unknown>();
@@ -218,16 +222,17 @@ export class DaemonSession {
     else proc.kill('SIGTERM');
   }
 
+  /** Without the echo nothing would ever count a queued message as taken in. */
+  private tracksReplay(): boolean {
+    return this.spec.args.includes('--replay-user-messages');
+  }
+
   // ---- from a window ----
 
   send(client: SessionClient, msg: Record<string, any>): void {
     this.lastActivity = Date.now();
     switch (msg.type) {
       case 'user': {
-        if (this.busy) {
-          client.send({ type: 'rejected', sessionId: this.id, reason: 'busy' });
-          return;
-        }
         if (!this.title) {
           const title = titleOf(msg.message);
           if (title) {
@@ -236,11 +241,14 @@ export class DaemonSession {
           }
         }
         this.ensureRunning();
-        this.busy = true;
-        this.partial = [];
+        if (!this.busy) {
+          this.busy = true;
+          this.partial = [];
+        }
+        if (this.tracksReplay()) this.unconsumed++;
         this.write(msg);
         for (const c of this.clients.values()) {
-          if (c.id !== client.id) c.send({ type: 'remote_user', sessionId: this.id, message: msg.message });
+          if (c.id !== client.id) c.send({ type: 'remote_user', sessionId: this.id, message: msg.message, uuid: msg.uuid });
         }
         return;
       }
@@ -328,13 +336,22 @@ export class DaemonSession {
         this.partial.push(ev);
         if (this.partial.length > MAX_PARTIAL) this.partial.splice(0, this.partial.length - MAX_PARTIAL);
         break;
-      case 'assistant':
       case 'user':
+        // A queued message the CLI just took in: when the previous turn already ended, it
+        // opens the next one.
+        if (ev.isReplay === true) {
+          if (this.unconsumed > 0) this.unconsumed--;
+          this.busy = true;
+        }
         // The message is complete, so it is in the transcript now.
         if (!ev.parent_tool_use_id) this.partial = [];
         break;
+      case 'assistant':
+        if (!ev.parent_tool_use_id) this.partial = [];
+        break;
       case 'result':
-        this.busy = false;
+        // Messages still waiting run as the next turn: stay busy for them.
+        this.busy = this.unconsumed > 0;
         this.partial = [];
         break;
     }
@@ -346,6 +363,7 @@ export class DaemonSession {
     this.hooks.log(`[${this.id}] exit ${code}${deliberate ? ' (stopped)' : ''}`);
     this.proc = null;
     this.busy = false;
+    this.unconsumed = 0;
     this.stopping = false;
     this.partial = [];
     this.pending.clear();

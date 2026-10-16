@@ -20,7 +20,6 @@
   "Claude process exited unexpectedly (code {0}) before finishing the turn. Send again to continue.": "Claude process exited unexpectedly (code {0}) before finishing the turn. Send again to continue.",
   "Connection was unstable — the turn may be incomplete. Send again if needed.{0}": "Connection was unstable — the turn may be incomplete. Send again if needed.{0}",
   "The turn ended with an error.{0}": "The turn ended with an error.{0}",
-  "This session is busy with a turn started on another device. Your message was not sent; it is back in the input box.": "This session is busy with a turn started on another device. Your message was not sent; it is back in the input box.",
   "Install daemon": "Install daemon",
   "dist/daemon.js is missing from this build.": "dist/daemon.js is missing from this build.",
   "Could not install cockpit-daemon: {0}": "Could not install cockpit-daemon: {0}",

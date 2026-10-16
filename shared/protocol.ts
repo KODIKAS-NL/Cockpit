@@ -352,6 +352,7 @@ export interface SessionConfig {
   showThinking: boolean; // expand thinking by default
   spellCheck: boolean; // spell-check while typing (composer overlay)
   expandToolCards: boolean; // expand tool cards by default in the timeline
+  scrollOnSend: boolean; // sending a message scrolls the conversation to the end
   pendingRestart: boolean; // model/effort/permission changed and restarts on the next send
   userName: string; // nome do assinante para o rótulo "You" (vazio = usa o padrão)
   voiceCorrect: boolean; // correct the dictated text via Haiku when dictation stops
@@ -510,9 +511,10 @@ type HostMsg =
   // Move keyboard focus to the waiting permission card or question (the "focus prompt" command).
   | { kind: 'focusPrompt' }
   // Daemon mode: another window sent this prompt; it shows as a user bubble here too.
-  | { kind: 'remoteUser'; text: string }
-  // Daemon mode: our last message was refused (a turn was running): drop its bubble.
-  | { kind: 'sendRejected' }
+  // Another window's message. `queued`: sent mid-turn, it waits in the CLI's queue.
+  | { kind: 'remoteUser'; text: string; id?: string; queued?: boolean }
+  // The CLI took in the message with this id (the bubble's id): no longer queued.
+  | { kind: 'userPickedUp'; id: string }
   | { kind: 'authRequired' }
   | { kind: 'stats'; stats: StatsSnapshot }
   // Session timeline/compactions (heavy): sent per turn, not per token.
@@ -646,7 +648,9 @@ export interface ImageAttachment {
 export type WebviewToHost =
   | { kind: 'init' }
   | { kind: 'heartbeat' } // render liveness beat: prolonged silence = dead renderer (blank screen)
-  | { kind: 'sendMessage'; text: string; images?: ImageAttachment[]; force?: boolean; selection?: string }
+  // `uuid`: the bubble's id, echoed back by the CLI when it takes the message in.
+  // `now`: "Send now": interrupt the running turn so this message runs right away.
+  | { kind: 'sendMessage'; text: string; images?: ImageAttachment[]; force?: boolean; selection?: string; uuid?: string; now?: boolean }
   | { kind: 'resolvePaths'; requestId: string; absPaths: string[] }
   | { kind: 'readClipboardFiles'; requestId: string }
   | { kind: 'openLink'; href: string; preview?: boolean }

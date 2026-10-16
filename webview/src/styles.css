@@ -32,6 +32,7 @@ body {
   flex-direction: column;
   height: 100%;
   position: relative; /* âncora da barra de busca flutuante (Ctrl+F) */
+  overflow: hidden; /* only .scroll scrolls; never the webview itself */
 }
 
 /* ---------- Tab bar (sessões paralelas) ---------- */
@@ -737,6 +738,9 @@ body {
 }
 .scroll {
   flex: 1 1 auto;
+  /* Containing block for absolutely positioned content (the visually hidden .role-name):
+     without it they are placed against .scroll-wrap, escape this clip and grow the page. */
+  position: relative;
   overflow-y: auto;
   padding: 10px 16px 10px 10px;
 }
@@ -891,7 +895,16 @@ body {
   border-radius: 8px;
   font-size: 12px;
   color: var(--vscode-descriptionForeground, #8a8a8a);
-  background: color-mix(in srgb, var(--vscode-foreground, #cccccc) 6%, transparent);
+  /* Opaque: it stays pinned to the bottom of the view (sticky) over the conversation, so
+     a running turn is visible however far up you have scrolled. */
+  background: color-mix(
+    in srgb,
+    var(--vscode-foreground, #cccccc) 6%,
+    var(--vscode-sideBar-background, var(--vscode-editor-background, #ffffff))
+  );
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
 }
 .activity-icon {
   flex: none;
@@ -1009,7 +1022,7 @@ body {
 /* Só o ÚLTIMO prompt fica "parado" no topo do timeline ao rolar. O sticky vai no
    wrapper (.tt-wrap) porque ele é o filho direto da timeline; a bolha sozinha,
    dentro do wrapper, não teria range de sticky. */
-.tt-wrap.pinned-wrap {
+.pinned-wrap {
   position: sticky;
   top: 0;
   z-index: 5;
@@ -6288,6 +6301,32 @@ body {
 .composer-side .btn.send.send-icon:disabled {
   opacity: 0.4;
 }
+/* "Send now" (a turn is running and something is typed): just left of Stop, same row. */
+.composer-side .btn.send-now {
+  position: absolute;
+  right: 46px;
+  bottom: 6px;
+  height: 28px;
+  margin: 0;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.composer-side:has(.send-now) {
+  padding-right: 136px;
+}
+/* A message waiting in the CLI's queue: a muted tag beside its time (not the header's color). */
+.bubble .role .bubble-queued {
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--vscode-descriptionForeground, #8a8a8a);
+  background: color-mix(in srgb, var(--vscode-foreground, #888) 14%, transparent);
+}
 
 /* The mic sits at the top right of the input; expand/collapse all floats at the bottom right of
    the conversation, just above the prompt box. */
@@ -6400,4 +6439,272 @@ body {
   align-items: center;
   justify-content: center;
   padding: 0;
+}
+
+/* The (i) that holds a message's, tool call's or turn's details (instead of a popover on hover). */
+.tt-wrap.info-tip {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.info-tip-icon {
+  display: inline-flex;
+  color: var(--vscode-descriptionForeground, #8a8a8a);
+  opacity: 0.6;
+  cursor: default;
+}
+.info-tip-icon:hover,
+.tt-wrap.info-tip:focus-visible .info-tip-icon {
+  opacity: 1;
+}
+/* While a turn runs, the pinned "Working…" row takes the bottom: the jump-to-end button sits above it. */
+.scroll-wrap:has(.activity) .scroll-bottom {
+  bottom: 58px;
+}
+
+/* Model + effort in one chip ("Opus 5.5 Medium"); its popup opens upward over the prompt box,
+   full width, like the official panel: model names only, a stepped effort slider underneath. */
+.mep {
+  position: static; /* the popup is placed against .composer-side */
+}
+.mep-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 220px;
+  height: 24px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  border: none;
+  border-radius: 12px;
+  color: var(--vscode-foreground);
+  background: color-mix(in srgb, var(--vscode-foreground, #888) 9%, transparent);
+  cursor: pointer;
+}
+.mep-btn:hover,
+.mep-btn[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--vscode-foreground, #888) 16%, transparent);
+}
+.mep-model {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-effort {
+  flex: none;
+  color: var(--vscode-descriptionForeground, #8a8a8a);
+}
+.mep-pop {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: calc(100% + 4px);
+  z-index: 50;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--vscode-widget-border, rgba(127, 127, 127, 0.35));
+  border-radius: 8px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background, #fff));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+.mep-head {
+  padding: 4px 8px 6px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground, #8a8a8a);
+}
+.mep-row {
+  display: flex;
+  align-items: center;
+  border-radius: 5px;
+}
+.mep-row:hover {
+  background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.12));
+}
+.mep-row.sel {
+  color: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground));
+  background: var(--vscode-list-activeSelectionBackground, rgba(0, 120, 212, 0.25));
+}
+.mep-row-pick {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.mep-row-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-check {
+  flex: none;
+}
+.mep-remove {
+  flex: none;
+  padding: 0 8px;
+  color: inherit;
+  background: none;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+}
+.mep-row:hover .mep-remove,
+.mep-remove:focus-visible {
+  opacity: 0.7;
+}
+.mep-effort-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  padding: 8px 8px 6px;
+  border-top: 1px solid var(--vscode-widget-border, rgba(127, 127, 127, 0.25));
+  font-size: 13px;
+}
+.mep-effort-label {
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+/* Stepped slider: a track with a dot per level, filled up to the chosen one. */
+.mep-slider {
+  position: relative;
+  flex: none;
+  width: 120px;
+  height: 18px;
+  margin: 0 8px;
+  outline: none;
+}
+.mep-slider:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #3794ff);
+  outline-offset: 4px;
+  border-radius: 9px;
+}
+.mep-track,
+.mep-fill {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 2px;
+}
+.mep-track {
+  right: 0;
+  background: color-mix(in srgb, var(--vscode-foreground, #888) 18%, transparent);
+}
+.mep-fill {
+  background: var(--vscode-button-background, #0078d4);
+}
+.mep-stop {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.mep-stop::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--vscode-foreground, #888) 45%, transparent);
+}
+.mep-stop.on::after {
+  background: var(--vscode-button-foreground, #fff);
+}
+.mep-thumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: var(--vscode-button-background, #0078d4);
+  box-shadow: 0 0 0 2px var(--vscode-editorWidget-background, var(--vscode-editor-background, #fff));
+  pointer-events: none;
+}
+
+/* Prompt toolbar on one row: small tool icons on the left, then the chips at their natural width.
+   Composer.tsx measures how many icons fit; the rest sit behind a [›] that shows them above it
+   on hover or focus. Only when not even the [›] fits ("tight") may the chips shrink. */
+.composer-side {
+  flex-wrap: nowrap;
+}
+.composer-tools {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+.composer-side .composer-tools .composer-side-btn {
+  width: 24px;
+  height: 24px;
+}
+.composer-tools .composer-side-btn svg {
+  width: 13px;
+  height: 13px;
+}
+.composer-tools-more {
+  position: relative;
+  display: flex;
+}
+.composer-tools-toggle {
+  font-size: 16px;
+  line-height: 1;
+}
+.composer-tools-pop {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: 100%; /* touching the [›]: moving the mouse up into it keeps the hover */
+  z-index: 40;
+  padding: 3px;
+  border: 1px solid var(--vscode-widget-border, rgba(127, 127, 127, 0.35));
+  border-radius: 8px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background, #fff));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+/* Stays open while you are in it (e.g. the slash menu it opened). */
+.composer-tools-more:hover .composer-tools-pop,
+.composer-tools-more:focus-within .composer-tools-pop {
+  display: flex;
+}
+.composer-picks {
+  flex: none;
+  flex-wrap: nowrap;
+}
+.composer-side.tight .composer-picks {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.mep {
+  min-width: 0;
+}
+.mep-btn {
+  max-width: 100%;
+}
+/* The permission mode box is as wide as the mode it shows, not as its longest option. */
+.composer-picks .composer-pick-mode {
+  field-sizing: content;
+  max-width: none;
+  min-width: 0;
 }

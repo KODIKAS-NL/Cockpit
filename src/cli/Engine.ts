@@ -29,7 +29,7 @@ const CAPS: Record<EngineId, EngineCaps> = {
 };
 
 export function cfg(): vscode.WorkspaceConfiguration {
-  return vscode.workspace.getConfiguration('tootega');
+  return vscode.workspace.getConfiguration('cockpitDaemon');
 }
 
 /**

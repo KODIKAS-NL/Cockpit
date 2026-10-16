@@ -46,6 +46,9 @@ export const ptBR: Partial<Strings> = {
   'composer.placeholder': 'Pergunte ao Claude Code…  (Enter envia, Shift+Enter quebra linha)',
   'composer.send': 'Enviar',
   'composer.stop': 'Parar',
+  'composer.tools': 'Ferramentas',
+  'composer.sendNow': 'Enviar agora',
+  'composer.sendNowHint': 'Interrompe o turno atual e envia esta mensagem imediatamente',
   'voice.start': 'Ditar (voz para texto)',
   'voice.stop': 'Parar ditado',
   'voice.correcting': 'Corrigindo…',
@@ -161,6 +164,7 @@ export const ptBR: Partial<Strings> = {
   'activity.received': 'Tokens recebidos',
 
   'tip.time': 'Horário',
+  'tip.details': 'Detalhes',
   'tip.chars': 'Caracteres',
   'tip.words': 'Palavras',
   'tip.images': 'Imagens',
@@ -427,6 +431,7 @@ export const ptBR: Partial<Strings> = {
   'tip.stop.desc': 'Para o agente agora. O turno atual encerra e a sessão continua aberta.',
 
   'controls.model': 'Modelo',
+  'controls.selectModel': 'Selecione um modelo',
   'controls.model.remove': 'Remover modelo',
   'controls.context': 'Contexto',
   'controls.price': 'Preço',
@@ -625,6 +630,8 @@ export const ptBR: Partial<Strings> = {
   'confirm.effort.action': 'Enviar mesmo assim',
   'rewind.title': 'Rebobinar até aqui (remove este prompt e tudo depois)',
   'bubble.showMore': 'Mostrar mais',
+  'bubble.queued': 'Na fila',
+  'bubble.queuedHint': 'O Claude recebe esta mensagem no próximo passo',
   'bubble.showLess': 'Mostrar menos',
   'confirm.cancel': 'Cancelar',
   // Contexto injetado por hook (timeline + painel Skills).

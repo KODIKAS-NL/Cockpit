@@ -1,7 +1,8 @@
 // Two windows, one conversation: real Sessions with RemoteCliProcess, through a real
 // cockpit-daemon, against the fake CLI. Checks what the user sees in each window: prompts
 // shown on attach and closed when the other window answers, the other window's message,
-// the busy refusal, and that closing a window leaves the conversation running.
+// a message sent mid-turn (queued by the CLI), and that closing a window leaves the conversation
+// running.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -28,14 +29,14 @@ const prevHome = process.env.HOME;
 interface Window {
   session: SessionT;
   ui: HostToWebview[];
-  rejected: string[];
+  errors: unknown[];
 }
 
 function makeWindow(sock: string): Window {
   const client = new mods.DaemonClient(sock);
   clients.push(client);
   const ui: HostToWebview[] = [];
-  const rejected: string[] = [];
+  const errors: unknown[] = [];
   const hooks: SessionHooks = {
     emit: (m) => ui.push(m),
     onBusy: () => {},
@@ -52,9 +53,9 @@ function makeWindow(sock: string): Window {
     extraSystemPrompt: () => undefined,
     quietPrompt: () => undefined,
     daemon: () => client,
-    onSendRejected: (text) => rejected.push(text),
+    onTurnError: (e) => errors.push(e),
   };
-  return { session: new mods.Session(hooks), ui, rejected };
+  return { session: new mods.Session(hooks), ui, errors };
 }
 
 async function until(cond: () => boolean, what: string, ms = 5000): Promise<void> {
@@ -93,7 +94,7 @@ afterAll(async () => {
 });
 
 describe('two windows on one daemon session', () => {
-  it('follows prompts, messages and refusals across windows', async () => {
+  it('follows prompts and messages across windows, queued ones included', async () => {
     const sock = path.join(dir, 'd.sock');
     const a = makeWindow(sock);
     const b = makeWindow(sock);
@@ -124,16 +125,19 @@ describe('two windows on one daemon session', () => {
     expect(kinds(b, 'remoteUser')[0].text).toBe('SLOW one');
     expect(b.session.busy).toBe(true);
 
-    // B tries to send mid-turn: refused, text handed back, turn unaffected.
-    b.session.send('me too');
-    await until(() => b.rejected.length === 1, 'B is told the session is busy');
-    expect(b.rejected[0]).toBe('me too');
-    await until(() => !a.session.busy && !b.session.busy, 'slow turn ends');
+    // B sends mid-turn: the CLI queues it. A shows it as queued until the CLI takes it in,
+    // and both windows stay busy until it has run.
+    b.session.send('me too', undefined, 'u-b');
+    await until(() => kinds(a, 'remoteUser').length === 1, 'A shows B\'s message');
+    expect(kinds(a, 'remoteUser')[0]).toMatchObject({ text: 'me too', id: 'u-b', queued: true });
+    await until(() => kinds(a, 'userPickedUp').some((m) => m.id === 'u-b'), 'A sees it taken in');
+    await until(() => kinds(b, 'turnComplete').length >= 3, 'the queued message ran');
+    await until(() => !a.session.busy && !b.session.busy, 'both turns end');
 
     // A closes its window: the conversation keeps running for B.
     a.session.detach();
     b.session.send('after A left');
-    await until(() => !b.session.busy && kinds(b, 'turnComplete').length >= 3, 'B continues alone');
+    await until(() => !b.session.busy && kinds(b, 'turnComplete').length >= 4, 'B continues alone');
 
     const log = fs
       .readFileSync(process.env.FAKE_LOG!, 'utf8')
@@ -141,7 +145,31 @@ describe('two windows on one daemon session', () => {
       .split('\n')
       .map((l) => JSON.parse(l));
     const users = log.filter((l) => l.type === 'user').map((l) => l.message.content[0].text);
-    expect(users).toEqual(['ASK can I?', 'SLOW one', 'after A left']);
+    expect(users).toEqual(['ASK can I?', 'SLOW one', 'me too', 'after A left']);
     expect(log.filter((l) => l.argv).length).toBe(1); // one process the whole time
+  });
+
+  it('"Send now" interrupts the turn and runs the message, without an error', async () => {
+    const sock = path.join(dir, 'd.sock');
+    const a = makeWindow(sock);
+    a.session.send('SLOW long one');
+    await until(() => kinds(a, 'assistantText').length > 0 || a.session.busy, 'turn running');
+    await new Promise((r) => setTimeout(r, 100));
+    a.session.sendNow('do this instead', undefined, 'u-now');
+    expect(a.session.busy).toBe(true);
+    await until(() => kinds(a, 'userPickedUp').some((m) => m.id === 'u-now'), 'the message is taken in');
+    await until(() => !a.session.busy, 'its turn ends');
+    expect(a.errors).toEqual([]);
+    const log = fs
+      .readFileSync(process.env.FAKE_LOG!, 'utf8')
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l));
+    expect(log.some((l) => l.request?.subtype === 'interrupt')).toBe(true);
+    expect(log.filter((l) => l.type === 'user').map((l) => l.message.content[0].text).slice(-2)).toEqual([
+      'SLOW long one',
+      'do this instead',
+    ]);
+    a.session.detach();
   });
 });

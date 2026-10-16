@@ -6,8 +6,7 @@
 //  - 'snapshot' (SessionSnapshot): attached; catch up on the message being written and the
 //    prompts still waiting. Always the first thing after start().
 //  - 'settled' (requestId): another window answered this prompt.
-//  - 'remoteUser' (message): another window sent this prompt; a turn is running.
-//  - 'rejected' ({ text, images }): our user message arrived mid-turn and was not sent.
+//  - 'remoteUser' (message, uuid?): another window sent this prompt.
 import { EventEmitter } from 'node:events';
 import type { CliProcess } from './CliProcess';
 import { buildClaudeArgs, engineEnvOverrides, type CliOptions } from './CliProcessManager';
@@ -24,7 +23,6 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
   private queue: Record<string, unknown>[] = [];
   private reqSeq = 0;
   private pendingControl = new Map<string, (payload: unknown) => void>();
-  private lastUser?: { text: string; images?: { mediaType: string; data: string }[] };
   private readonly handler = (m: SessionMessage) => this.onDaemon(m);
 
   constructor(
@@ -54,15 +52,14 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
     if (id) this.opts.resumeSessionId = id;
   }
 
-  sendUserMessage(text: string, images?: { mediaType: string; data: string }[]): void {
-    this.lastUser = { text, images };
+  sendUserMessage(text: string, images?: { mediaType: string; data: string }[], uuid?: string): void {
     const content: unknown[] = [];
     if (text) content.push({ type: 'text', text });
     for (const img of images ?? []) {
       content.push({ type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } });
     }
     if (content.length === 0) content.push({ type: 'text', text: '' });
-    this.write({ type: 'user', message: { role: 'user', content } });
+    this.write({ type: 'user', ...(uuid ? { uuid } : {}), message: { role: 'user', content } });
   }
 
   sendControlResponse(requestId: string, response: Record<string, unknown>): void {
@@ -200,10 +197,7 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
         this.emit('settled', m.requestId);
         return;
       case 'remote_user':
-        this.emit('remoteUser', m.message);
-        return;
-      case 'rejected':
-        this.emit('rejected', this.lastUser ?? { text: '' });
+        this.emit('remoteUser', m.message, m.uuid);
         return;
       case 'stderr':
         this.emit('stderr', m.text);

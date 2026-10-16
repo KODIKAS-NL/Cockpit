@@ -23,7 +23,7 @@ import {
 } from './daemon/service';
 
 export function activate(context: vscode.ExtensionContext): void {
-  setDebugLogging(vscode.workspace.getConfiguration('tootega').get<boolean>('debugLog', false));
+  setDebugLogging(vscode.workspace.getConfiguration('cockpitDaemon').get<boolean>('debugLog', false));
   log('Cockpit for Claude Code activating…');
 
   // Restart/reload: VSCode tries to restore the contexts' webview tabs, but
@@ -80,7 +80,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     // ---- Daemon mode (cockpit-daemon keeps Claude running across windows/devices) ----
     vscode.commands.registerCommand('cockpitDaemon.daemon.install', async () => {
-      const cfg = vscode.workspace.getConfiguration('tootega');
+      const cfg = vscode.workspace.getConfiguration('cockpitDaemon');
       const bundledScript = path.join(context.extensionPath, 'dist', 'daemon.js');
       const idleStopHours = cfg.get<number>('daemon.idleStopHours', 0) ?? 0;
       const socketPath = provider.daemonSocketPath();
@@ -287,7 +287,7 @@ export function activate(context: vscode.ExtensionContext): void {
       );
     }),
     vscode.commands.registerCommand('cockpitDaemon.toggleLanguage', async () => {
-      const cfg = vscode.workspace.getConfiguration('tootega');
+      const cfg = vscode.workspace.getConfiguration('cockpitDaemon');
       const current = cfg.get<string>('language', 'auto');
       const next = current === 'pt-BR' ? 'en' : 'pt-BR';
       await cfg.update('language', next, vscode.ConfigurationTarget.Global);
@@ -313,7 +313,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (e.affectsConfiguration('cockpitDaemon.internalModel')) provider.applyInternalModel();
       if (e.affectsConfiguration('cockpitDaemon.enableTodoTools')) provider.applyTodoToolsChange();
       if (e.affectsConfiguration('cockpitDaemon.debugLog')) {
-        setDebugLogging(vscode.workspace.getConfiguration('tootega').get<boolean>('debugLog', false));
+        setDebugLogging(vscode.workspace.getConfiguration('cockpitDaemon').get<boolean>('debugLog', false));
       }
       // Model/effort/permission change: resets overrides + reflects them in the dropdowns.
       if (

@@ -117,7 +117,7 @@ export function nextUserId(): string {
 
 export type Action =
   | { type: 'host'; msg: HostToWebview }
-  | { type: 'localUser'; text: string; images?: string[] }
+  | { type: 'localUser'; id: string; text: string; images?: string[]; queued?: boolean }
   | { type: 'removeLastUser' }
   | { type: 'clearPermission' }
   | { type: 'clearAsk'; answers?: Record<string, string> }
@@ -132,7 +132,7 @@ export function reducer(state: UiState, action: Action): UiState {
       ...tab,
       items: [
         ...tab.items,
-        { kind: 'user', id: nextUserId(), text: action.text, images: action.images, ts: Date.now() },
+        { kind: 'user', id: action.id, text: action.text, images: action.images, ts: Date.now(), queued: action.queued },
       ],
     }));
   }
@@ -216,9 +216,13 @@ export function reducer(state: UiState, action: Action): UiState {
       const existing = new Map(state.tabs.map((t) => [t.id, t]));
       const tabs = msg.tabs.map((info) => {
         const prev = existing.get(info.id);
-        return prev
-          ? { ...prev, title: info.title, status: info.status, sessionId: info.sessionId, surface: info.surface }
-          : { ...emptyTab(info.id, info.title, info.status), sessionId: info.sessionId, surface: info.surface };
+        if (!prev) return { ...emptyTab(info.id, info.title, info.status), sessionId: info.sessionId, surface: info.surface };
+        // Idle: nothing is waiting in the CLI's queue any more (a process that died took it along).
+        const items =
+          info.status !== 'busy' && prev.items.some((i) => i.kind === 'user' && i.queued)
+            ? prev.items.map((i) => (i.kind === 'user' && i.queued ? { ...i, queued: false } : i))
+            : prev.items;
+        return { ...prev, items, title: info.title, status: info.status, sessionId: info.sessionId, surface: info.surface };
       });
       return { ...state, tabs, activeTab: msg.activeTab, chatTab: msg.chatTab };
     }
@@ -400,15 +404,16 @@ function tabReducer(tab: TabState, msg: HostToWebview): TabState {
     case 'remoteUser':
       return {
         ...tab,
-        items: [...tab.items, { kind: 'user', id: nextUserId(), text: msg.text, ts: Date.now() }],
+        items: [
+          ...tab.items,
+          { kind: 'user', id: msg.id ?? nextUserId(), text: msg.text, ts: Date.now(), queued: msg.queued },
+        ],
       };
-    case 'sendRejected': {
-      // The message never reached the agent: its bubble goes (the text returns to the input).
-      const idx = [...tab.items].reverse().findIndex((i) => i.kind === 'user');
-      if (idx < 0) return tab;
-      const at = tab.items.length - 1 - idx;
-      return { ...tab, items: tab.items.filter((_, i) => i !== at) };
-    }
+    case 'userPickedUp':
+      return {
+        ...tab,
+        items: tab.items.map((i) => (i.kind === 'user' && i.queued && i.id === msg.id ? { ...i, queued: false } : i)),
+      };
 
     case 'permissionRequest':
       return {

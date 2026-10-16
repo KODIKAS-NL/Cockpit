@@ -290,7 +290,7 @@ export class CliProcessManager extends EventEmitter implements CliProcess {
   }
 
   /** Sends a user message through stdin (text + optional images). */
-  sendUserMessage(text: string, images?: { mediaType: string; data: string }[]): void {
+  sendUserMessage(text: string, images?: { mediaType: string; data: string }[], uuid?: string): void {
     const content: unknown[] = [];
     if (text) content.push({ type: 'text', text });
     for (const img of images ?? []) {
@@ -300,7 +300,7 @@ export class CliProcessManager extends EventEmitter implements CliProcess {
       });
     }
     if (content.length === 0) content.push({ type: 'text', text: '' });
-    this.writeLine({ type: 'user', message: { role: 'user', content } });
+    this.writeLine({ type: 'user', ...(uuid ? { uuid } : {}), message: { role: 'user', content } });
   }
 
   /**
@@ -454,6 +454,9 @@ export function buildClaudeArgs(
     // silently in headless mode. AskUserQuestion also arrives through here.
     '--permission-prompt-tool', 'stdio',
     '--verbose',
+    // Echoes each user message (with our uuid) when the CLI takes it in: a message sent
+    // mid-turn is queued by the CLI, and this is how we learn when it starts.
+    '--replay-user-messages',
   ];
   if (opts.model) args.push('--model', opts.model);
   if (opts.effort) args.push('--effort', opts.effort);

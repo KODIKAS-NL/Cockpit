@@ -18,6 +18,7 @@ All under **Settings → Extensions → Cockpit for Claude Code** (prefix `cockp
 | `showThinking` | boolean | `false` | Expand *thinking* blocks by default |
 | `verbosity` | enum | `verbose` | Timeline display level — `verbose` / `necessary` / `dialogo` / `quiet` (display only; see [Timeline verbosity](features.md#timeline-verbosity)) |
 | `expandToolCards` | boolean | `false` | Expand tool cards by default in the timeline |
+| `scrollOnSend` | boolean | `true` | Scroll the conversation to the end when you send a message |
 | `spellCheck` | boolean | `false` | Inline PT-BR + EN spell-checker in the composer — **marks only, never auto-corrects**; click an underlined word for suggestions |
 | `userName` | string | `""` | Name shown on your messages; empty = OS user |
 | `internalModel` | enum | `claude-haiku-4-5` | Model for the Cockpit's internal AI calls (dictation correction, slash-command research) — clean, isolated calls; Haiku is fastest/cheapest |

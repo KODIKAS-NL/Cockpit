@@ -72,6 +72,9 @@ export interface AssistantEvent {
 export interface UserEvent {
   type: 'user';
   session_id?: string;
+  /** With --replay-user-messages: an echo of a message we sent, when the CLI takes it in. */
+  isReplay?: boolean;
+  uuid?: string;
   message: {
     role: 'user';
     content: ContentBlock[] | string;

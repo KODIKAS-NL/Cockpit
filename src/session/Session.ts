@@ -2,6 +2,7 @@
 // all the streaming state. It emits UI messages through a callback (the provider
 // tags them with the tab id and forwards them to the webview). Several instances run
 // in parallel — one per tab.
+import { randomUUID } from 'node:crypto';
 import type { DiscoveredModel } from '../cli/ModelDiscovery';
 import { CliProcessManager, type CliOptions } from '../cli/CliProcessManager';
 import type { CliProcess } from '../cli/CliProcess';
@@ -81,9 +82,6 @@ export interface SessionHooks {
   // Daemon mode: when this returns a client, the Claude process lives in cockpit-daemon and
   // outlives the window. Undefined (or no hook) = a local child process, as before.
   daemon?: () => DaemonClient | undefined;
-  // Daemon mode: our message arrived while another window's turn was running and was NOT
-  // sent. The host gives the text back to the input and says why.
-  onSendRejected?: (text: string, images?: { mediaType: string; data: string }[]) => void;
 }
 
 export class Session {
@@ -156,8 +154,13 @@ export class Session {
   // Feeding a daemon snapshot through onCliEvent: the events already happened, so side
   // effects that must happen once (writing the plan file) are skipped.
   private replaying = false;
-  // A keep-alive ping is in flight: a rejection of it is not the user's message.
-  private pingInFlight = false;
+  // Our messages the CLI has not taken in yet (it queues what arrives mid-turn). Only
+  // tracked when the CLI echoes them back (--replay-user-messages: the Claude engine).
+  private unconsumed = new Set<string>();
+  private replayEcho = false;
+  // We interrupted a turn that has messages waiting: its error result is expected, and the
+  // CLI goes on with the queue.
+  private interrupting = false;
 
   constructor(private hooks: SessionHooks) {
     this.stats = this.newStats();
@@ -263,14 +266,12 @@ export class Session {
     };
     // Daemon mode is for the Claude engine only: the local agent keeps its own lifecycle.
     const daemon = engine === 'claude' ? this.hooks.daemon?.() : undefined;
+    this.replayEcho = engine === 'claude'; // buildClaudeArgs passes --replay-user-messages
     if (daemon) {
       const remote = new RemoteCliProcess(opts, daemon);
       remote.on('snapshot', (snap: SessionSnapshot) => this.onSnapshot(snap));
       remote.on('settled', (requestId: string) => this.onPromptSettled(requestId));
-      remote.on('remoteUser', (message: unknown) => this.onRemoteUser(message));
-      remote.on('rejected', (last: { text: string; images?: { mediaType: string; data: string }[] }) =>
-        this.onRejected(last),
-      );
+      remote.on('remoteUser', (message: unknown, uuid?: string) => this.onRemoteUser(message, uuid));
       this.cli = remote;
     } else {
       this.cli = new CliProcessManager(opts);
@@ -286,6 +287,7 @@ export class Session {
       // which clear busy first): the process aborted without emitting `result`. Without a warning the
       // indicator disappears and the user thinks it is still running. Finish and warn.
       const abortedMidTurn = this.busy;
+      this.clearQueue(); // the queue died with the process
       if (abortedMidTurn) {
         if (this.currentAssistantId) this.emit({ kind: 'assistantDone', id: this.currentAssistantId });
         this.stats.endTurn();
@@ -302,10 +304,16 @@ export class Session {
     this.cli.start();
   }
 
-  send(text: string, images?: { mediaType: string; data: string }[]): void {
+  /**
+   * Sends a message. Mid-turn the CLI queues it: it joins the running turn at its next step,
+   * or runs as the next turn. `uuid` identifies it when the CLI echoes it back.
+   */
+  send(text: string, images?: { mediaType: string; data: string }[], uuid: string = randomUUID()): void {
     this.ensureCli();
-    this.setBusy(true);
-    this.stats.beginTurn(); // stopwatch of the active execution time (excludes idleness)
+    if (!this.busy) {
+      this.setBusy(true);
+      this.stats.beginTurn(); // stopwatch of the active execution time (excludes idleness)
+    }
     // State BEFORE the turn: mainly the cache (age/life), to understand what
     // each prompt finds (warm vs. cold cache = re-paying the cacheWrite).
     const s = this.stats.snapshot();
@@ -322,7 +330,18 @@ export class Session {
         `custo=$${s.sessionCostUsd.toFixed(4)}${s.costIsEstimate ? '~' : ''} turnos=${s.turnCount ?? 0}`,
     );
     this.noteSlashSkill(text);
-    this.cli!.sendUserMessage(text, images);
+    if (this.replayEcho) this.unconsumed.add(uuid);
+    this.cli!.sendUserMessage(text, images, uuid);
+  }
+
+  /**
+   * "Send now": the message goes into the CLI's queue and the running turn is interrupted;
+   * the CLI then runs the queue. Idle, it is a plain send.
+   */
+  sendNow(text: string, images?: { mediaType: string; data: string }[], uuid: string = randomUUID()): void {
+    const running = this.busy;
+    this.send(text, images, uuid);
+    if (running) this.interrupt();
   }
 
   /**
@@ -355,6 +374,14 @@ export class Session {
   }
 
   interrupt(): void {
+    if (this.unconsumed.size > 0 && this.cli) {
+      // Queued messages survive an interrupt: the CLI ends this turn with an error result
+      // and runs them next, so the turn ends there (see 'result'), not here.
+      this.interrupting = true;
+      this.cli.interrupt();
+      dlog('session', `interrupt with ${this.unconsumed.size} queued (${this.sessionId ?? '?'})`);
+      return;
+    }
     this.cli?.interrupt();
     this.stats.endTurn();
     this.persist();
@@ -368,7 +395,7 @@ export class Session {
     this.resetStreamingState();
     this.pendingPerm.clear();
     this.pendingPromptMsg.clear();
-    this.pingInFlight = false;
+    this.clearQueue();
     this.stats.endTurn(); // closes the turn in flight (idle time after it isn't counted)
     this.persist();
     if (this.cli) dlog('session', `stop (${this.sessionId ?? this.resumeId ?? '?'})`);
@@ -390,7 +417,7 @@ export class Session {
     this.resetStreamingState();
     this.pendingPerm.clear();
     this.pendingPromptMsg.clear();
-    this.pingInFlight = false;
+    this.clearQueue();
     this.stats.endTurn();
     this.persist();
     dlog('session', `detach (${this.sessionId ?? this.resumeId ?? '?'})`);
@@ -462,7 +489,7 @@ export class Session {
   }
 
   /** Another window sent a prompt: show it, and follow the turn it started. */
-  private onRemoteUser(message: unknown): void {
+  private onRemoteUser(message: unknown, uuid?: string): void {
     const content = (message as { content?: unknown })?.content;
     let text = '';
     if (typeof content === 'string') text = content;
@@ -472,24 +499,13 @@ export class Session {
         .map((b: any) => b.text)
         .join('');
     }
+    // Mid-turn it waits in the CLI's queue, like ours (cleared by the echo, see onUser).
+    const queued = this.busy;
     if (!this.busy) {
       this.setBusy(true);
       this.stats.beginTurn();
     }
-    this.emit({ kind: 'remoteUser', text });
-  }
-
-  /**
-   * Our message was refused because a turn is running (started from another window). The
-   * turn really is running, so busy stays on until its result; only the message comes back.
-   */
-  private onRejected(last: { text: string; images?: { mediaType: string; data: string }[] }): void {
-    if (this.pingInFlight) {
-      this.pingInFlight = false;
-      return;
-    }
-    log(`[session] message refused: a turn is running in another window (${this.sessionId ?? '?'})`);
-    this.hooks.onSendRejected?.(last.text, last.images);
+    this.emit({ kind: 'remoteUser', text, id: uuid, queued: queued && this.replayEcho && !!uuid });
   }
 
   /** Clears the conversation entirely (new/resume): also resets the statistics. */
@@ -545,7 +561,6 @@ export class Session {
     this.setBusy(true);
     this.stats.beginTurn();
     dlog('session', `keep-alive ping (${this.sessionId ?? this.resumeId ?? '?'})`);
-    this.pingInFlight = true;
     this.cli!.sendUserMessage('keep-alive: answer only "ok". Do not use tools and do not change files.');
     return true;
   }
@@ -972,7 +987,11 @@ export class Session {
           break;
         }
         const errText = String(r.result ?? r.error ?? '').trim();
-        if (r.is_error && isAuthError(errText)) {
+        const interrupted = this.interrupting;
+        this.interrupting = false;
+        if (interrupted) {
+          // The end of the turn we interrupted for "Send now" / Stop: not an error.
+        } else if (r.is_error && isAuthError(errText)) {
           this.hooks.onAuthRequired();
         } else if (r.is_error) {
           // Error reported by the CLI at the end of the turn. A transient one (drop/stall, CLI
@@ -995,10 +1014,14 @@ export class Session {
         this.emit({ kind: 'stats', stats: this.stats.snapshot() }); // activeMs consolidado
         this.emitTimeline(); // nova amostra de timeline (1x por turno)
         this.persist(); // saves the session state (stays coherent on reopen)
-        this.pingInFlight = false;
         this.setBusy(false);
         this.hooks.onResult();
         this.resetStreamingState();
+        // Messages still in the CLI's queue run as the next turn, right away.
+        if (this.unconsumed.size > 0) {
+          this.setBusy(true);
+          this.stats.beginTurn();
+        }
         break;
       }
       case 'rate_limit_event':
@@ -1148,6 +1171,19 @@ export class Session {
   }
 
   private onUser(ev: UserEvent): void {
+    if (ev.isReplay) {
+      // The CLI took a message in. Ours or another window's: when the turn had already
+      // ended, this one starts the next.
+      if (ev.uuid) {
+        this.unconsumed.delete(ev.uuid);
+        this.emit({ kind: 'userPickedUp', id: ev.uuid });
+      }
+      if (!this.busy) {
+        this.setBusy(true);
+        this.stats.beginTurn();
+      }
+      return;
+    }
     const content = ev.message?.content;
     if (!Array.isArray(content)) return;
     for (const b of content) {
@@ -1156,6 +1192,11 @@ export class Session {
         this.emit({ kind: 'toolResult', toolUseId: r.tool_use_id, content: r.content, isError: r.is_error });
       }
     }
+  }
+
+  private clearQueue(): void {
+    this.unconsumed.clear();
+    this.interrupting = false;
   }
 
   private resetStreamingState(): void {

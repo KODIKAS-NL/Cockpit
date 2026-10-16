@@ -1,8 +1,10 @@
 import {
+  Fragment,
   memo,
   useState,
   useRef,
   useEffect,
+  useLayoutEffect,
   type KeyboardEvent,
   type ClipboardEvent,
   type DragEvent,
@@ -43,7 +45,8 @@ interface Props {
   // released by the vault). Its ref changes to trigger the insertion.
   injectText?: { text: string } | null;
   onTextInjected?: () => void;
-  onSend: (text: string, images: ImageAttachment[], selection?: string) => void;
+  /** `now`: "Send now": interrupt the running turn so this message runs right away. */
+  onSend: (text: string, images: ImageAttachment[], selection?: string, now?: boolean) => void;
   selectionRef?: string; // @file#a-b of the editor's active selection
   onStop: () => void;
   onVoiceDict?: () => void; // opens the dictation dictionary modal
@@ -465,7 +468,8 @@ export const Composer = memo(function Composer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [injectText]);
 
-  const submit = () => {
+  // While a turn runs, Enter queues the message (the CLI takes it in at its next step).
+  const submit = (now?: boolean) => {
     // Sending during dictation: ends the capture NOW (without correction) and cancels a
     // pending correction — otherwise the button keeps recording and late transcriptions
     // repopulate the area after the clear. recordingRef=false BEFORE so the
@@ -486,6 +490,7 @@ export const Composer = memo(function Composer({
       v,
       images.map((i) => ({ mediaType: i.mediaType, data: i.data })),
       includeSel && selectionRef ? selectionRef : undefined,
+      now,
     );
     setText('');
     setImages([]);
@@ -654,6 +659,159 @@ export const Composer = memo(function Composer({
   const mentionOpen = mention !== null && mentionItems.length > 0;
 
   const canSend = !disabled && !correcting && (!!text.trim() || images.length > 0);
+
+  // How many tool icons fit beside the chips. The chips keep their natural width; the icons
+  // take what is left, one by one, and the rest go behind the [›]. Only when not even the [›]
+  // fits do the chips shrink ("tight"), and their natural width is remembered from before.
+  const sideRef = useRef<HTMLDivElement>(null);
+  const picksNatural = useRef(0);
+  const [toolsShown, setToolsShown] = useState(99);
+  const [toolsTight, setToolsTight] = useState(false);
+  const toolCountRef = useRef(0);
+  toolCountRef.current = (onVoiceDict ? 1 : 0) + (onCredentials ? 1 : 0) + (onRemoteControl ? 1 : 0) + 1;
+  // Runs after every render (cheap; React drops a state update that changes nothing), so it also
+  // catches the chips appearing once the config arrives; the observer covers resizes in between.
+  const toolsObserver = useRef<{ ro: ResizeObserver; picks: Element | null } | null>(null);
+  useLayoutEffect(() => {
+    const side = sideRef.current;
+    if (!side) return;
+    const ICON = 24; // .composer-tools .composer-side-btn
+    const measure = () => {
+      const picks = side.querySelector<HTMLElement>('.composer-picks');
+      if (picks && !side.classList.contains('tight')) picksNatural.current = picks.getBoundingClientRect().width;
+      const cs = getComputedStyle(side);
+      const inner = side.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const gap = picks ? parseFloat(getComputedStyle(picks).marginLeft) || 0 : 0;
+      const free = inner - picksNatural.current - gap;
+      const count = toolCountRef.current;
+      const n = count * ICON <= free ? count : Math.max(0, Math.floor((free - ICON) / ICON));
+      setToolsShown(n);
+      setToolsTight(n === 0 && free < ICON);
+    };
+    measure();
+    let obs = toolsObserver.current;
+    if (!obs) {
+      obs = { ro: new ResizeObserver(() => measure()), picks: null };
+      obs.ro.observe(side);
+      toolsObserver.current = obs;
+    }
+    const picks = side.querySelector('.composer-picks');
+    if (picks !== obs.picks) {
+      if (obs.picks) obs.ro.unobserve(obs.picks);
+      if (picks) obs.ro.observe(picks);
+      obs.picks = picks;
+    }
+  });
+  useEffect(() => () => toolsObserver.current?.ro.disconnect(), []);
+
+  // The toolbar's tool icons, in order. As many as fit sit inline at the start of the row;
+  // the rest fold into a [›] that shows them on hover or focus (see the toolsShown effect).
+  const toolItems: { key: string; node: ReactNode }[] = [];
+  if (onVoiceDict) {
+    toolItems.push({
+      key: 'dict',
+      node: (
+        <Tooltip text={t('voicedict.open')}>
+          <button
+            type="button"
+            className="composer-side-btn voicedict-btn"
+            onClick={onVoiceDict}
+            aria-label={t('voicedict.open')}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z" />
+              <line x1="9" y1="7" x2="15" y2="7" />
+              <line x1="9" y1="11" x2="15" y2="11" />
+            </svg>
+          </button>
+        </Tooltip>
+      ),
+    });
+  }
+  if (onCredentials) {
+    toolItems.push({
+      key: 'creds',
+      node: (
+        <Tooltip text={t('creds.open')}>
+          <button
+            type="button"
+            className="composer-side-btn creds-btn"
+            onClick={onCredentials}
+            aria-label={t('creds.open')}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </button>
+        </Tooltip>
+      ),
+    });
+  }
+  if (onRemoteControl) {
+    // Falha não é "desligado": o indicador fica, e o clique é reconectar.
+    const label = remoteLabel(t, remoteActive, remotePhase);
+    toolItems.push({
+      key: 'remote',
+      node: (
+        <Tooltip text={label}>
+          <button
+            type="button"
+            className={`composer-side-btn remote-btn${remoteActive ? ' on' : ''}${
+              remotePhase === 'connecting' ? ' connecting' : ''
+            }${remotePhase === 'failed' || remotePhase === 'offline' ? ' failed' : ''}${
+              remotePhase === 'cloud' ? ' cloud' : ''
+            }`}
+            onClick={onRemoteControl}
+            // Ligado, o botão continua clicável: é o desligar (toggle).
+            disabled={!remoteActive && (disabled || !canRemoteControl)}
+            aria-pressed={remoteActive}
+            aria-label={label}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="7" y="2" width="10" height="20" rx="2" />
+              <line x1="11" y1="18" x2="13" y2="18" />
+            </svg>
+          </button>
+        </Tooltip>
+      ),
+    });
+  }
+  toolItems.push({
+    key: 'slash',
+    node: <SlashMenu t={t} commands={slashCommands} meta={slashMeta} busy={slashBusy} onPick={pickSlash} />,
+  });
+  const shownTools = Math.min(toolsShown, toolItems.length);
 
   return (
     <div className="composer">
@@ -828,96 +986,35 @@ export const Composer = memo(function Composer({
               </button>
             </Tooltip>
         </div>
-        <div className="composer-side">
-          {onVoiceDict && (
-            <Tooltip text={t('voicedict.open')}>
-              <button
-                type="button"
-                className="composer-side-btn voicedict-btn"
-                onClick={onVoiceDict}
-                aria-label={t('voicedict.open')}
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+        <div className={`composer-side${toolsTight ? ' tight' : ''}`} ref={sideRef}>
+          <div className="composer-tools">
+            {toolItems.slice(0, shownTools).map((it) => (
+              <Fragment key={it.key}>{it.node}</Fragment>
+            ))}
+            {shownTools < toolItems.length && (
+              <div className="composer-tools-more">
+                <button
+                  type="button"
+                  className="composer-side-btn composer-tools-toggle"
+                  aria-label={t('composer.tools')}
+                  title={t('composer.tools')}
                 >
-                  <path d="M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z" />
-                  <line x1="9" y1="7" x2="15" y2="7" />
-                  <line x1="9" y1="11" x2="15" y2="11" />
-                </svg>
-              </button>
-            </Tooltip>
-          )}
-          {onCredentials && (
-            <Tooltip text={t('creds.open')}>
-              <button
-                type="button"
-                className="composer-side-btn creds-btn"
-                onClick={onCredentials}
-                aria-label={t('creds.open')}
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="3" y="11" width="18" height="11" rx="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-              </button>
-            </Tooltip>
-          )}
-          {onRemoteControl && (() => {
-            // Falha não é "desligado": o indicador fica, e o clique é reconectar.
-            const label = remoteLabel(t, remoteActive, remotePhase);
-            return (
-            <Tooltip text={label}>
-              <button
-                type="button"
-                className={`composer-side-btn remote-btn${remoteActive ? ' on' : ''}${
-                  remotePhase === 'connecting' ? ' connecting' : ''
-                }${remotePhase === 'failed' || remotePhase === 'offline' ? ' failed' : ''}${
-                  remotePhase === 'cloud' ? ' cloud' : ''
-                }`}
-                onClick={onRemoteControl}
-                // Ligado, o botão continua clicável: é o desligar (toggle).
-                disabled={!remoteActive && (disabled || !canRemoteControl)}
-                aria-pressed={remoteActive}
-                aria-label={label}
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="7" y="2" width="10" height="20" rx="2" />
-                  <line x1="11" y1="18" x2="13" y2="18" />
-                </svg>
-              </button>
-            </Tooltip>
-            );
-          })()}
-          <SlashMenu t={t} commands={slashCommands} meta={slashMeta} busy={slashBusy} onPick={pickSlash} />
+                  ›
+                </button>
+                <div className="composer-tools-pop">
+                  {toolItems.slice(shownTools).map((it) => (
+                    <Fragment key={it.key}>{it.node}</Fragment>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           {picks}
+          {busy && canSend && (
+            <button type="button" className="btn send-now" onClick={() => submit(true)} title={t('composer.sendNowHint')}>
+              {t('composer.sendNow')}
+            </button>
+          )}
           {busy ? (
             <button type="button" className="btn stop send-icon" onClick={onStop} title={t('composer.stop')} aria-label={t('composer.stop')}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -925,7 +1022,7 @@ export const Composer = memo(function Composer({
               </svg>
             </button>
           ) : (
-            <button type="button" className="btn send send-icon" onClick={submit} disabled={!canSend} title={t('composer.send')} aria-label={t('composer.send')}>
+            <button type="button" className="btn send send-icon" onClick={() => submit()} disabled={!canSend} title={t('composer.send')} aria-label={t('composer.send')}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 19V5M5 12l7-7 7 7" />
               </svg>

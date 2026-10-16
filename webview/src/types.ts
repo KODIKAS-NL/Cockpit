@@ -15,6 +15,7 @@ export interface UserItem {
   text: string;
   images?: string[]; // data URLs for the preview
   ts?: number; // epoch ms of when the message entered the UI
+  queued?: boolean; // sent mid-turn: waiting in the CLI's queue until it is taken in
 }
 
 export interface AssistantItem {

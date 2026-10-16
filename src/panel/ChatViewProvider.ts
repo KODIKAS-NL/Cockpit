@@ -95,6 +95,7 @@ const USAGE_CACHE_MAX_AGE_MS = 6 * 3600_000; // 6h
 interface SessionPrefs {
   model?: string;
   effort?: string;
+  permission?: string;
   allowAgents?: boolean;
   autoCompact?: string;
 }
@@ -423,19 +424,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       extraSystemPrompt: () => this.extraSystemPrompt(),
       quietPrompt: () => this.quietPrompt(),
       daemon: () => this.daemonClient(),
-      onSendRejected: (text) => {
-        this.post({ kind: 'sendRejected' }, tabId);
-        if (text) this.post({ kind: 'draftRestore', text }, tabId);
-        this.post(
-          {
-            kind: 'error',
-            message: vscode.l10n.t(
-              'This session is busy with a turn started on another device. Your message was not sent; it is back in the input box.',
-            ),
-          },
-          tabId,
-        );
-      },
     };
   }
 
@@ -1852,7 +1840,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  /** Persists a session's model/effort (override) by sessionId, to restore later. */
+  /** Persists a session's model/effort/permission (override) by sessionId, to restore later. */
   private saveSessionModel(s: Session): void {
     const id = s.sessionId ?? s.resumeId;
     if (!id) return; // a new session without an id yet: saved when init brings the id
@@ -1860,6 +1848,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     map[id] = {
       model: s.modelOverride,
       effort: s.effortOverride,
+      permission: s.permissionOverride,
       allowAgents: s.allowAgentsOverride,
       autoCompact: s.autoCompactOverride,
     };
@@ -1873,6 +1862,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (!o) return;
     if (o.model) s.modelOverride = o.model;
     if (o.effort) s.effortOverride = o.effort;
+    if (o.permission && PERMISSION_MODES.includes(o.permission)) s.permissionOverride = o.permission;
     if (typeof o.allowAgents === 'boolean') s.allowAgentsOverride = o.allowAgents;
     if (o.autoCompact) s.autoCompactOverride = o.autoCompact;
   }
@@ -2531,6 +2521,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         showThinking: this.cfg().get<boolean>('showThinking', false),
         spellCheck: this.cfg().get<boolean>('spellCheck', false),
         expandToolCards: this.cfg().get<boolean>('expandToolCards', false),
+        scrollOnSend: this.cfg().get<boolean>('scrollOnSend', true),
         pendingRestart: this.pendingRestart,
         userName: this.userName(),
         voiceCorrect: this.cfg().get<boolean>('voiceCorrect', false),
@@ -2933,7 +2924,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Shares the editor selection as context, when the composer asked for it.
         const sel = m.selection ? `${m.selection}\n` : '';
         const text = `${sel}${body}`;
-        s.send(text, m.images);
+        if (m.now) s.sendNow(text, m.images, m.uuid);
+        else s.send(text, m.images, m.uuid);
         this.draftByTab.delete(srcTab); // enviado: descarta o rascunho espelhado
         break;
       }
@@ -2945,7 +2937,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         });
         break;
       case 'readClipboardFiles': {
-        const paths = readClipboardFiles();
+        // The OS clipboard is the one of the machine this host runs on. Over Remote-SSH or in
+        // a browser (code-server) that is not where you copied, so the paste's own content
+        // (the webview's fallback) is the only right answer there.
+        const local = !vscode.env.remoteName && vscode.env.uiKind !== vscode.UIKind.Web;
+        const paths = local ? readClipboardFiles() : [];
         this.post({
           kind: 'resolvedPath',
           requestId: m.requestId,
@@ -3019,6 +3015,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'setPermissionMode':
         this.snapComboBaseline(srcTab);
         srcSession().setPermission(m.mode);
+        this.saveSessionModel(srcSession()); // persiste por contexto
+        // The last choice is where new conversations start. Not Bypass: a new chat that
+        // silently skips every permission prompt is too easy to miss.
+        if (m.mode !== 'bypassPermissions' && PERMISSION_MODES.includes(m.mode)) {
+          void this.cfg().update('permissionMode', m.mode, vscode.ConfigurationTarget.Global);
+        }
         this.pendingRestart = true;
         this.sendConfig();
         break;
@@ -3335,7 +3337,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   // ---- CLI ----
 
   private cfg() {
-    return vscode.workspace.getConfiguration('tootega');
+    return vscode.workspace.getConfiguration('cockpitDaemon');
   }
 
   // Resolved path per engine: with tabs on different engines, both binaries

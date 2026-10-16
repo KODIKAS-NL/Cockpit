@@ -44,6 +44,9 @@ export const en = {
   'composer.placeholder': 'Ask Claude Code…  (Enter to send, Shift+Enter for newline)',
   'composer.send': 'Send',
   'composer.stop': 'Stop',
+  'composer.tools': 'Tools',
+  'composer.sendNow': 'Send now',
+  'composer.sendNowHint': 'Stop the current turn and send this message right away',
   'voice.start': 'Dictate (voice to text)',
   'voice.stop': 'Stop dictation',
   'voice.correcting': 'Correcting…',
@@ -222,6 +225,7 @@ export const en = {
   'activity.received': 'Tokens received',
 
   'tip.time': 'Time',
+  'tip.details': 'Details',
   'tip.chars': 'Characters',
   'tip.words': 'Words',
   'tip.images': 'Images',
@@ -490,6 +494,7 @@ export const en = {
   'tip.stop.desc': 'Stop the agent now. The current turn ends and the session stays open.',
 
   'controls.model': 'Model',
+  'controls.selectModel': 'Select a model',
   'controls.model.remove': 'Remove model',
   'controls.context': 'Context',
   'controls.price': 'Price',
@@ -688,6 +693,8 @@ export const en = {
   'confirm.effort.action': 'Send anyway',
   'rewind.title': 'Rewind to here (removes this prompt and everything after)',
   'bubble.showMore': 'Show more',
+  'bubble.queued': 'Queued',
+  'bubble.queuedHint': 'Claude takes this message in at its next step',
   'bubble.showLess': 'Show less',
   'confirm.cancel': 'Cancel',
 };

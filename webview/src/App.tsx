@@ -56,7 +56,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
   // Effort gate: the host blocks and sends 'effortGate'; we keep the last send
   // so it can be re-sent with force=true if the user confirms.
   const [confirmEffort, setConfirmEffort] = useState<{ selected: string; min: string } | null>(null);
-  const lastSendRef = useRef<{ text: string; images: ImageAttachment[] } | null>(null);
+  const lastSendRef = useRef<{ text: string; images: ImageAttachment[]; uuid?: string } | null>(null);
   const [draftRestore, setDraftRestore] = useState<{ text: string; images: ImageAttachment[] } | null>(null);
   const [showUsage, setShowUsage] = useState(false);
   const [usage, setUsage] = useState<UsageData | null>(null);
@@ -210,19 +210,31 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
   // so they can be useCallback([])-stable even though `tab` changes on every delta.
   const tabRef = useRef(tab);
   tabRef.current = tab;
+  const scrollOnSendRef = useRef(true);
+  scrollOnSendRef.current = state.config?.scrollOnSend !== false;
 
-  const onSend = useCallback((text: string, images: ImageAttachment[], selection?: string) => {
+  const onSend = useCallback((text: string, images: ImageAttachment[], selection?: string, now?: boolean) => {
     // Aba sob Remote Control: quem conduz é o terminal/celular. O host recusa e explica —
     // não criamos a bolha local, que ficaria órfã.
     if (tabRef.current?.remote) {
       send({ kind: 'sendMessage', text, images: images.length ? images : undefined, selection });
       return;
     }
-    lastSendRef.current = { text, images };
+    // The bubble's id travels with the message: the CLI echoes it back when it takes the
+    // message in, which is when a message sent mid-turn stops being "queued".
+    const uuid = crypto.randomUUID();
+    lastSendRef.current = { text, images, uuid };
     const previews = images.map((i) => `data:${i.mediaType};base64,${i.data}`);
-    dispatch({ type: 'localUser', text, images: previews.length ? previews : undefined });
+    const queued = !now && tabRef.current?.status === 'busy';
+    // Back to the end (unless turned off): the new bubble lands there, and the auto-scroll
+    // only follows new content while the view is at the bottom.
+    if (scrollOnSendRef.current) {
+      atBottomRef.current = true;
+      setAtBottom(true);
+    }
+    dispatch({ type: 'localUser', id: uuid, text, images: previews.length ? previews : undefined, queued });
     dispatch({ type: 'clearError' }); // new send: clears the previous error/abort warning
-    send({ kind: 'sendMessage', text, images: images.length ? images : undefined, selection });
+    send({ kind: 'sendMessage', text, images: images.length ? images : undefined, selection, uuid, now });
   }, []);
   const onStop = useCallback(() => {
     send({ kind: 'interrupt' });
@@ -793,6 +805,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
                 text: p.text,
                 images: p.images.length ? p.images : undefined,
                 force: true,
+                uuid: p.uuid,
               });
             }
             setConfirmEffort(null);

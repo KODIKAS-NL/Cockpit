@@ -126,6 +126,14 @@ async function peer(id: string): Promise<Peer> {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+async function until(cond: () => boolean, ms = 4000): Promise<void> {
+  const end = Date.now() + ms;
+  while (!cond()) {
+    if (Date.now() > end) throw new Error('condition not met in time');
+    await sleep(10);
+  }
+}
+
 beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cockpit-daemon-test-'));
   sock = path.join(dir, 'd.sock');
@@ -180,21 +188,38 @@ describe('cockpit-daemon', () => {
     expect(a.msgs.some((m) => m.type === 'remote_user')).toBe(false);
   });
 
-  it('refuses a user message while a turn runs, but lets interrupt through', async () => {
+  it('passes a message sent mid-turn to the CLI and stays busy until it has run', async () => {
     const a = await peer('A');
     const b = await peer('B');
-    const s = await a.open(project, spec({ args: ['--resume', 'sess-2'] }));
-    await b.open(project, spec(), 'sess-2');
+    const replay = { args: ['--resume', 'sess-2', '--replay-user-messages'] };
+    const s = await a.open(project, spec(replay));
+    await b.open(project, spec(replay), 'sess-2');
     a.user(s.session.id, 'SLOW please');
     await a.wait((m) => m.type === 'event' && (m as any).event.type === 'stream_event');
-    b.user(s.session.id, 'me too');
-    const rej = (await b.wait((m) => m.type === 'rejected')) as any;
-    expect(rej.reason).toBe('busy');
-    b.send(s.session.id, { type: 'control_request', request_id: 'B:int', request: { subtype: 'interrupt' } });
-    await a.wait((m) => m.type === 'event' && (m as any).event.type === 'result');
-    const users = cliLog().filter((l) => l.type === 'user');
-    expect(users.length).toBe(1);
-    expect(cliLog().some((l) => l.request?.subtype === 'interrupt')).toBe(true);
+    b.send(s.session.id, { type: 'user', uuid: 'u-2', message: { role: 'user', content: [{ type: 'text', text: 'SLOW me too' }] } });
+    // A sees B's message right away, before the CLI takes it in.
+    const remote = (await a.wait((m) => m.type === 'remote_user')) as any;
+    expect(remote.message.content[0].text).toBe('SLOW me too');
+    const results = () => a.events('result').length;
+    await until(() => results() === 1);
+    // The first turn is over, but the queued message is still running.
+    expect((await a.list(project))[0].state).toBe('busy');
+    await a.wait((m) => m.type === 'event' && (m as any).event.isReplay && (m as any).event.uuid === 'u-2');
+    await until(() => results() === 2);
+    expect((await a.list(project))[0].state).toBe('running');
+    expect(cliLog().filter((l) => l.type === 'user').length).toBe(2);
+  });
+
+  it('runs a queued message after an interrupt', async () => {
+    const a = await peer('A');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-2b', '--replay-user-messages'] }));
+    a.user(s.session.id, 'SLOW please');
+    await a.wait((m) => m.type === 'event' && (m as any).event.type === 'stream_event');
+    a.send(s.session.id, { type: 'user', uuid: 'u-now', message: { role: 'user', content: [{ type: 'text', text: 'now this' }] } });
+    a.send(s.session.id, { type: 'control_request', request_id: 'A:int', request: { subtype: 'interrupt' } });
+    await a.wait((m) => m.type === 'event' && (m as any).event.result === 'interrupted');
+    await a.wait((m) => m.type === 'event' && (m as any).event.result === 'echo now this');
+    expect((await a.list(project))[0].state).toBe('running');
   });
 
   it('lets the first answer win and tells the other windows', async () => {
@@ -333,6 +358,17 @@ describe('cockpit-daemon', () => {
     b.close();
     await sleep(100);
     expect((await a.list(project)).map((s) => s.cliSessionId)).toEqual(['sess-8']);
+  });
+
+  it('does not bring back a session that never got a message after a restart', async () => {
+    const a = await peer('A');
+    await a.open(project, spec()); // still held when the daemon goes down
+    await a.open(project, spec({ args: ['--resume', 'sess-10'] }));
+    await daemon.shutdown();
+    daemon = new Daemon({ socketPath: sock, stateFile: state });
+    await daemon.start();
+    const b = await peer('B');
+    expect((await b.list(project)).map((s) => s.cliSessionId)).toEqual(['sess-10']);
   });
 
   it('answers a forget only after the process has exited', async () => {

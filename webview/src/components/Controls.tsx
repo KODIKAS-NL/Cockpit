@@ -404,7 +404,7 @@ export function EffortSelect({ t, value, efforts, defaultEffort, onSelect }: Eff
   );
 }
 
-function modelLabel(
+export function modelLabel(
   m: string,
   t: Translator,
   defaultForParen?: string,
@@ -457,7 +457,7 @@ export function permLabel(pm: string, t: Translator): string {
   return v === key ? pm : v;
 }
 
-function effortLabel(ef: string, t: Translator, defaultEffort?: string): string {
+export function effortLabel(ef: string, t: Translator, defaultEffort?: string): string {
   const key = `effort.${ef}` as Parameters<Translator>[0];
   const label = t(key);
   const base = label === key ? ef : label;

@@ -36,6 +36,7 @@
   "cfg.showThinking": "Expande os blocos de raciocínio do Claude por padrão no chat.",
   "cfg.spellCheck": "Verifica a ortografia enquanto você digita no compositor, sublinhando as palavras erradas. Nunca corrige sozinho — clique numa palavra sublinhada para ver as sugestões. Desligado por padrão.",
   "cfg.expandToolCards": "Expande os cartões de chamadas de ferramenta por padrão na timeline.",
+  "cfg.scrollOnSend": "Rola a conversa até o fim ao enviar uma mensagem.",
   "cfg.userName": "Nome exibido nas suas mensagens no lugar de 'You'. Vazio = usuário do sistema operacional.",
   "cfg.ffmpegPath": "Caminho do executável ffmpeg usado na captura do ditado por voz. Vazio = usa 'ffmpeg' do PATH.",
   "cfg.voiceLanguage": "Idioma do ditado por voz (fala para texto). Vazio = segue o idioma da UI do Cockpit.",

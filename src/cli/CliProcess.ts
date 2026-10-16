@@ -6,14 +6,15 @@
 //    class relays the same JSON lines over a Unix socket.
 //
 // Events (EventEmitter): 'event' (ClaudeEvent), 'exit' (code|null), 'stderr' (text).
-// RemoteCliProcess adds 'snapshot', 'settled', 'rejected' and 'remoteUser' (see there).
+// RemoteCliProcess adds 'snapshot', 'settled' and 'remoteUser' (see there).
 import type { EventEmitter } from 'node:events';
 
 export interface CliProcess extends EventEmitter {
   start(): void;
   isRunning(): boolean;
   setResumeId(id: string): void;
-  sendUserMessage(text: string, images?: { mediaType: string; data: string }[]): void;
+  /** `uuid`: with --replay-user-messages the CLI echoes it back when it takes the message in. */
+  sendUserMessage(text: string, images?: { mediaType: string; data: string }[], uuid?: string): void;
   sendControlResponse(requestId: string, response: Record<string, unknown>): void;
   requestControl(subtype: string, timeoutMs?: number): Promise<unknown>;
   interrupt(): void;

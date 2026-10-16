@@ -90,9 +90,7 @@ export type DaemonMessage =
   /** Another window answered this prompt: close it here. */
   | { type: 'control_settled'; sessionId: string; requestId: string }
   /** Another window sent this prompt: show it, the turn is now running. */
-  | { type: 'remote_user'; sessionId: string; message: unknown }
-  /** A user message arrived while a turn was running; it was not sent to the CLI. */
-  | { type: 'rejected'; sessionId: string; reason: 'busy' }
+  | { type: 'remote_user'; sessionId: string; message: unknown; uuid?: string }
   | { type: 'exit'; sessionId: string; code: number | null }
   | { type: 'stderr'; sessionId: string; text: string }
   | { type: 'error'; reqId?: string; sessionId?: string; message: string };

@@ -21,6 +21,7 @@ import { DiffView } from './DiffView';
 import { TodoCard } from './Todos';
 import { useImageViewer } from './ImageViewer';
 import { Tooltip, type TooltipRow } from './Tooltip';
+import { Icon } from './Icon';
 import { languageFromPath, stripLineNumbers, richHighlight } from '../util/highlight';
 import {
   fmtCompact,
@@ -543,9 +544,7 @@ function ClaudeTurn({
     const grp = group;
     group = [];
     nodes.push(
-      <Tooltip key={grp[0].id} className="tt-block" title={grp[0].name} rows={toolRows(grp[0], t)}>
-        <ToolCard items={grp} t={t} defaultOpen={defaultOpenTools} />
-      </Tooltip>,
+      <ToolCard key={grp[0].id} items={grp} t={t} defaultOpen={defaultOpenTools} />,
     );
   };
   for (const it of visible) {
@@ -580,21 +579,17 @@ function ClaudeTurn({
     // Assistente (texto/thinking): quebra o grupo.
     flushGroup();
     nodes.push(
-      <Tooltip key={it.id} className="tt-block" title={t('role.assistant')} rows={assistantRows(it, t)}>
-        <AssistantContent item={it} t={t} defaultShowThinking={defaultShowThinking} />
-      </Tooltip>,
+      <AssistantContent key={it.id} item={it} t={t} defaultShowThinking={defaultShowThinking} />,
     );
   }
   flushGroup();
   return (
     <div className="bubble assistant turn">
-      <Tooltip className="tt-block" focusable title={t('role.assistant')} rows={turnRows(items, t)}>
-        <div className="role role-assistant">
-          <span className="role-name">{t('role.assistant')}</span>
-          {active && <span className="caret">▋</span>}
-          {canceled && <span className="canceled-tag">{t('turn.canceled')}</span>}
-        </div>
-      </Tooltip>
+      <div className="role role-assistant">
+        <span className="role-name">{t('role.assistant')}</span>
+        {active && <span className="caret">▋</span>}
+        {canceled && <span className="canceled-tag">{t('turn.canceled')}</span>}
+      </div>
       {nodes}
       {!active && turnEnd != null && (
         <div className="turn-end">
@@ -602,6 +597,7 @@ function ClaudeTurn({
           {turnStart != null && turnEnd > turnStart && (
             <span className="turn-elapsed">{fmtMinSec(turnEnd - turnStart)}</span>
           )}
+          <InfoTip t={t} title={t('role.assistant')} rows={turnRows(items, t)} />
         </div>
       )}
     </div>
@@ -667,6 +663,20 @@ function NoticeBanner({ item, t }: { item: NoticeItem; t: Translator }) {
   );
 }
 
+/**
+ * The details of a message, tool call or turn. They used to pop up on hovering anywhere over
+ * it; now only on this small (i). Not focusable inside a tool card's header (a button).
+ */
+function InfoTip({ t, title, rows, focusable = true }: { t: Translator; title: string; rows: TooltipRow[]; focusable?: boolean }) {
+  return (
+    <Tooltip className="info-tip" focusable={focusable} title={title} rows={rows}>
+      <span className="info-tip-icon" role="img" aria-label={t('tip.details')} onClick={(e) => e.stopPropagation()}>
+        <Icon name="info" size={12} />
+      </span>
+    </Tooltip>
+  );
+}
+
 function UserBubble({
   item,
   t,
@@ -685,15 +695,17 @@ function UserBubble({
   // It only makes sense to offer expanding when the text has more than one line.
   const collapsible = !!item.text && item.text.includes('\n');
   return (
-    <Tooltip
-      className={`tt-block ${pinned ? 'pinned-wrap' : ''}`}
-      title={t('role.user')}
-      rows={userRows(item, t)}
-    >
+    <div className={pinned ? 'pinned-wrap' : undefined}>
       <div className={`bubble user ${pinned ? 'pinned' : ''}`} id={`msg-${item.id}`}>
         <div className="role role-user">
           <span className="role-name">{userName || t('role.user')}</span>
           {item.ts && <span className="bubble-time">{fmtStamp(item.ts)}</span>}
+          <InfoTip t={t} title={t('role.user')} rows={userRows(item, t)} />
+          {item.queued && (
+            <span className="bubble-queued" title={t('bubble.queuedHint')}>
+              {t('bubble.queued')}
+            </span>
+          )}
           {item.text && <CopyButton text={item.text} t={t} />}
           {collapsible && (
             <button
@@ -737,7 +749,7 @@ function UserBubble({
           />
         )}
       </div>
-    </Tooltip>
+    </div>
   );
 }
 
@@ -827,6 +839,7 @@ function ToolCard({ items, t, defaultOpen }: { items: ToolItem[]; t: Translator;
           </span>
         )}
         {last.ts && <span className="tool-time">{fmtStamp(last.ts)}</span>}
+        <InfoTip t={t} title={name} rows={toolRows(item, t)} focusable={false} />
         {filePath && hasPreview(filePath) && (
           <span
             className="tool-view"
@@ -1163,20 +1176,6 @@ function toolRows(item: ToolItem, t: Translator): TooltipRow[] {
   }
   if (item.isError) rows.push({ label: t('tip.status'), value: t('tool.error'), accent: true });
   rows.push({ label: t('tip.id'), value: item.id.slice(0, 12) });
-  return rows;
-}
-
-function assistantRows(item: AssistantItem, t: Translator): TooltipRow[] {
-  const rows: TooltipRow[] = [];
-  if (item.ts) rows.push({ label: t('tip.time'), value: fmtClock(item.ts) });
-  rows.push({ label: t('tip.outChars'), value: fmtCompact(item.text.length) });
-  rows.push({ label: t('tip.estTokens'), value: `~${fmtCompact(Math.round(item.text.length / 4))}` });
-  if (item.thinking) rows.push({ label: t('tip.thinking'), value: fmtCompact(item.thinking.length) });
-  if (item.usage?.input != null) rows.push({ label: t('tip.tokensIn'), value: fmtCompact(item.usage.input) });
-  if (item.usage?.output != null) rows.push({ label: t('tip.tokensOut'), value: fmtCompact(item.usage.output) });
-  if (item.costUsd != null) {
-    rows.push({ label: t('tip.cost'), value: fmtUsdShort(item.costUsd), accent: true });
-  }
   return rows;
 }
 
