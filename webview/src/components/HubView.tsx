@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Translator } from '../i18n';
 import { Icon, type IconName } from './Icon';
-import type { StatsSnapshot, SessionInfo } from '../../../shared/protocol';
+import type { StatsSnapshot, SessionInfo, UsageBucket, ScopedBucket } from '../../../shared/protocol';
 import { fmtInt, fmtPct, fmtCompact, fmtBytes, fmtDuration, fmtUsdShort } from '../util/format';
 import type { TooltipRow } from './Tooltip';
 import { Tooltip, type TooltipMeta } from './Tooltip';
 import { send } from '../vscodeApi';
+import { LimitBars } from './LimitBars';
 
 // Provenance of a piece of data: source + confidence level, already localized, for the
 // hint footer (colored chips). It keeps the i18n descriptions clean.
@@ -30,6 +31,7 @@ interface Props {
   onDaemonInstall: () => void;
   cliLatest?: string;
   stats?: StatsSnapshot;
+  limits?: { live: boolean; fiveHour?: UsageBucket; sevenDay?: UsageBucket; weeklyScoped?: ScopedBucket[] };
   busy?: boolean; // contexto ativo processando um turno → spinner no card
   loggedIn: boolean;
   sessions: SessionInfo[];
@@ -68,6 +70,7 @@ export function HubView({
   onDaemonInstall,
   cliLatest,
   stats,
+  limits,
   busy,
   loggedIn,
   sessions,
@@ -240,6 +243,10 @@ export function HubView({
           </button>
         </Tooltip>
       </div>
+
+      {limits?.live && (
+        <LimitBars t={t} locale={locale} fiveHour={limits.fiveHour} sevenDay={limits.sevenDay} weeklyScoped={limits.weeklyScoped} onClick={onUsage} />
+      )}
 
       {/* Everything below the header and the buttons scrolls. */}
       <div className="ctx-panel-body">

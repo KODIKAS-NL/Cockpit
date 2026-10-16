@@ -752,6 +752,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     setInterval(() => void this.refreshUsage(), 120_000);
   }
 
+  /** The account's limit windows for the dashboard bars: real percentages only, never the local estimate. */
+  private postAccountLimits(): void {
+    const live = currentEngine() === 'claude' && this.lastLimitsSource === 'real';
+    const toBucket = (w?: LimitWindow) => (w && typeof w.usedPct === 'number' ? { usedPct: w.usedPct, resetsAt: w.resetsAt } : undefined);
+    this.post({
+      kind: 'accountLimits',
+      live,
+      fiveHour: live ? toBucket(this.lastLimits?.fiveHour) : undefined,
+      sevenDay: live ? toBucket(this.lastLimits?.sevenDay) : undefined,
+      weeklyScoped: live ? this.lastScoped : undefined,
+    });
+  }
+
   private async refreshUsage(force = false): Promise<void> {
     const before = this.lastUsageSource;
     try {
@@ -803,6 +816,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         s.applyLimits(this.lastLimits, this.lastLimitsSource);
         this.post({ kind: 'stats', stats: s.snapshot() }, id);
       }
+      this.postAccountLimits();
     } catch {
       /* ignora */
     }
@@ -2714,6 +2728,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.reportCliStatus();
         void this.tryDiscoverModels();
         this.startUsageTimer();
+        this.postAccountLimits();
         this.startDaemonStatusTimer();
         void this.reportDaemonStatus();
         this.reportAuth(); // login state for the Sign in/out button

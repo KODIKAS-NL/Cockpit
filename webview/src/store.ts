@@ -8,6 +8,8 @@ import type {
   SessionInfo,
   SlashCmdMeta,
   BackgroundTask,
+  UsageBucket,
+  ScopedBucket,
 } from '../../shared/protocol';
 import type {
   TimelineItem,
@@ -58,6 +60,7 @@ export interface UiState {
   chatTab?: string;
   /** Daemon mode status from the host (absent until the first report). */
   daemon?: { enabled: boolean; connected: boolean; pid?: number };
+  limits?: { live: boolean; fiveHour?: UsageBucket; sevenDay?: UsageBucket; weeklyScoped?: ScopedBucket[] };
   cli: {
     available: boolean;
     checked?: boolean; // the host already reported the status (false = still loading)
@@ -186,6 +189,8 @@ export function reducer(state: UiState, action: Action): UiState {
       return { ...state, config: msg.config };
     case 'daemonStatus':
       return { ...state, daemon: { enabled: msg.enabled, connected: msg.connected, pid: msg.pid } };
+    case 'accountLimits':
+      return { ...state, limits: { live: msg.live, fiveHour: msg.fiveHour, sevenDay: msg.sevenDay, weeklyScoped: msg.weeklyScoped } };
     case 'cliStatus':
       return {
         ...state,

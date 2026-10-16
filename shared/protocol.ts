@@ -470,6 +470,8 @@ type HostMsg =
   | { kind: 'ready'; locale: string }
   /** Daemon mode: whether it is on, and whether the daemon answers on its socket. */
   | { kind: 'daemonStatus'; enabled: boolean; connected: boolean; pid?: number }
+  /** Account limit windows for the dashboard's bars. Only sent with real percentages (`live`); `ageMs` marks a reused reading. */
+  | { kind: 'accountLimits'; live: boolean; fiveHour?: UsageBucket; sevenDay?: UsageBucket; weeklyScoped?: ScopedBucket[] }
   | { kind: 'tabs'; tabs: TabInfo[]; activeTab: string; chatTab?: string }
   | { kind: 'config'; config: SessionConfig }
   | {

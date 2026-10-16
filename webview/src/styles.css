@@ -6863,3 +6863,54 @@ body {
   content-visibility: auto;
   contain-intrinsic-size: auto 160px;
 }
+
+/* Account limit bars under the dashboard's button bar. */
+.limit-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--vscode-panel-border, transparent);
+  color: var(--vscode-foreground);
+  text-align: left;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+}
+.limit-bars:hover {
+  background: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
+}
+.limit-bar-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+.limit-bar-pct {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.limit-bar-pct.warn {
+  color: var(--vscode-editorWarning-foreground, #cca700);
+}
+.limit-bar-pct.crit {
+  color: var(--vscode-errorForeground, #f85149);
+}
+.limit-bar .usage-bar {
+  height: 4px;
+}
+.usage-bar-fill.warn {
+  background: var(--vscode-editorWarning-foreground, #cca700);
+}
+.usage-bar-fill.crit {
+  background: var(--vscode-errorForeground, #f85149);
+}
+.limit-bar-sub {
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #8a8a8a);
+}

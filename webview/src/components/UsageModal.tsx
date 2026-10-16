@@ -10,6 +10,7 @@ import type {
   TokenTotals,
 } from '../../../shared/protocol';
 import { fmtUsdShort, fmtCompact, fmtInt } from '../util/format';
+import { relReset } from './LimitBars';
 
 interface Props {
   t: Translator;
@@ -546,14 +547,4 @@ function relExpiry(expiresAt: number, locale: string): string {
   } catch {
     return `${days}d`;
   }
-}
-
-function relReset(iso: string, _locale: string): string {
-  const ms = Date.parse(iso) - Date.now();
-  if (Number.isNaN(ms) || ms <= 0) return '0m';
-  const m = Math.round(ms / 60000);
-  if (m < 60) return `${m}m`;
-  const h = Math.round(m / 60);
-  if (h < 48) return `${h}h`;
-  return `${Math.round(h / 24)}d`;
 }

@@ -497,6 +497,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
           onDaemonInstall={() => send({ kind: 'daemonInstall' })}
           cliLatest={state.cli.latest}
           stats={tab?.stats}
+          limits={state.limits}
           busy={tab?.status === 'busy' || tab?.bgBusy === true}
           loggedIn={state.loggedIn}
           sessions={state.sessions}
