@@ -6793,3 +6793,14 @@ body {
   flex: none;
   color: var(--vscode-descriptionForeground, #8a8a8a);
 }
+
+/* Older messages are in the DOM only when needed; off-screen rows skip layout and paint. */
+.timeline-earlier {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0;
+}
+.timeline .bubble.assistant.turn {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
+}

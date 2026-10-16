@@ -1,16 +1,16 @@
 // Lightweight markdown -> React nodes (safe, no innerHTML for text).
 // Supports: headers, lists (ul/ol), bold, italic, inline code, links and
 // code blocks with syntax highlighting.
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, memo, type ReactNode } from 'react';
 import { CodeBlock } from './CodeBlock';
 
 interface Props {
   text: string;
 }
 
-export function Markdown({ text }: Props) {
+export const Markdown = memo(function Markdown({ text }: Props) {
   return <div className="md">{renderBlocks(text)}</div>;
-}
+});
 
 type Seg = { type: 'text'; content: string } | { type: 'code'; content: string; lang?: string };
 

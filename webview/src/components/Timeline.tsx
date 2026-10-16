@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useRef, type ReactNode } from 'react';
+import { memo, useState, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import type { Translator } from '../i18n';
 import type { StatsSnapshot } from '../../../shared/protocol';
 import { send } from '../vscodeApi';
@@ -125,6 +125,8 @@ function CopyButton({ text, t }: { text: string; t: Translator }) {
   );
 }
 
+const WINDOW_STEP = 40; // groups (a prompt, or one Claude turn) in the DOM at first and per step
+
 // Memoised: every stream-json delta dispatches into the reducer and re-renders App. Without
 // this, each delta re-ran groupItems() plus a Markdown parse and a highlight.js pass for the
 // WHOLE transcript — the work that made typing stall while the agent was running. The props
@@ -145,6 +147,40 @@ export const Timeline = memo(function Timeline({
   verbosity = 'verbose',
   compacting,
 }: Props) {
+  // Only the newest groups are in the DOM: a long conversation is slow to lay out and scroll
+  // on a tablet. Older ones come back in steps, or all at once for search.
+  const [shown, setShown] = useState(WINDOW_STEP);
+  const topRef = useRef<HTMLDivElement>(null);
+  const grow = useRef<{ height: number; top: number } | null>(null);
+  const revealMore = (): void => {
+    const sc = topRef.current?.closest('.scroll') as HTMLElement | null;
+    if (sc) grow.current = { height: sc.scrollHeight, top: sc.scrollTop };
+    setShown((n) => n + WINDOW_STEP);
+  };
+  // Keeps what the reader was looking at in place when older groups appear above it.
+  useLayoutEffect(() => {
+    const g = grow.current;
+    if (!g) return;
+    grow.current = null;
+    const sc = topRef.current?.closest('.scroll') as HTMLElement | null;
+    if (sc) sc.scrollTop = g.top + (sc.scrollHeight - g.height);
+  }, [shown]);
+  useEffect(() => {
+    const all = () => setShown(Number.MAX_SAFE_INTEGER);
+    window.addEventListener('cockpit:reveal-all', all);
+    return () => window.removeEventListener('cockpit:reveal-all', all);
+  }, []);
+  const hasHidden = items.length > 0 && shown < Number.MAX_SAFE_INTEGER;
+  useEffect(() => {
+    const el = topRef.current;
+    if (!el || !hasHidden || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && revealMore(), {
+      root: el.closest('.scroll'),
+      rootMargin: '200px 0px 0px 0px',
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  });
   if (items.length === 0 && emptyHint) {
     return (
       <div className="timeline empty">
@@ -153,7 +189,9 @@ export const Timeline = memo(function Timeline({
       </div>
     );
   }
-  const groups = groupItems(items);
+  const allGroups = groupItems(items);
+  const hidden = Math.max(0, allGroups.length - shown);
+  const groups = hidden ? allGroups.slice(hidden) : allGroups;
   // The task checklist is unique and lives aggregated: it is rendered only in the last
   // turn that touched tasks, avoiding repeating the group on every add/tick.
   let lastTodoGroup = -1;
@@ -166,9 +204,16 @@ export const Timeline = memo(function Timeline({
   });
   // Ordinal of each user prompt (matching the order in the host's transcript),
   // p/ o rewind referenciar o prompt certo independentemente do id local/uuid.
-  let userOrdinal = -1;
+  let userOrdinal = allGroups.slice(0, hidden).filter((g) => g.kind === 'user').length - 1;
   return (
     <div className="timeline">
+      {hidden > 0 && (
+        <div className="timeline-earlier" ref={topRef}>
+          <button type="button" className="link-btn" onClick={revealMore}>
+            {t('timeline.showEarlier', hidden)}
+          </button>
+        </div>
+      )}
       {groups.map((g, gi) =>
         g.kind === 'notice' ? (
           <NoticeBanner key={g.item.id} item={g.item} t={t} />
@@ -183,7 +228,8 @@ export const Timeline = memo(function Timeline({
               t={t}
               userName={userName}
               pinned={gi === lastUserGroup}
-              onRewind={onRewind ? ((idx) => () => onRewind(idx))(userOrdinal) : undefined}
+              ordinal={userOrdinal}
+              onRewind={onRewind}
             />
           ))
         ) : (
@@ -504,7 +550,7 @@ function visibleInTimeline(it: TimelineItem, verbosity: string, lastAssistId?: s
   return MERGE_EDIT.test(it.name); // necessary/dialogo: edits only
 }
 
-function ClaudeTurn({
+function ClaudeTurnView({
   items,
   t,
   defaultShowThinking,
@@ -618,12 +664,31 @@ function ClaudeTurn({
   );
 }
 
+// A turn re-renders only when something it shows changed. `groupItems` builds a new `items`
+// array on every render, so the default shallow compare would never hold; the items
+// themselves keep their identity in the reducer unless they were patched.
+const ClaudeTurn = memo(ClaudeTurnView, (a, b) => {
+  if (
+    a.t !== b.t ||
+    a.defaultShowThinking !== b.defaultShowThinking ||
+    a.defaultOpenTools !== b.defaultOpenTools ||
+    a.showTodos !== b.showTodos ||
+    a.verbosity !== b.verbosity ||
+    a.answers !== b.answers ||
+    a.items.length !== b.items.length
+  ) {
+    return false;
+  }
+  if (a.showTodos && a.todos !== b.todos) return false;
+  return a.items.every((it, i) => it === b.items[i]);
+});
+
 /**
  * Faixa do contexto que um hook injetou. Mostra o hook, a skill reconhecida (quando o corpo
  * casa com um SKILL.md em disco) e o tamanho estimado — o mesmo custo que o card do `Skill`
  * exibe quando a carga vem pelo caminho normal.
  */
-function HookBanner({ item, t }: { item: HookItem; t: Translator }) {
+const HookBanner = memo(function HookBanner({ item, t }: { item: HookItem; t: Translator }) {
   return (
     <div className="hook-banner" id={`msg-${item.id}`}>
       <span className="hook-banner-mark">⚡</span>
@@ -637,13 +702,13 @@ function HookBanner({ item, t }: { item: HookItem; t: Translator }) {
       {item.ts && <span className="hook-banner-time">{fmtStamp(item.ts)}</span>}
     </div>
   );
-}
+});
 
 /**
  * Aviso do engine no meio da sessão: créditos do modo rápido esgotados, modelo de subagente
  * restrito rodando no modelo do pai. Sem esta faixa, o usuário só veria o efeito.
  */
-function NoticeBanner({ item, t }: { item: NoticeItem; t: Translator }) {
+const NoticeBanner = memo(function NoticeBanner({ item, t }: { item: NoticeItem; t: Translator }) {
   // Fronteira de compactação: não é aviso, é a MEDIDA do que saiu do contexto.
   const c = item.compaction;
   if (c) {
@@ -675,7 +740,7 @@ function NoticeBanner({ item, t }: { item: NoticeItem; t: Translator }) {
       {item.ts && <span className="notice-banner-time">{fmtStamp(item.ts)}</span>}
     </div>
   );
-}
+});
 
 /**
  * The details of a message, tool call or turn. They used to pop up on hovering anywhere over
@@ -691,18 +756,20 @@ function InfoTip({ t, title, rows, focusable = true }: { t: Translator; title: s
   );
 }
 
-function UserBubble({
+const UserBubble = memo(function UserBubble({
   item,
   t,
   userName,
   pinned,
+  ordinal,
   onRewind,
 }: {
   item: UserItem;
   t: Translator;
   userName?: string;
   pinned?: boolean;
-  onRewind?: () => void;
+  ordinal: number;
+  onRewind?: (userIndex: number) => void;
 }) {
   const openImage = useImageViewer();
   const [collapsed, setCollapsed] = useState(true);
@@ -735,7 +802,7 @@ function UserBubble({
               type="button"
               className="msg-rewind"
               title={t('rewind.title')}
-              onClick={onRewind}
+              onClick={() => onRewind(ordinal)}
             >
               ↶
             </button>
@@ -765,7 +832,7 @@ function UserBubble({
       </div>
     </div>
   );
-}
+});
 
 
 // Content of an assistant message, WITHOUT a role header (the turn already

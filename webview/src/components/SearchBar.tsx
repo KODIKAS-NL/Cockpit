@@ -25,6 +25,8 @@ export function SearchBar({ t, scrollRef, itemsKey, onClose }: Props) {
   const ranges = useRef<Range[]>([]);
 
   useEffect(() => {
+    // Search reads the DOM, and older messages are not in it until the timeline shows them.
+    window.dispatchEvent(new Event('cockpit:reveal-all'));
     inputRef.current?.focus();
     inputRef.current?.select();
     return () => clearHighlights();

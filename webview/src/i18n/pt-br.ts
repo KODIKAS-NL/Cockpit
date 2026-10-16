@@ -642,6 +642,7 @@ export const ptBR: Partial<Strings> = {
   'confirm.cancel': 'Cancelar',
   // Contexto injetado por hook (timeline + painel Skills).
   'timeline.hookSkill': 'skill carregada por hook: {0}',
+  'timeline.showEarlier': 'Mostrar mensagens anteriores ({0})',
   'timeline.hookContext': 'contexto injetado por hook',
   'timeline.engineNotice': 'aviso do engine',
   'timeline.compactAuto': 'contexto compactado (auto)',

@@ -141,6 +141,7 @@ export const en = {
   'skills.residentTokens': '{0} tk still in the context',
   'skills.residentUnknown': 'body still in the context (size not reported)',
   'skills.viaHook': 'loaded by a hook (recognised by the body)',
+  'timeline.showEarlier': 'Show earlier messages ({0})',
   'timeline.hookSkill': 'skill loaded by a hook: {0}',
   'timeline.hookContext': 'context injected by a hook',
   'timeline.engineNotice': 'engine warning',

@@ -648,6 +648,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
         <>
         <div className="scroll" ref={scrollRef} onClick={onContentClick} onScroll={onScroll}>
           <Timeline
+            key={state.activeTab}
             items={items}
             t={t}
             emptyHint={items.length === 0}
