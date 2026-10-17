@@ -217,12 +217,6 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
   scrollOnSendRef.current = state.config?.scrollOnSend !== false;
 
   const onSend = useCallback((text: string, images: ImageAttachment[], selection?: string, now?: boolean) => {
-    // Aba sob Remote Control: quem conduz é o terminal/celular. O host recusa e explica —
-    // não criamos a bolha local, que ficaria órfã.
-    if (tabRef.current?.remote) {
-      send({ kind: 'sendMessage', text, images: images.length ? images : undefined, selection });
-      return;
-    }
     // The bubble's id travels with the message: the CLI echoes it back when it takes the
     // message in, which is when a message sent mid-turn stops being "queued".
     const uuid = crypto.randomUUID();
