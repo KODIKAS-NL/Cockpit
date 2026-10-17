@@ -273,3 +273,22 @@ describe('two windows on one daemon session', () => {
     b.session.detach();
   });
 });
+
+describe('a prompt typed on the phone', () => {
+  it('shows up in the window\'s timeline, once', async () => {
+    process.env.FAKE_PHONE = 'typed on the phone';
+    try {
+      const a = makeWindow(path.join(dir, 'd.sock'));
+      a.session.send('hello');
+      await until(() => !a.session.busy && kinds(a, 'assistantDone').length > 0, 'first turn done');
+      const r = await a.session.setRemote(true);
+      expect(r.ok).toBe(true);
+      await until(() => kinds(a, 'remoteUser').length === 1, 'the phone prompt is drawn');
+      expect(kinds(a, 'remoteUser')[0].text).toBe('typed on the phone');
+      await new Promise((res) => setTimeout(res, 300));
+      expect(kinds(a, 'remoteUser').length).toBe(1);
+    } finally {
+      delete process.env.FAKE_PHONE;
+    }
+  });
+});

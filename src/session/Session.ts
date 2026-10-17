@@ -163,6 +163,8 @@ export class Session {
   // Our messages the CLI has not taken in yet (it queues what arrives mid-turn). Only
   // tracked when the CLI echoes them back (--replay-user-messages: the Claude engine).
   private unconsumed = new Set<string>();
+  /** Prompts this window already has on screen (its own and other windows'), by uuid: their CLI echo must not draw them again. */
+  private shownUser = new Set<string>();
   private replayEcho = false;
   // We interrupted a turn that has messages waiting: its error result is expected, and the
   // CLI goes on with the queue.
@@ -365,6 +367,7 @@ export class Session {
     );
     this.noteSlashSkill(text);
     if (this.replayEcho) this.unconsumed.add(uuid);
+    this.shownUser.add(uuid);
     this.cli!.sendUserMessage(text, images, uuid);
   }
 
@@ -551,6 +554,7 @@ export class Session {
   }
 
   private onRemoteUser(message: unknown, uuid?: string): void {
+    if (uuid) this.shownUser.add(uuid);
     const content = (message as { content?: unknown })?.content;
     let text = '';
     if (typeof content === 'string') text = content;
@@ -1249,12 +1253,14 @@ export class Session {
         this.unconsumed.delete(ev.uuid);
         this.emit({ kind: 'userPickedUp', id: ev.uuid });
       }
+      if (this.showPhonePrompt(ev)) return;
       if (!this.busy) {
         this.setBusy(true);
         this.stats.beginTurn();
       }
       return;
     }
+    if (this.showPhonePrompt(ev)) return;
     const content = ev.message?.content;
     if (!Array.isArray(content)) return;
     for (const b of content) {
@@ -1263,6 +1269,24 @@ export class Session {
         this.emit({ kind: 'toolResult', toolUseId: r.tool_use_id, content: r.content, isError: r.is_error });
       }
     }
+  }
+
+  /**
+   * A prompt nobody here sent, typed on the phone / claude.ai/code over Remote Control: the CLI
+   * puts it on the stream (echoed or plain), and that is the only place its text reaches this
+   * window. Draws it once; false when the event is something else (tool result, subagent
+   * prompt, CLI-made message) or a prompt this window already shows.
+   */
+  private showPhonePrompt(ev: UserEvent): boolean {
+    const x = ev as any;
+    if (x.parent_tool_use_id || x.isSynthetic || x.isMeta || x.isCompactSummary) return false;
+    if (ev.uuid && this.shownUser.has(ev.uuid)) return false;
+    const c = ev.message?.content;
+    const blocks = typeof c === 'string' ? [{ type: 'text', text: c }] : Array.isArray(c) ? c : [];
+    if (blocks.some((b: any) => b?.type === 'tool_result')) return false;
+    if (!blocks.some((b: any) => b?.type === 'text' && typeof b.text === 'string' && b.text.trim() !== '')) return false;
+    this.onRemoteUser(ev.message, ev.uuid);
+    return true;
   }
 
   private clearQueue(): void {
