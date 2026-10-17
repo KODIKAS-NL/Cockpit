@@ -34,6 +34,7 @@ interface Props {
   correctEnabled: boolean;
   spellCheck: boolean; // spell-check while typing (marks words in the overlay)
   busy: boolean;
+  compacting?: boolean; // the CLI is condensing the context (shown in the Stop button's title)
   disabled: boolean;
   slashCommands: string[];
   slashMeta: Record<string, SlashCmdMeta>;
@@ -53,8 +54,8 @@ interface Props {
   onCredentials?: () => void; // abre o cofre de credenciais (TOTP 2FA)
   onRemoteControl?: () => void; // publishes this session for remote control (phone/app)
   canRemoteControl?: boolean; // there is a live session id to publish
-  remoteActive?: boolean; // a aba já está sob Remote Control (terminal conduzindo)
-  remotePhase?: 'connecting' | 'active' | 'failed' | 'cloud' | 'offline'; // o que se SABE da conexão remota
+  remoteActive?: boolean; // Remote Control is on for this conversation
+  remotePhase?: 'connecting' | 'active' | 'failed'; // o que se SABE da conexão remota
   /** Model / effort / mode pickers, shown in the toolbar before Send (chat views only). */
   picks?: ReactNode;
 }
@@ -82,6 +83,7 @@ export const Composer = memo(function Composer({
   correctEnabled,
   spellCheck,
   busy,
+  compacting,
   disabled,
   slashCommands,
   slashMeta,
@@ -789,9 +791,7 @@ export const Composer = memo(function Composer({
             type="button"
             className={`composer-side-btn remote-btn${remoteActive ? ' on' : ''}${
               remotePhase === 'connecting' ? ' connecting' : ''
-            }${remotePhase === 'failed' || remotePhase === 'offline' ? ' failed' : ''}${
-              remotePhase === 'cloud' ? ' cloud' : ''
-            }`}
+            }${remotePhase === 'failed' ? ' failed' : ''}`}
             onClick={onRemoteControl}
             // Ligado, o botão continua clicável: é o desligar (toggle).
             disabled={!remoteActive && (disabled || !canRemoteControl)}
@@ -1026,8 +1026,16 @@ export const Composer = memo(function Composer({
             </button>
           )}
           {busy ? (
-            <button type="button" className="btn stop send-icon" onClick={onStop} title={t('composer.stop')} aria-label={t('composer.stop')}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <button
+              type="button"
+              className="btn stop send-icon"
+              onClick={onStop}
+              title={compacting ? `${t('activity.compacting')} · ${t('composer.stop')}` : t('composer.stop')}
+              aria-label={t('composer.stop')}
+            >
+              {/* A spinner while the turn runs; on hover/focus it turns into the square (= Stop). */}
+              <span className="stop-spinner" aria-hidden="true" />
+              <svg className="stop-square" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <rect x="6" y="6" width="12" height="12" rx="2" />
               </svg>
             </button>
@@ -1063,11 +1071,9 @@ export const Composer = memo(function Composer({
 function remoteLabel(
   t: Translator,
   active?: boolean,
-  phase?: 'connecting' | 'active' | 'failed' | 'cloud' | 'offline',
+  phase?: 'connecting' | 'active' | 'failed',
 ): string {
   if (phase === 'failed') return t('remote.failed');
-  if (phase === 'offline') return t('remote.offline');
-  if (phase === 'cloud') return t('remote.cloud');
   if (phase === 'connecting') return t('remote.connecting');
   return active ? t('remote.active') : t('remote.publish');
 }

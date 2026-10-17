@@ -25,6 +25,8 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
   private queue: Record<string, unknown>[] = [];
   private reqSeq = 0;
   private pendingControl = new Map<string, (payload: unknown) => void>();
+  /** An auto-compact choice made before attaching: sent right after the snapshot. */
+  private pendingCompact?: string;
   private readonly handler = (m: SessionMessage) => this.onDaemon(m);
 
   constructor(
@@ -85,9 +87,30 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
     });
   }
 
-  /** Stores the conversation's auto-compact limit in the daemon; the caller restarts the process to apply it. */
+  /**
+   * Stores the conversation's auto-compact limit in the daemon, which restarts the process to
+   * apply it (after the turn, when busy). Not attached yet: sent once attached.
+   */
   setAutoCompact(value: string): void {
-    if (this.sessionId) this.client.autoCompact(this.sessionId, value);
+    if (this.attached && this.sessionId) this.client.autoCompact(this.sessionId, value);
+    else {
+      this.pendingCompact = value;
+      this.start();
+    }
+  }
+
+  /** A choice of this window's own is on its way to the daemon. */
+  hasPendingCompact(): boolean {
+    return this.pendingCompact !== undefined;
+  }
+
+  /**
+   * Settings switched live in the running process (model, effort, permission mode): the
+   * daemon's next (re)start must use them too.
+   */
+  updateOptions(patch: Partial<CliOptions>): void {
+    Object.assign(this.opts, patch);
+    if (this.attached && this.sessionId) this.client.respec(this.sessionId, this.spawnSpec());
   }
 
   /** Turns Remote Control on or off for this session; the daemon owns the bridge. */
@@ -192,6 +215,11 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
         this.running = m.snapshot.session.state !== 'idle';
         if (m.snapshot.session.cliSessionId) this.setResumeId(m.snapshot.session.cliSessionId);
         this.emit('snapshot', m.snapshot);
+        if (this.pendingCompact !== undefined) {
+          const value = this.pendingCompact;
+          this.pendingCompact = undefined;
+          this.client.autoCompact(this.sessionId, value);
+        }
         return;
       case 'event': {
         const ev = m.event as Record<string, any>;
@@ -201,7 +229,7 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
           const done = typeof id === 'string' ? this.pendingControl.get(id) : undefined;
           if (done) {
             this.pendingControl.delete(id);
-            done(ev.response?.subtype === 'success' ? ev.response.response : undefined);
+            done(ev.response?.subtype === 'success' ? (ev.response.response ?? {}) : undefined);
           }
         }
         if (ev?.type === 'system' && ev.subtype === 'init' && typeof ev.session_id === 'string') {
@@ -230,6 +258,15 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
         for (const done of this.pendingControl.values()) done(undefined);
         this.pendingControl.clear();
         this.emit('exit', m.code);
+        return;
+      case 'gone':
+        // Another window deleted this conversation: let go. The next message opens a new one.
+        this.attached = false;
+        this.running = false;
+        for (const done of this.pendingControl.values()) done(undefined);
+        this.pendingControl.clear();
+        this.emit('gone');
+        this.emit('exit', null);
         return;
       case 'disconnected':
         // The daemon went away (restart, crash). The next message re-opens: the session is

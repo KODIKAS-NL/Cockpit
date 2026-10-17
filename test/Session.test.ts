@@ -1,6 +1,6 @@
 // Regression: session continuity vs. context duplication.
 // The CLI creates a NEW .jsonl whenever it starts WITHOUT --resume. So, after a stop()
-// (model/effort/permission change) the respawn must resume the SAME session.
+// (a setting the CLI only reads at start) the respawn must resume the SAME session.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { CliOptions } from '../src/cli/CliProcessManager';
 
@@ -12,7 +12,9 @@ const { spawns, MockCli } = vi.hoisted(() => {
   class MockCli {
     handlers = new Map<string, ((...a: any[]) => void)[]>();
     sent: string[] = [];
+    controls: { subtype: string; payload?: Record<string, unknown> }[] = [];
     started = false;
+    stopped = false;
     constructor(public opts: CliOptions) {
       spawns.push(this);
     }
@@ -31,8 +33,17 @@ const { spawns, MockCli } = vi.hoisted(() => {
     setResumeId(id: string) {
       if (id) this.opts.resumeSessionId = id;
     }
+    isRunning() {
+      return this.started && !this.stopped;
+    }
+    requestControl(subtype: string, _timeout?: number, payload?: Record<string, unknown>) {
+      this.controls.push({ subtype, payload });
+      return Promise.resolve({});
+    }
     interrupt() {}
-    stop() {}
+    stop() {
+      this.stopped = true;
+    }
     emit(ev: string, ...a: any[]) {
       for (const cb of this.handlers.get(ev) ?? []) cb(...a);
     }
@@ -54,9 +65,9 @@ vi.mock('../src/stats/StatsStore', async (importOriginal) => ({
 
 import { Session, type SessionHooks } from '../src/session/Session';
 
-function makeSession(): Session {
+function makeSession(emit: SessionHooks['emit'] = () => {}): Session {
   const hooks: SessionHooks = {
-    emit: () => {},
+    emit,
     onBusy: () => {},
     onResult: () => {},
     onInteraction: () => {},
@@ -83,7 +94,7 @@ describe('Session — continuidade de contexto (anti-duplicação)', () => {
     spawns.length = 0;
   });
 
-  it('respawn após troca de modelo retoma a MESMA sessão (não duplica)', () => {
+  it('respawn após uma troca que reinicia retoma a MESMA sessão (não duplica)', () => {
     const s = makeSession();
     s.send('primeiro prompt');
     expect(spawns).toHaveLength(1);
@@ -91,11 +102,62 @@ describe('Session — continuidade de contexto (anti-duplicação)', () => {
 
     spawns[0].fireInit('sess-A'); // CLI revela o id
 
-    s.setModel('claude-opus-4-8'); // stop() descarta o CLI
+    s.setAllowAgents(false); // stop() descarta o CLI
     s.send('segundo prompt'); // respawn
 
     expect(spawns).toHaveLength(2);
     expect(spawns[1].opts.resumeSessionId).toBe('sess-A'); // CONTINUA sess-A
+  });
+
+  it('model, effort and permission mode switch in the running process, without a respawn', () => {
+    const s = makeSession();
+    s.send('p');
+    spawns[0].fireInit('sess-A');
+
+    expect(s.setModel('claude-opus-4-8')).toBe(true);
+    expect(s.setEffort('high')).toBe(true);
+    expect(s.setPermission('plan')).toBe(true);
+    s.send('p2');
+
+    expect(spawns).toHaveLength(1);
+    expect(spawns[0].controls).toEqual([
+      { subtype: 'set_model', payload: { model: 'claude-opus-4-8' } },
+      { subtype: 'apply_flag_settings', payload: { settings: { effortLevel: 'high' } } },
+      { subtype: 'set_permission_mode', payload: { mode: 'plan' } },
+    ]);
+  });
+
+  it('a refused live switch falls back to a respawn with the new model', async () => {
+    const s = makeSession();
+    s.send('p');
+    spawns[0].fireInit('sess-A');
+    spawns[0].requestControl = () => Promise.resolve(undefined);
+
+    s.setModel('claude-opus-4-8');
+    await new Promise((r) => setTimeout(r, 0));
+    s.send('p2');
+
+    expect(spawns).toHaveLength(2);
+    expect(spawns[1].opts.model).toBe('claude-opus-4-8');
+    expect(spawns[1].opts.resumeSessionId).toBe('sess-A');
+  });
+
+  it('a prompt still open when the process exits is closed', () => {
+    const emitted: any[] = [];
+    const s = makeSession((m) => emitted.push(m));
+    s.send('p');
+    spawns[0].fireInit('sess-A');
+    spawns[0].emit('event', {
+      type: 'control_request',
+      request_id: 'perm-1',
+      request: { subtype: 'can_use_tool', tool_name: 'Bash', input: { command: 'ls' }, tool_use_id: 't1' },
+    });
+    expect(s.hasPendingPermission('perm-1')).toBe(true);
+
+    spawns[0].emit('exit', 1);
+
+    expect(s.hasPendingPermission('perm-1')).toBe(false);
+    expect(emitted).toContainEqual({ kind: 'promptSettled', requestId: 'perm-1' });
   });
 
   it('clearConversation começa uma sessão realmente nova (sem --resume)', () => {
@@ -131,7 +193,7 @@ describe('Session — texto extra no system prompt', () => {
     spawns[0].fireInit('sess-A');
     expect(spawns[0].opts.extraSystemPrompt).toBe('DIRETIVA DE SHELL');
 
-    s.setModel('claude-opus-4-8'); // respawn
+    s.setAllowAgents(false); // respawn
     s.send('p2');
     expect(spawns[1].opts.extraSystemPrompt).toBe('DIRETIVA DE SHELL');
     expect(spawns[1].opts.resumeSessionId).toBe('sess-A');
@@ -150,9 +212,59 @@ describe('Session — texto extra no system prompt', () => {
     spawns[1].fireInit('sess-B');
     expect(spawns[1].opts.quietPrompt).toBe('SEM NARRAÇÃO');
 
-    s2.setModel('claude-opus-4-8'); // respawn
+    s2.setAllowAgents(false); // respawn
     s2.send('p2');
     expect(spawns[2].opts.quietPrompt).toBe('SEM NARRAÇÃO');
+  });
+});
+
+describe('Session — background tasks', () => {
+  beforeEach(() => {
+    spawns.length = 0;
+  });
+
+  const setup = () => {
+    const emitted: any[] = [];
+    const s = makeSession((m) => emitted.push(m));
+    s.send('p');
+    const lists = () => emitted.filter((m) => m.kind === 'background').map((m) => m.tasks.map((t: any) => t.id));
+    const toolUse = (id: string, input: Record<string, unknown>) =>
+      spawns[0].emit('event', {
+        type: 'assistant',
+        message: { id: `m-${id}`, role: 'assistant', content: [{ type: 'tool_use', id, name: 'Bash', input }] },
+      });
+    const started = (taskId: string, toolUseId: string) =>
+      spawns[0].emit('event', { type: 'system', subtype: 'task_started', task_id: taskId, tool_use_id: toolUseId, task_type: 'local_bash', description: 'cmd' });
+    const result = (toolUseId: string) =>
+      spawns[0].emit('event', {
+        type: 'user',
+        message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUseId, content: 'ok' }] },
+      });
+    spawns[0].fireInit('sess-A');
+    return { emitted, lists, toolUse, started, result };
+  };
+
+  it('does not list the tool call that is running in the turn', () => {
+    const { lists, toolUse, started } = setup();
+    toolUse('t1', { command: 'ls' });
+    started('task-1', 't1');
+    expect(lists().every((l) => l.length === 0)).toBe(true);
+  });
+
+  it('lists it once its result is in and the task goes on', () => {
+    const { lists, toolUse, started, result } = setup();
+    toolUse('t1', { command: 'sleep 100' });
+    started('task-1', 't1');
+    result('t1');
+    expect(lists().pop()).toEqual(['task-1']);
+  });
+
+  it('lists a run_in_background task right away', () => {
+    const { lists, toolUse, started, result } = setup();
+    toolUse('t2', { command: 'sleep 100', run_in_background: true });
+    result('t2');
+    started('task-2', 't2');
+    expect(lists().pop()).toEqual(['task-2']);
   });
 });
 
@@ -282,5 +394,63 @@ describe('Session — carga de skill ponta a ponta (eventos reais)', () => {
     expect(sk.active).toBe(true);
     expect(sk.invokedBy).toBe('model');
     expect(sk.activeTokens).toBeGreaterThan(150);
+  });
+});
+
+describe('local slash command output', () => {
+  beforeEach(() => {
+    spawns.length = 0;
+  });
+
+  const run = (content: string) => {
+    const emitted: any[] = [];
+    const s = makeSession((m) => emitted.push(m));
+    s.send('p');
+    spawns[0].fireInit('sess-L');
+    emitted.length = 0;
+    spawns[0].emit('event', { type: 'user', uuid: 'u1', message: { role: 'user', content } });
+    return emitted;
+  };
+
+  it('shows the output as a notice, not as a prompt', () => {
+    const e = run('<local-command-stdout>Set model to `sonnet`</local-command-stdout>');
+    expect(e.some((m) => m.kind === 'remoteUser')).toBe(false);
+    expect(e.find((m) => m.kind === 'engineNotice')).toMatchObject({ text: 'Set model to `sonnet`', topic: 'local_command' });
+  });
+
+  it('draws nothing for the command wrapper', () => {
+    const e = run('<command-name>/model</command-name><command-message>model</command-message>');
+    expect(e.filter((m) => m.kind === 'remoteUser' || m.kind === 'engineNotice')).toEqual([]);
+  });
+});
+
+describe('model switched elsewhere', () => {
+  beforeEach(() => {
+    spawns.length = 0;
+  });
+
+  const answer = (model: string, id: string) =>
+    spawns[0].emit('event', { type: 'assistant', message: { id, role: 'assistant', model, content: [{ type: 'text', text: 'x' }] } });
+
+  it('follows a model the picker does not show', () => {
+    const s = makeSession(() => {});
+    s.setModel('sonnet');
+    s.send('p');
+    spawns[0].fireInit('sess-M');
+    answer('claude-sonnet-5-5', 'm1');
+    expect(s.model()).toBe('sonnet');
+    answer('claude-opus-5-5', 'm2'); // /model opus typed on the phone
+    expect(s.model()).toBe('claude-opus-5-5');
+  });
+
+  it('keeps the picker when it already matches', () => {
+    const s = makeSession(() => {});
+    s.setModel('sonnet');
+    s.send('p');
+    spawns[0].fireInit('sess-N');
+    answer('claude-opus-5-5', 'm1');
+    s.setModel('sonnet');
+    answer('claude-sonnet-5-5', 'm2');
+    expect(s.model()).toBe('sonnet');
   });
 });

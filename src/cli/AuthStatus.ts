@@ -18,10 +18,18 @@ export interface AccountInfo {
   loginExpiresAt?: number;
   // Session flags (fast mode, model label, …) filled in later from the statusline cache.
   session?: UsageAccount['session'];
+  /** The check failed: the state is not known (never read as logged out). */
+  unknown?: true;
+  /** Why it failed (no output contents: they can carry the e-mail). */
+  error?: string;
 }
 
-/** Fetches the account live (hot data). Tolerant: failure/timeout → { loggedIn:false }. */
-export function fetchAuthStatus(claudePath: string): Promise<AccountInfo> {
+/**
+ * Fetches the account live (hot data). Only the CLI saying `loggedIn: false` means logged out: a
+ * check that failed (could not start, timed out, printed no JSON) is `unknown`, and must not
+ * turn a signed-in user's button into "Sign in".
+ */
+export function fetchAuthStatus(claudePath: string, timeoutMs = 8000): Promise<AccountInfo> {
   return new Promise((resolve) => {
     let done = false;
     const finish = (info: AccountInfo) => {
@@ -30,6 +38,7 @@ export function fetchAuthStatus(claudePath: string): Promise<AccountInfo> {
         resolve(info);
       }
     };
+    const unknown = (error: string): AccountInfo => ({ loggedIn: false, unknown: true, error });
     try {
       const useShell = process.platform === 'win32';
       const exe =
@@ -43,39 +52,44 @@ export function fetchAuthStatus(claudePath: string): Promise<AccountInfo> {
         } catch {
           /* noop */
         }
-        finish({ loggedIn: false });
-      }, 8000);
+        finish(unknown('timeout'));
+      }, timeoutMs);
       let out = '';
       p.stdout?.setEncoding('utf8');
       p.stdout?.on('data', (c: string) => (out += c));
       p.on('error', () => {
         clearTimeout(timer);
-        finish({ loggedIn: false });
+        finish(unknown('spawn error'));
       });
-      p.on('close', () => {
+      p.on('close', (code) => {
         clearTimeout(timer);
-        finish(parse(out));
+        finish(parse(out) ?? unknown(code ? `exit ${code}, no JSON` : 'unparseable output'));
       });
     } catch {
-      finish({ loggedIn: false });
+      finish(unknown('spawn error'));
     }
   });
 }
 
-function parse(out: string): AccountInfo {
+// The JSON object in the output: tolerant of a banner or warning line around it.
+function parse(out: string): AccountInfo | undefined {
+  const a = out.indexOf('{');
+  const b = out.lastIndexOf('}');
+  if (a < 0 || b <= a) return undefined;
   try {
-    const j = JSON.parse(out.trim());
+    const j = JSON.parse(out.slice(a, b + 1));
+    if (typeof j?.loggedIn !== 'boolean') return undefined;
     return {
-      loggedIn: !!j.loggedIn,
+      loggedIn: j.loggedIn,
       authMethod: str(j.authMethod),
       apiProvider: str(j.apiProvider),
       email: str(j.email),
       orgName: str(j.orgName),
       plan: str(j.subscriptionType),
-      loginExpiresAt: readLoginExpiry(),
+      loginExpiresAt: j.loggedIn ? readLoginExpiry() : undefined,
     };
   } catch {
-    return { loggedIn: false };
+    return undefined;
   }
 }
 

@@ -258,19 +258,95 @@ describe('two windows on one daemon session', () => {
     a.session.send('hello');
     await until(() => kinds(a, 'turnComplete').length === 1, 'turn ends');
     const cliId = a.session.sessionId!;
-    a.session.setAutoCompact('300000');
+    const from = cliLines().length;
+    // The daemon restarts the process with it: nothing waits for the next message.
+    expect(a.session.setAutoCompact('300000')).toBe(true);
+    await until(() => cliLines(from).some((l) => l.argv?.includes('300000')), 'restarted with the new limit');
     const b = makeWindow(sock);
     b.session.resume(cliId);
     b.session.ensureCli();
     await until(() => b.session.autoCompact() === '300000', 'B adopts the daemon\'s value');
-    // B restarts the process: it comes up with the conversation's value, not B's own setting.
-    const from = cliLines().length;
     b.session.send('again');
     await until(() => kinds(b, 'turnComplete').length >= 1, 'B\'s turn ends');
-    const argv = cliLines(from).find((l) => l.argv)!.argv as string[];
-    expect(argv[argv.indexOf('--autocompact') + 1]).toBe('300000');
     a.session.detach();
     b.session.detach();
+  });
+
+  it('an auto-compact choice made before attaching reaches the daemon', async () => {
+    const sock = path.join(dir, 'd.sock');
+    const a = makeWindow(sock);
+    a.session.send('hello');
+    await until(() => kinds(a, 'turnComplete').length === 1, 'turn ends');
+    const cliId = a.session.sessionId!;
+    a.session.detach(); // the process keeps running in the daemon
+    // A reloaded window: not attached yet when the user picks a limit.
+    const b = makeWindow(sock);
+    b.session.resume(cliId);
+    const from = cliLines().length;
+    expect(b.session.setAutoCompact('250000')).toBe(true);
+    await until(() => cliLines(from).some((l) => l.argv?.includes('250000')), 'restarted with B\'s choice');
+    expect(b.session.autoCompact()).toBe('250000');
+    b.session.detach();
+  });
+
+  it('switching model, effort and mode mid-turn keeps the process and the turn', async () => {
+    const sock = path.join(dir, 'd.sock');
+    const a = makeWindow(sock);
+    const from = cliLines().length;
+    a.session.send('SLOW long one');
+    await until(() => kinds(a, 'assistantDelta').length > 0 || cliLines(from).some((l) => l.type === 'user'), 'the turn runs');
+    await until(() => a.session.isPersistent() && a.session.busy, 'attached and busy');
+    expect(a.session.setModel('claude-opus-x')).toBe(true);
+    expect(a.session.setEffort('high')).toBe(true);
+    expect(a.session.setPermission('acceptEdits')).toBe(true);
+    await until(() => kinds(a, 'turnComplete').length === 1, 'the turn ends');
+    const lines = cliLines(from);
+    expect(lines.filter((l) => l.argv).length).toBe(1); // never restarted
+    const requests = lines.filter((l) => l.type === 'control_request').map((l) => l.request);
+    expect(requests).toContainEqual({ subtype: 'set_model', model: 'claude-opus-x' });
+    expect(requests).toContainEqual({ subtype: 'apply_flag_settings', settings: { effortLevel: 'high' } });
+    expect(requests).toContainEqual({ subtype: 'set_permission_mode', mode: 'acceptEdits' });
+    expect(a.errors).toEqual([]);
+    a.session.detach();
+  });
+
+  it('a model picked while detached is applied to the running process on attach', async () => {
+    const sock = path.join(dir, 'd.sock');
+    const a = makeWindow(sock);
+    a.session.send('hello');
+    await until(() => kinds(a, 'turnComplete').length === 1, 'turn ends');
+    const cliId = a.session.sessionId!;
+    a.session.detach();
+    const b = makeWindow(sock);
+    b.session.resume(cliId);
+    b.session.setModel('claude-opus-y');
+    const from = cliLines().length;
+    b.session.send('next');
+    await until(() => kinds(b, 'turnComplete').length === 1, 'B\'s turn ends');
+    const lines = cliLines(from);
+    expect(lines.filter((l) => l.argv).length).toBe(0); // the running process was kept
+    expect(lines.filter((l) => l.type === 'control_request').map((l) => l.request)).toContainEqual({
+      subtype: 'set_model',
+      model: 'claude-opus-y',
+    });
+    b.session.detach();
+  });
+
+  it('closes a prompt whose process ended', async () => {
+    const sock = path.join(dir, 'd.sock');
+    const a = makeWindow(sock);
+    a.session.send('ASK may I?');
+    await until(() => kinds(a, 'permissionRequest').length === 1, 'A sees the prompt');
+    const requestId = kinds(a, 'permissionRequest')[0].requestId;
+    // Another window changes a setting the CLI only reads at start: the process restarts.
+    const b = makeWindow(sock);
+    b.session.resume(a.session.sessionId!);
+    b.session.ensureCli();
+    await until(() => b.session.isPersistent() && b.session.hasPendingPermission(requestId), 'B attached');
+    b.session.setAllowAgents(false);
+    await until(() => kinds(a, 'promptSettled').some((m) => m.requestId === requestId), 'A\'s card closes');
+    expect(a.session.hasPendingPermission(requestId)).toBe(false);
+    a.session.detach();
   });
 });
 

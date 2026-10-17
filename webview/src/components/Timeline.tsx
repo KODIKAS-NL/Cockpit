@@ -1,6 +1,5 @@
-import { memo, useState, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { memo, useMemo, useState, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import type { Translator } from '../i18n';
-import type { StatsSnapshot } from '../../../shared/protocol';
 import { send } from '../vscodeApi';
 import type {
   TimelineItem,
@@ -13,7 +12,7 @@ import type {
   AskQuestion,
 } from '../types';
 import { isTodoToolName } from '../store';
-import { splitAnswerNote } from '../askAnswer';
+import { splitAnswerNote, parseChoices } from '../askAnswer';
 import { decodeFlattenedUnicode as dec } from '../util/decodeText';
 import { Markdown } from './Markdown';
 import { CodeBlock } from './CodeBlock';
@@ -22,7 +21,7 @@ import { TodoCard } from './Todos';
 import { useImageViewer } from './ImageViewer';
 import { Tooltip, type TooltipRow } from './Tooltip';
 import { Icon } from './Icon';
-import { languageFromPath, stripLineNumbers, richHighlight } from '../util/highlight';
+import { languageFromPath, stripLineNumbers, richHighlight, highlightCode } from '../util/highlight';
 import {
   fmtCompact,
   fmtTk,
@@ -66,11 +65,8 @@ interface Props {
   userName?: string;
   todos: TodoItem[];
   answers?: Record<string, string>;
-  busy?: boolean; // turno em andamento: mostra o indicador de atividade no fim
-  stats?: StatsSnapshot; // tokens enviados/recebidos p/ o contador do indicador
   onRewind?: (userIndex: number) => void; // rewind to this prompt (removing it)
   verbosity?: string; // verbose|necessary|dialogo|quiet — filters the display
-  compacting?: boolean; // o CLI está condensando o contexto (S11)
 }
 
 // Groups items into turns: each user message and, after it, the contiguous
@@ -141,11 +137,8 @@ export const Timeline = memo(function Timeline({
   userName,
   todos,
   answers,
-  busy,
-  stats,
   onRewind,
   verbosity = 'verbose',
-  compacting,
 }: Props) {
   // Only the newest groups are in the DOM: a long conversation is slow to lay out and scroll
   // on a tablet. Older ones come back in steps, or all at once for search.
@@ -246,228 +239,14 @@ export const Timeline = memo(function Timeline({
           />
         ),
       )}
-      {busy && (
-        <ActivityIndicator
-          t={t}
-          items={items}
-          stats={stats}
-          verbosity={verbosity}
-          compacting={compacting}
-        />
-      )}
     </div>
   );
 });
-
-// Progress gauge (asymptotic). It only appears after GAUGE_DELAY of waiting —
-// short tasks (< 2s) show no gauge, avoiding flicker. When it appears it already starts
-// em GAUGE_START (10%) e cresce desacelerando: progress = 1 - (1-START)·e^(-(t-DELAY)/τ),
-// with a ceiling of 1 - GAUGE_FLOOR (≈ 97%, never 100%). It restarts on every piece of information received;
-// when it completes/ends it simply disappears (no 100% flash). GAUGE_TAU = speed.
-const GAUGE_TAU = 25_000;
-const GAUGE_FLOOR = 0.03;
-const GAUGE_DELAY = 2_000;
-const GAUGE_START = 0.1;
-
-// --- Gauge calibration per task type (less "fake") ---
-// The average durations per type come from the HOST (persisted in ~/.claude/tootega,
-// global for every project/tab/session). The webview sends duration samples and
-// consults the received map to derive τ — that way the gauge is fast for typically
-// short tasks and slow for long ones, calibrated to the real time.
-const TASK_AVG = new Map<string, number>(); // type -> average (ms): mirror of the host
-const TAU_TARGET = 0.8; // progress the gauge should reach at the average duration
-// τ = (average - DELAY) / k, where k solves progress=TAU_TARGET at the average.
-const TAU_K = Math.log((1 - GAUGE_START) / (1 - TAU_TARGET)); // ≈ 1.504
-const TAU_MIN = 1_500;
-const TAU_MAX = 120_000;
 
 /** Formats ms as min:sec (e.g. 75000 -> "1:15"). */
 function fmtMinSec(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-}
-
-/** Seeds/updates the local mirror with the averages coming from the host. */
-export function seedTaskTimings(timings: Record<string, number>): void {
-  TASK_AVG.clear();
-  for (const [k, v] of Object.entries(timings)) if (Number.isFinite(v)) TASK_AVG.set(k, v);
-}
-// Type of the task in progress = what is being waited on right now: the result of
-// a tool (by name) or the model's next response.
-function taskType(items: TimelineItem[]): string {
-  const last = items[items.length - 1];
-  if (last && last.kind === 'tool' && !last.done) return `tool:${last.name}`;
-  return 'assistant';
-}
-function tauForType(type: string): number {
-  const avg = TASK_AVG.get(type);
-  if (avg == null) return GAUGE_TAU; // no sample yet: default
-  return Math.min(TAU_MAX, Math.max(TAU_MIN, (avg - GAUGE_DELAY) / TAU_K));
-}
-
-// Command/tool running right now (last unfinished tool): name +
-// file/command/pattern. Used in the progress bar in non-verbose modes.
-function currentCmd(items: TimelineItem[]): string | undefined {
-  for (let i = items.length - 1; i >= 0; i--) {
-    const it = items[i];
-    if (it.kind === 'tool' && !it.done) {
-      const input = (it.input ?? {}) as Record<string, unknown>;
-      const file = typeof input.file_path === 'string' ? basename(input.file_path) : undefined;
-      const cmd = typeof input.command === 'string' ? input.command : undefined;
-      const pat = typeof input.pattern === 'string' ? input.pattern : undefined;
-      const detail = file || (cmd ? cmd.slice(0, 48) : pat ? pat.slice(0, 48) : '');
-      return detail ? `${it.name}: ${detail}` : it.name;
-    }
-  }
-  return undefined;
-}
-
-// Activity indicator on the timeline's last line (while the turn runs):
-// extension icon + spinner + sent/received token counter, as in the
-// original Claude Code GUI, + a remaining-progress gauge (asymptotic) to the
-// right of "Working". "Received" adds the consolidated output to the estimate of the
-// turn in flight (text÷4) so it counts live during the streaming.
-function ActivityIndicator({
-  t,
-  items,
-  stats,
-  verbosity = 'verbose',
-  compacting,
-}: {
-  t: Translator;
-  items: TimelineItem[];
-  stats?: StatsSnapshot;
-  verbosity?: string;
-  compacting?: boolean;
-}) {
-  const icon = window.__TOOTEGA_ICON__;
-  // "Information received" signature: it changes on every new item (text/tool),
-  // tool result that arrives, or completed response. It is the restart trigger
-  // — streaming within the same block doesn't change the id, but each arrival changes the signature.
-  // The gauge must only restart when something is REALLY painted in the timeline (according to
-  // the verbosity). In quiet, hidden tools change command without painting anything → they don't
-  // reset. That's why we count only the VISIBLE items.
-  const lastAssistId = [...items].reverse().find((i) => i.kind === 'assistant' && !isEmptyAssistant(i))?.id;
-  const vis = items.filter((it) => visibleInTimeline(it, verbosity, lastAssistId));
-  let doneAssist = 0;
-  let doneTools = 0;
-  for (const it of vis) {
-    if (it.kind === 'assistant') {
-      if (it.done) doneAssist++;
-    } else if (it.kind === 'tool' && it.done) {
-      doneTools++;
-    }
-  }
-  // Text/thinking of the visible response in flight: it grows with every token that appears.
-  const last = vis[vis.length - 1];
-  const flowing =
-    last && last.kind === 'assistant' && !last.done ? last.text.length + last.thinking.length : 0;
-  // Completed visible edits (deliverables painted in necessary/dialogo).
-  const editsDone = vis.filter((i) => i.kind === 'tool' && i.done && MERGE_EDIT.test(i.name)).length;
-  // Fronteira de segmento (aprendizado) e reset visual, POR MODO:
-  //  - quiet: SEVERAL commands = ONE bar for the whole turn → it never resets.
-  //  - necessary: resets only when an EDIT is painted (between edits = 1 bar).
-  //  - verbose/dialogo: reset per visible item (each command/text = 1 bar).
-  let segSig: string;
-  if (verbosity === 'quiet') segSig = 'turn';
-  else if (verbosity === 'necessary') segSig = `e${editsDone}`;
-  else segSig = `${vis.length}:${doneAssist}:${doneTools}`;
-  // "Fine" reset: includes the text streaming (it doesn't climb while the response arrives)
-  // only where the text is painted (verbose/dialogo). Quiet/necessary ignore tokens.
-  const liveSig =
-    verbosity === 'verbose' || verbosity === 'dialogo' ? `${segSig}:${flowing}` : segSig;
-  const sent = stats?.inputTokens ?? 0;
-  const received = stats?.outputTokens ?? 0;
-  const [elapsed, setElapsed] = useState(0);
-  const [totalMs, setTotalMs] = useState(0); // turn elapsed time (not reset per token)
-  const gaugeStartRef = useRef(Date.now()); // base do gauge (reset por liveSig)
-  const turnStartRef = useRef(Date.now()); // turn start (indicator mount)
-  const segStartRef = useRef(Date.now()); // base do segmento (aprendizado)
-  const prevLive = useRef(liveSig);
-  const prevSeg = useRef(segSig);
-  // Segment type for the duration learning:
-  //  - verbose: each command is its own segment → type = command (tool:Read…).
-  //  - non-verbose: ONE bar covers SEVERAL different commands (between two painted
-  //    items) → it can't be keyed per command; it uses a single 'batch' bucket.
-  const segType = () => (verbosity === 'verbose' ? taskType(vis) : 'batch');
-  const typeRef = useRef(segType());
-  const tauRef = useRef(tauForType(typeRef.current)); // τ calibrado p/ esse tipo
-  // Gauge stopwatch tick.
-  useEffect(() => {
-    const id = setInterval(() => {
-      const now = Date.now();
-      setElapsed(now - gaugeStartRef.current);
-      setTotalMs(now - turnStartRef.current);
-    }, 100);
-    return () => clearInterval(id);
-  }, []);
-  // Any information that arrives (item, tool result OR a flowing token) restarts the
-  // gauge — that way it only "climbs" on a real stall, and disappears when the response arrives.
-  useEffect(() => {
-    if (liveSig === prevLive.current) return;
-    prevLive.current = liveSig;
-    gaugeStartRef.current = Date.now();
-    setElapsed(0);
-  }, [liveSig]);
-  // Learning: it measures the duration only on the coarse segments (not per token, so the
-  // EMA isn't polluted) and calibrates τ by the type of the next wait.
-  useEffect(() => {
-    if (segSig === prevSeg.current) return;
-    prevSeg.current = segSig;
-    const dur = Date.now() - segStartRef.current;
-    if (dur >= 150) send({ kind: 'taskDuration', type: typeRef.current, ms: dur });
-    typeRef.current = segType();
-    tauRef.current = tauForType(typeRef.current);
-    segStartRef.current = Date.now();
-  }, [segSig]);
-  // End of the turn (the indicator unmounts): records the last bar still in progress —
-  // that is what captures the duration of quiet's SINGLE bar (which never changes segSig).
-  useEffect(() => {
-    return () => {
-      const dur = Date.now() - segStartRef.current;
-      if (dur >= 150) send({ kind: 'taskDuration', type: typeRef.current, ms: dur });
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  // Gauge only after GAUGE_DELAY (stall > 2s); it appears at GAUGE_START and grows
-  // asymptotically (τ calibrated by task type) up to the ceiling (1 - GAUGE_FLOOR).
-  const showGauge = elapsed >= GAUGE_DELAY;
-  const progress = Math.min(
-    1 - GAUGE_FLOOR,
-    1 - (1 - GAUGE_START) * Math.exp(-(elapsed - GAUGE_DELAY) / tauRef.current),
-  );
-  const pct = Math.round(progress * 100);
-  // In non-verbose modes the tool cards are hidden: it shows on the left the
-  // command running right now (name + file/command).
-  const cmd = verbosity !== 'verbose' ? currentCmd(items) : undefined;
-  return (
-    <div className="activity" role="status" aria-live="polite">
-      {icon && <img className="activity-icon" src={icon} alt="" width={16} height={16} />}
-      <span className="activity-spinner" aria-hidden="true" />
-      <span className="activity-tokens">
-        <span className="activity-up" title={t('activity.sent')}>↑ {fmtCompact(sent)}</span>
-        <span className="activity-down" title={t('activity.received')}>↓ {fmtCompact(received)}</span>
-      </span>
-      {/* Compactando: o turno não travou, o CLI está condensando o contexto. */}
-      <span className="activity-label">
-        {compacting ? t('activity.compacting') : cmd || t('activity.working')}
-      </span>
-      {showGauge && (
-        <span
-          className="activity-gauge"
-          role="progressbar"
-          aria-valuenow={pct}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          title={`${pct}%`}
-        >
-          <span className="activity-gauge-fill" style={{ width: `${(progress * 100).toFixed(1)}%` }} />
-          <span className="activity-gauge-pct">{pct}%</span>
-          <span className="activity-gauge-time">{fmtMinSec(totalMs)}</span>
-        </span>
-      )}
-    </div>
-  );
 }
 
 // One Claude turn: a single header + text/tools in order. Runs of task tools
@@ -647,10 +426,10 @@ function ClaudeTurnView({
     <div className="bubble assistant turn">
       <div className="role role-assistant">
         <span className="role-name">{t('role.assistant')}</span>
-        {active && <span className="caret">▋</span>}
         {canceled && <span className="canceled-tag">{t('turn.canceled')}</span>}
       </div>
       {nodes}
+      {active && <div className="caret-row"><span className="caret">▋</span></div>}
       {!active && turnEnd != null && (
         <div className="turn-end">
           {fmtStamp(turnEnd)}
@@ -727,6 +506,42 @@ const NoticeBanner = memo(function NoticeBanner({ item, t }: { item: NoticeItem;
               : ''}
           {dropped !== undefined && dropped > 0 && ` · −${fmtTk(dropped)}`}
           {c.durationMs !== undefined && ` · ${fmtMs(c.durationMs)}`}
+        </span>
+        {item.ts && <span className="notice-banner-time">{fmtStamp(item.ts)}</span>}
+      </div>
+    );
+  }
+  if (item.topic === 'compacting') {
+    return (
+      <div className="notice-banner compact-banner" id={`msg-${item.id}`}>
+        <span className="notice-banner-spinner" aria-hidden="true" />
+        <span className="notice-banner-label">{t('activity.compacting')}</span>
+        {item.ts && <span className="notice-banner-time">{fmtStamp(item.ts)}</span>}
+      </div>
+    );
+  }
+  if (item.topic === 'session_gone') {
+    return (
+      <div className="notice-banner" id={`msg-${item.id}`}>
+        <span className="notice-banner-mark">⚠</span>
+        <span className="notice-banner-text">{t('timeline.sessionGone')}</span>
+      </div>
+    );
+  }
+  if (item.topic === 'local_command' || item.topic === 'local_command_error') {
+    const err = item.topic === 'local_command_error';
+    return (
+      <div className={`notice-banner local-command${err ? ' error' : ''}`} id={`msg-${item.id}`}>
+        <span className="notice-banner-mark">›</span>
+        <span className="notice-banner-label">{t('timeline.commandOutput')}</span>
+        <span className="notice-banner-text">
+          {item.text.split(/(`[^`]+`)/g).map((part, i) =>
+            part.length > 2 && part.startsWith('`') && part.endsWith('`') ? (
+              <code key={i}>{part.slice(1, -1)}</code>
+            ) : (
+              <span key={i}>{part}</span>
+            ),
+          )}
         </span>
         {item.ts && <span className="notice-banner-time">{fmtStamp(item.ts)}</span>}
       </div>
@@ -870,6 +685,29 @@ function AssistantContent({
   );
 }
 
+const PEEK_LINES = 3;
+
+/**
+ * What a collapsed Bash card shows: the command itself, at most PEEK_LINES lines. A single call
+ * shows its first lines; a merged card shows one line per command. `cut` says something is
+ * hidden, so the last line fades out only then.
+ */
+function bashPeek(items: ToolItem[]): { text: string; cut: boolean } | undefined {
+  const cmds = items
+    .map((it) => (it.input as Record<string, unknown> | undefined)?.command)
+    .filter((c): c is string => typeof c === 'string' && c.trim() !== '')
+    .map((c) => c.replace(/\s+$/, '').split('\n'));
+  if (cmds.length === 0) return undefined;
+  if (cmds.length === 1) {
+    const lines = cmds[0];
+    return { text: lines.slice(0, PEEK_LINES).join('\n'), cut: lines.length > PEEK_LINES };
+  }
+  const shown = cmds.slice(0, PEEK_LINES);
+  const text = shown.map((l) => (l.length > 1 ? `${l[0]} …` : l[0])).join('\n');
+  const last = shown[shown.length - 1];
+  return { text, cut: cmds.length > PEEK_LINES || last.length > 1 };
+}
+
 /** Aggregated status of a (merged) tool card: error when any failed, busy while any runs. */
 function toolStatus(items: ToolItem[]): 'ok' | 'busy' | 'err' {
   if (items.some((i) => i.isError)) return 'err';
@@ -882,6 +720,8 @@ function ToolCard({ items, t, defaultOpen }: { items: ToolItem[]; t: Translator;
   useEffect(() => setOpen(defaultOpen), [defaultOpen]);
   const item = items[0]; // primary (header)
   const last = items[items.length - 1];
+  const peek = !open && item.name === 'Bash' ? bashPeek(items) : undefined;
+  const peekHtml = useMemo(() => (peek ? highlightCode(peek.text, 'bash').html : ''), [peek?.text]);
   const merged = items.length > 1;
   const statusCls = toolStatus(items);
   const input = (item.input ?? {}) as Record<string, unknown>;
@@ -946,6 +786,13 @@ function ToolCard({ items, t, defaultOpen }: { items: ToolItem[]; t: Translator;
         <div className="tool-end-banner">
           {t('tool.endConversation')}
           {endReason && <span className="tool-end-reason"> — {endReason}</span>}
+        </div>
+      )}
+      {peek && (
+        <div className={`tool-peek${peek.cut ? ' cut' : ''}`} onClick={() => setOpen(true)}>
+          <pre className="tool-peek-code">
+            <code className="hljs" dangerouslySetInnerHTML={{ __html: peekHtml }} />
+          </pre>
         </div>
       )}
       {open && (
@@ -1101,9 +948,9 @@ function AskCard({
       {questions.map((q, i) => {
         const known = new Set(q.options.map((o) => o.label));
         const { core, note } = splitAnswerNote(answerOf(q.question), known);
-        const tokens = core ? core.split(',').map((s) => s.trim()).filter(Boolean) : [];
-        const picked = new Set(tokens.filter((tk) => known.has(tk)));
-        const other = tokens.filter((tk) => !known.has(tk)).join(', ');
+        const choices = parseChoices(core, known);
+        const picked = new Set(choices.picked);
+        const other = choices.other;
         return (
           <div className="ask-card-q" key={i}>
             <div className="ask-card-qhead">

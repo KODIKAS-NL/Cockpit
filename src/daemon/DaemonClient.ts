@@ -61,9 +61,14 @@ export class DaemonClient {
     this.post({ op: 'send', sessionId, msg });
   }
 
-  /** Sets the conversation's auto-compact limit in the daemon (applies on the process's next start). */
+  /** Sets the conversation's auto-compact limit in the daemon; it restarts the process to apply it. */
   autoCompact(sessionId: string, value: string): void {
     this.post({ op: 'autocompact', sessionId, value });
+  }
+
+  /** The spec the daemon uses the next time it (re)starts the session's process. */
+  respec(sessionId: string, spawn: SpawnSpec): void {
+    this.post({ op: 'respec', sessionId, spawn });
   }
 
   /** Turns the session's Remote Control bridge on or off; `url` is the pairing link once on. */

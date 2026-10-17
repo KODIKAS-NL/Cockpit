@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { joinAnswer, splitAnswerNote } from '../webview/src/askAnswer';
+import { joinAnswer, splitAnswerNote, parseChoices } from '../webview/src/askAnswer';
 
 // O editor por pergunta do modal do Ask acrescenta texto às escolhas. O card da timeline
 // precisa desfazer isso, ou a opção escolhida apareceria apagada e tudo viraria "Outro".
@@ -33,5 +33,17 @@ describe('Ask — texto acrescentado às escolhas', () => {
     // Resposta puramente escrita, mesmo com várias linhas: segue inteira ("Outro").
     const ans = 'talvez\nnão sei ainda';
     expect(splitAnswerNote(ans, known)).toEqual({ core: ans });
+  });
+
+  it('reconhece labels que contêm vírgula', () => {
+    const known = new Set(['Each command, 1 line', 'Last command only', 'Command']);
+    expect(parseChoices('Each command, 1 line', known)).toEqual({ picked: ['Each command, 1 line'], other: '' });
+    expect(parseChoices('Command, Each command, 1 line', known)).toEqual({
+      picked: ['Command', 'Each command, 1 line'],
+      other: '',
+    });
+    expect(parseChoices('Command, something typed', known)).toEqual({ picked: ['Command'], other: 'something typed' });
+    expect(parseChoices('just text', known)).toEqual({ picked: [], other: 'just text' });
+    expect(splitAnswerNote('Each command, 1 line\nnote', known)).toEqual({ core: 'Each command, 1 line', note: 'note' });
   });
 });

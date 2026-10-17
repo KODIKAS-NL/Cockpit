@@ -19,8 +19,12 @@ export interface DaemonOptions {
   stateFile?: string;
   /** Stop a CLI that is idle, unattended and has no prompt waiting for this long. 0 = never. */
   idleStopHours?: number;
+  /** Delays between restarts of a crashed Remote Control session (tests shorten them). */
+  keepAliveBackoffMs?: number[];
   log?: (msg: string) => void;
 }
+
+const KEEPALIVE_STAGGER_MS = 500;
 
 interface Connection extends SessionClient {
   socket: net.Socket;
@@ -70,13 +74,21 @@ export class Daemon {
       this.idleTimer.unref?.();
     }
     this.log(`listening on ${this.opts.socketPath} (${this.sessions.size} sessions known)`);
+    // Remote Control was on: the phone can only reach a running process. Staggered, so a
+    // daemon restart doesn't start every CLI at once.
+    let n = 0;
+    for (const s of this.sessions.values()) {
+      if (!s.hasRemote()) continue;
+      const t = setTimeout(() => s.keepAlive(), KEEPALIVE_STAGGER_MS * n++);
+      t.unref?.();
+    }
   }
 
   /** Ends every CLI and closes the socket. */
   async shutdown(): Promise<void> {
     if (this.idleTimer) clearInterval(this.idleTimer);
     this.flushSave();
-    for (const s of this.sessions.values()) s.stop();
+    for (const s of this.sessions.values()) s.dispose();
     for (const c of this.connections) c.socket.destroy();
     await new Promise<void>((resolve) => (this.server ? this.server.close(() => resolve()) : resolve()));
     try {
@@ -171,9 +183,9 @@ export class Daemon {
         return;
       }
       case 'open': {
-        const session = this.findOrCreate(msg.cwd, msg.cliSessionId, msg.spawn);
+        const { session, started } = this.findOrCreate(msg.cwd, msg.cliSessionId, msg.spawn);
         conn.sessions.add(session.id);
-        const snapshot = session.attach(conn);
+        const snapshot = { ...session.attach(conn), started };
         conn.send({ type: 'snapshot', reqId: msg.reqId, snapshot });
         return;
       }
@@ -192,6 +204,13 @@ export class Daemon {
       case 'autocompact':
         this.need(msg.sessionId).setAutoCompact(msg.value);
         return;
+      case 'respec': {
+        // Settings the window switched live: the next (re)start must use them too.
+        const s = this.need(msg.sessionId);
+        s.spec = msg.spawn;
+        this.scheduleSave();
+        return;
+      }
       case 'send':
         this.need(msg.sessionId).send(conn, msg.msg);
         return;
@@ -202,7 +221,8 @@ export class Daemon {
       case 'forget': {
         const s = this.need(msg.sessionId);
         this.log(`[${s.id}] forget (${s.info().cliSessionId ?? 'no CLI session yet'}) requested by ${conn.id}`);
-        s.stop();
+        s.announceGone();
+        s.dispose();
         this.sessions.delete(s.id);
         this.scheduleSave();
         const { reqId } = msg;
@@ -225,18 +245,23 @@ export class Daemon {
    * running takes the newest spawn spec (the window may have changed model or permission
    * mode since); a running one keeps what it was started with.
    */
-  private findOrCreate(cwd: string, cliSessionId: string | undefined, spec: PersistedSession['spec']): DaemonSession {
+  private findOrCreate(
+    cwd: string,
+    cliSessionId: string | undefined,
+    spec: PersistedSession['spec'],
+  ): { session: DaemonSession; started: boolean } {
     const cwdKey = normalizeCwd(cwd);
     const wanted = cliSessionId ?? resumeIdOf(spec.args);
     if (wanted) {
       for (const s of this.sessions.values()) {
         if (s.cwdKey !== cwdKey || s.cliSessionId !== wanted) continue;
-        if (!s.isRunning()) {
+        const started = !s.isRunning();
+        if (started) {
           s.spec = spec;
           this.scheduleSave();
         }
         s.ensureRunning();
-        return s;
+        return { session: s, started };
       }
     }
     const now = Date.now();
@@ -252,7 +277,7 @@ export class Daemon {
     this.sessions.set(session.id, session);
     session.ensureRunning();
     this.scheduleSave();
-    return session;
+    return { session, started: true };
   }
 
   /**
@@ -262,13 +287,17 @@ export class Daemon {
    */
   private releaseIfUnused(s: DaemonSession): void {
     if (s.clientCount() > 0 || s.cliSessionId || s.isBusy()) return;
-    s.stop();
+    s.dispose();
     this.sessions.delete(s.id);
     this.scheduleSave();
   }
 
   private makeSession(data: PersistedSession): DaemonSession {
-    return new DaemonSession(data, { log: this.log, changed: () => this.scheduleSave() });
+    return new DaemonSession(data, {
+      log: this.log,
+      changed: () => this.scheduleSave(),
+      keepAliveBackoffMs: this.opts.keepAliveBackoffMs,
+    });
   }
 
   private stopIdle(maxIdleMs: number): void {

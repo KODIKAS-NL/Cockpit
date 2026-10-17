@@ -12,6 +12,7 @@ interface Props {
   t: Translator;
   req: PermissionRequest;
   onDecision: (d: 'allow' | 'deny' | 'allow_always', message?: string, mode?: string) => void;
+  planApproval?: string; // last plan-approval choice: 'default' | 'acceptEdits' | 'auto'
 }
 
 // Line icon per tool.
@@ -25,20 +26,23 @@ const TOOL_ICON: Record<string, IconName> = {
   WebSearch: 'search',
 };
 
-export function PermissionModal({ t, req, onDecision }: Props) {
+export function PermissionModal({ t, req, onDecision, planApproval }: Props) {
   useEffect(() => {
     // Only Ctrl/Cmd+Enter decides anything here: a stray Escape (or a click outside the
     // dialog, see the overlay below) must not silently deny a tool the user meant to allow.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) onDecision('allow');
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        const m = req.tool === 'ExitPlanMode' && planApproval && planApproval !== 'default' ? planApproval : undefined;
+        onDecision('allow', undefined, m);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onDecision]);
+  }, [onDecision, req.tool, planApproval]);
 
   // Plan mode: ExitPlanMode arrives as a permission; the plan comes in input.plan.
   if (req.tool === 'ExitPlanMode') {
-    return <PlanModal t={t} req={req} onDecision={onDecision} />;
+    return <PlanModal t={t} req={req} onDecision={onDecision} planApproval={planApproval} />;
   }
 
   const inp = (req.input ?? {}) as Record<string, unknown>;
@@ -217,13 +221,14 @@ function clip(s: string, n: number): string {
 // in the editor); this card keeps only the approval gate and a link to that file, plus an
 // optional notes box for "Keep planning". When the host could not write the file — an older CLI,
 // or no workspace — it falls back to showing the plan inline, editable, as before.
-function PlanModal({ t, req, onDecision }: Props) {
+function PlanModal({ t, req, onDecision, planApproval }: Props) {
   const plan = String((req.input as Record<string, unknown>)?.plan ?? '');
   const planFile = req.planFile;
   const [editing, setEditing] = useState(false);
   const [maximized, setMaximized] = useState(false);
   const [draft, setDraft] = useState(plan);
   const [notes, setNotes] = useState('');
+  const remembered = planApproval === 'acceptEdits' || planApproval === 'auto' ? planApproval : 'default';
 
   // With a file, "Keep planning" carries the notes box; inline, it carries the edited plan.
   const edited = draft.trim() !== plan.trim();
@@ -232,7 +237,7 @@ function PlanModal({ t, req, onDecision }: Props) {
       ? onDecision('deny', notes.trim() || undefined)
       : onDecision('deny', edited ? draft : undefined);
 
-  const openPlan = () => planFile && send({ kind: 'openLink', href: planFile });
+  const openPlan = () => planFile && send({ kind: 'openLink', href: planFile, preview: true });
 
   return (
     <Portal>
@@ -309,15 +314,23 @@ function PlanModal({ t, req, onDecision }: Props) {
                 ? t('permission.planSendNotes')
                 : t('permission.keepPlanning')}
             </button>
-            <button type="button" className="btn" onClick={() => onDecision('allow', undefined, 'acceptEdits')}>
-              {t('permission.approvePlanEdits')}
-            </button>
-            <button type="button" className="btn" onClick={() => onDecision('allow', undefined, 'auto')}>
-              {t('permission.approvePlanAuto')}
-            </button>
-            <button type="button" className="btn send" onClick={() => onDecision('allow')}>
-              {t('permission.approvePlan')}
-            </button>
+            {(
+              [
+                ['acceptEdits', 'permission.approvePlanEdits'],
+                ['auto', 'permission.approvePlanAuto'],
+                ['default', 'permission.approvePlan'],
+              ] as const
+            ).map(([mode, key]) => (
+              <button
+                key={mode}
+                type="button"
+                className={`btn${remembered === mode ? ' send' : ''}`}
+                autoFocus={remembered === mode}
+                onClick={() => onDecision('allow', undefined, mode === 'default' ? undefined : mode)}
+              >
+                {t(key)}
+              </button>
+            ))}
           </div>
         </div>
       </div>

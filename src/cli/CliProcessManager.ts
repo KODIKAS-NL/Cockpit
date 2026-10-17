@@ -363,7 +363,8 @@ export class CliProcessManager extends EventEmitter implements CliProcess {
     const done = this.pendingControl.get(id);
     if (!done) return;
     this.pendingControl.delete(id);
-    done(resp?.subtype === 'success' ? resp.response : undefined);
+    // Success without a payload (`set_model`) is still a success: {} vs. undefined = failed.
+    done(resp?.subtype === 'success' ? (resp.response ?? {}) : undefined);
   }
 
   private writeLine(obj: unknown): void {

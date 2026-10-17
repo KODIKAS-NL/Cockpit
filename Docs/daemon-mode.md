@@ -75,6 +75,12 @@ It does:
   the message being written right now and the prompts still waiting.
 - **Remember its sessions.** Across a restart or reboot, sessions are listed as idle and are
   resumed with `--resume` on the next message.
+- **Keep Remote Control reachable.** A session with Remote Control on always has a process:
+  it is started when the daemon starts and again after it exits, then the bridge is turned
+  back on. A crash is retried with a back-off (2s, 10s, 30s, 60s); after 5 quick crashes in a
+  row Remote Control is turned off and the windows show it as off.
+- **Restart for start-only settings.** The auto-compact limit is read by the CLI only at
+  start, so changing it restarts the process: at once when idle, after the turn when busy.
 - **Tidy up.** A session that never received a message is dropped when no window holds it.
   Optionally, an idle process with nobody attached is stopped after a set number of hours.
 
@@ -83,7 +89,9 @@ It doesn't:
 - Interpret the conversation, store history, or talk to the network. It never sees your
   API credentials: the CLI reads those itself, as usual.
 - Decide anything for you. Settings (model, effort, permission mode, system prompt) are chosen
-  in the window, which builds the CLI's argument list and hands it to the daemon.
+  in the window, which builds the CLI's argument list and hands it to the daemon. Model, effort
+  and permission mode are switched in the running process (the CLI's own control requests),
+  and the window sends the updated argument list (`respec`) for the next start.
 - Work across machines. The socket is local to the machine.
 
 ## How the main flows work
@@ -273,11 +281,17 @@ Window → daemon (`op`):
 | `open` | Attach to (or start, or create) the session for a folder + CLI session id. Answered with `snapshot`. |
 | `send` | One JSON line for the CLI's stdin. |
 | `detach` | Stop following a session; it keeps running. |
-| `stop` | End the process; the session stays listed (idle). |
+| `stop` | End the process; the session stays listed (idle). With Remote Control on it is started again. |
 | `forget` | End the process and drop the session. |
+| `remote` | Turn Remote Control on or off inside the session's process. Answered with `remote_result`. |
+| `autocompact` | Set the conversation's auto-compact limit; a running process restarts to apply it. |
+| `respec` | Replace the argument list used for the next (re)start, leaving the running process alone. |
 
 Daemon → window (`type`): `hello_ok`, `sessions`, `snapshot`, `event` (one CLI line,
-unchanged), `control_settled`, `remote_user`, `rejected`, `exit`, `stderr`, `error`.
+unchanged), `control_settled`, `remote_user`, `remote_result`, `remote_state`,
+`autocompact_state`, `rejected`, `exit`, `stderr`, `error`. The `snapshot` says whether this
+`open` started the process (`started`); when it didn't, the process still runs with the
+settings it was started with.
 
 The CLI's arguments travel in `open` as a list built by the window. Files the CLI must read
 are sent as contents: an argument `@file:<name>` is replaced by the path of a temporary file

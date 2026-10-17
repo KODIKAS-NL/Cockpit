@@ -33,10 +33,10 @@ export interface TabState {
   // each process is doing. `bgBusy` = derived (bgTasks.length > 0).
   bgTasks?: BackgroundTask[];
   bgBusy?: boolean;
-  // A aba foi entregue a uma sessão de Remote Control no terminal: quem conduz é o
-  // terminal/celular, e o composer daqui fica fora do caminho.
+  // Remote Control (the daemon's bridge) is on for this conversation: the phone / claude.ai/code
+  // can follow and drive it, while this window keeps working too.
   remote?: boolean;
-  remotePhase?: 'connecting' | 'active' | 'failed' | 'cloud' | 'offline';
+  remotePhase?: 'connecting' | 'active' | 'failed';
   compacting?: boolean; // o CLI está condensando o contexto agora
   sessionId?: string; // id do transcript (casa com SessionInfo.id); vem do 'tabs'
   surface?: 'sidebar' | 'editor'; // where the host shows this conversation; vem do 'tabs'
@@ -330,15 +330,29 @@ function tabReducer(tab: TabState, msg: HostToWebview): TabState {
     // Compactação (S11): enquanto acontece é só um estado (o turno não travou); a fronteira
     // vira faixa na linha do tempo com o tamanho antes/depois.
     case 'compaction': {
-      if (msg.active) return { ...tab, compacting: true };
+      const open = tab.items.findIndex((i) => i.kind === 'notice' && i.topic === 'compacting');
+      if (msg.active) {
+        if (open >= 0) return { ...tab, compacting: true };
+        const started: NoticeItem = {
+          kind: 'notice',
+          id: `compacting:${Date.now()}`,
+          text: '',
+          topic: 'compacting',
+          ts: Date.now(),
+        };
+        return { ...tab, compacting: true, items: [...tab.items, started] };
+      }
       const base = { ...tab, compacting: false };
-      if (msg.pre === undefined && msg.post === undefined) return base;
+      // Ended without a boundary (interrupted, error): nothing was condensed.
+      if (msg.pre === undefined && msg.post === undefined) {
+        return open >= 0 ? { ...base, items: base.items.filter((_, i) => i !== open) } : base;
+      }
       const item: NoticeItem = {
         kind: 'notice',
         id: `compact:${msg.pre ?? '?'}:${Date.now()}`,
         text: '',
         topic: 'compact_boundary',
-        ts: Date.now(),
+        ts: open >= 0 ? (tab.items[open] as NoticeItem).ts : Date.now(),
         compaction: {
           pre: msg.pre,
           post: msg.post,
@@ -346,6 +360,7 @@ function tabReducer(tab: TabState, msg: HostToWebview): TabState {
           durationMs: msg.durationMs,
         },
       };
+      if (open >= 0) return { ...base, items: base.items.map((it, i) => (i === open ? item : it)) };
       return { ...base, items: [...base.items, item] };
     }
     // Texto de subagente encaminhado pelo CLI: acumula no card do Task que o lançou.

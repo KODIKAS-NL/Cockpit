@@ -125,6 +125,9 @@ async function peer(id: string): Promise<Peer> {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const FAST_BACKOFF = [50, 50, 50, 50];
+const spawnsOf = (resumeId: string) => cliLog().filter((l) => l.argv && l.argv.includes(resumeId));
+const remoteEnables = () => cliLog().filter((l) => l.request?.subtype === 'remote_control' && l.request.enabled === true);
 
 async function until(cond: () => boolean, ms = 4000): Promise<void> {
   const end = Date.now() + ms;
@@ -141,7 +144,7 @@ beforeEach(async () => {
   logFile = path.join(dir, 'cli.log');
   project = path.join(dir, 'project');
   fs.mkdirSync(path.join(project, 'sub'), { recursive: true });
-  daemon = new Daemon({ socketPath: sock, stateFile: state });
+  daemon = new Daemon({ socketPath: sock, stateFile: state, keepAliveBackoffMs: FAST_BACKOFF });
   await daemon.start();
 });
 
@@ -290,35 +293,123 @@ describe('cockpit-daemon', () => {
     const s = await a.open(project, spec({ args: ['--resume', 'sess-c', '--autocompact', '300000'] }));
     expect(s.session.autoCompact).toBe('300000');
     await b.open(project, spec(), 'sess-c');
+    await until(() => spawnsOf('sess-c').length === 1); // up (a kill before then leaves no record)
+    // Idle and running: the daemon restarts the process itself, with the new limit.
     a.write({ op: 'autocompact', sessionId: s.session.id, value: '500000' });
     const seen = (await b.wait((m) => m.type === 'autocompact_state')) as any;
     expect(seen.value).toBe('500000');
-    // The process stops; a window with another setting opens it again: the stored value still wins.
-    a.write({ op: 'stop', sessionId: s.session.id });
-    await a.wait((m) => m.type === 'exit');
-    const before = cliLog().filter((l) => l.argv).length;
-    const snap = await b.open(project, spec({ args: ['--autocompact', '150000'] }), 'sess-c');
-    expect(snap.session.autoCompact).toBe('500000');
-    await until(() => cliLog().filter((l) => l.argv).length > before);
-    const argv = cliLog().filter((l) => l.argv).pop().argv as string[];
+    await until(() => spawnsOf('sess-c').length === 2);
+    let argv = spawnsOf('sess-c').pop().argv as string[];
     expect(argv.filter((x) => x === '--autocompact').length).toBe(1);
     expect(argv[argv.indexOf('--autocompact') + 1]).toBe('500000');
-    // Off becomes the environment switch, with no window argument left over.
-    a.write({ op: 'autocompact', sessionId: s.session.id, value: 'off' });
-    await b.wait((m) => m.type === 'autocompact_state' && (m as any).value === 'off');
-    b.write({ op: 'stop', sessionId: s.session.id });
-    await until(() => b.msgs.filter((m) => m.type === 'exit').length >= 2);
-    const n = cliLog().filter((l) => l.argv).length;
+    // The windows stay attached to the new process.
+    b.user(s.session.id, 'after the restart');
+    await a.wait((m) => m.type === 'event' && (m as any).event.result === 'echo after the restart');
+    // The process stops; a window with another setting opens it again: the stored value still wins.
+    a.write({ op: 'stop', sessionId: s.session.id });
+    await until(() => a.msgs.filter((m) => m.type === 'exit').length >= 2);
+    a.write({ op: 'detach', sessionId: s.session.id });
     b.write({ op: 'detach', sessionId: s.session.id });
-    await b.open(project, spec({ args: ['--autocompact', '200000'] }), 'sess-c');
-    await until(() => cliLog().filter((l) => l.argv).length > n);
-    const rec = cliLog().filter((l) => l.argv).pop();
+    const snap = await b.open(project, spec({ args: ['--autocompact', '150000'] }), 'sess-c');
+    expect(snap.session.autoCompact).toBe('500000');
+    await until(() => spawnsOf('sess-c').length === 3);
+    argv = spawnsOf('sess-c').pop().argv as string[];
+    expect(argv[argv.indexOf('--autocompact') + 1]).toBe('500000');
+    // Off becomes the environment switch, with no window argument left over.
+    b.write({ op: 'autocompact', sessionId: s.session.id, value: 'off' });
+    await until(() => spawnsOf('sess-c').length === 4);
+    const rec = spawnsOf('sess-c').pop();
     expect(rec.argv).not.toContain('--autocompact');
     expect(rec.env.DISABLE_AUTO_COMPACT).toBe('1');
     // A value outside the CLI's range is ignored.
-    a.write({ op: 'autocompact', sessionId: s.session.id, value: '5' });
+    b.write({ op: 'autocompact', sessionId: s.session.id, value: '5' });
     await sleep(100);
-    expect((await a.list()).find((x) => x.id === s.session.id).autoCompact).toBe('off');
+    expect((await b.list()).find((x) => x.id === s.session.id).autoCompact).toBe('off');
+  });
+
+  it('applies an auto-compact change made mid-turn once the turn is over', async () => {
+    const a = await peer('A');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-cb'] }));
+    a.user(s.session.id, 'SLOW turn');
+    await a.wait((m) => m.type === 'event' && (m as any).event.type === 'stream_event');
+    a.write({ op: 'autocompact', sessionId: s.session.id, value: '400000' });
+    await a.wait((m) => m.type === 'autocompact_state');
+    await sleep(100);
+    expect(spawnsOf('sess-cb').length).toBe(1); // the turn is not cut short
+    const result = (await a.wait((m) => m.type === 'event' && (m as any).event.type === 'result')) as any;
+    expect(result.event.result).toBe('slow done');
+    await until(() => spawnsOf('sess-cb').length === 2);
+    const argv = spawnsOf('sess-cb').pop().argv as string[];
+    expect(argv[argv.indexOf('--autocompact') + 1]).toBe('400000');
+  });
+
+  it('starts the next process from a spec a window switched live', async () => {
+    const a = await peer('A');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-sp', '--model', 'old-model'] }));
+    expect(s.started).toBe(true);
+    await until(() => spawnsOf('sess-sp').length === 1);
+    a.write({ op: 'respec', sessionId: s.session.id, spawn: spec({ args: ['--model', 'new-model'] }) });
+    await sleep(50);
+    expect(spawnsOf('sess-sp').length).toBe(1); // the running process is left alone
+    a.write({ op: 'stop', sessionId: s.session.id });
+    await a.wait((m) => m.type === 'exit');
+    a.user(s.session.id, 'again');
+    await until(() => spawnsOf('sess-sp').length === 2);
+    const argv = spawnsOf('sess-sp').pop().argv as string[];
+    expect(argv[argv.indexOf('--model') + 1]).toBe('new-model');
+    // A second window attaching to the running process did not start it.
+    const b = await peer('B');
+    expect((await b.open(project, spec(), 'sess-sp')).started).toBe(false);
+  });
+
+  it('starts a Remote Control session\'s process when the daemon starts', async () => {
+    const a = await peer('A');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-k'] }));
+    a.write({ op: 'remote', sessionId: s.session.id, on: true, reqId: 'rk1' });
+    await a.wait((m) => m.type === 'remote_result');
+    a.close();
+    await daemon.shutdown();
+    const enables = remoteEnables().length;
+    daemon = new Daemon({ socketPath: sock, stateFile: state, keepAliveBackoffMs: FAST_BACKOFF });
+    await daemon.start();
+    // No window sends anything: the phone must still find a running process.
+    await until(() => spawnsOf('sess-k').length === 2 && remoteEnables().length > enables);
+    const b = await peer('B');
+    const info = (await b.list(project)).find((x) => x.id === s.session.id);
+    expect(info.state).toBe('running');
+    expect(info.remote?.on).toBe(true);
+  });
+
+  it('restarts a Remote Control session after a crash, and gives up when it keeps crashing', async () => {
+    const dieFlag = path.join(dir, 'die');
+    const a = await peer('A');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-x'], env: { FAKE_EXIT_IF: dieFlag } }));
+    a.write({ op: 'remote', sessionId: s.session.id, on: true, reqId: 'rx1' });
+    await a.wait((m) => m.type === 'remote_result');
+    const enables = remoteEnables().length;
+    a.user(s.session.id, 'CRASH now');
+    await until(() => spawnsOf('sess-x').length === 2 && remoteEnables().length > enables);
+    expect(a.msgs.some((m) => m.type === 'remote_state' && (m as any).on === false)).toBe(false);
+    // From now on every start dies at once: after a few tries it is shown as off.
+    fs.writeFileSync(dieFlag, '1');
+    a.user(s.session.id, 'CRASH again');
+    await a.wait((m) => m.type === 'remote_state' && (m as any).on === false, 5000);
+    expect((await a.list()).find((x) => x.id === s.session.id).remote).toBeUndefined();
+    const n = spawnsOf('sess-x').length;
+    await sleep(300);
+    expect(spawnsOf('sess-x').length).toBe(n); // and it stops trying
+  });
+
+  it('does not bring back a forgotten Remote Control session', async () => {
+    const a = await peer('A');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-fg'] }));
+    await until(() => spawnsOf('sess-fg').length === 1);
+    a.write({ op: 'remote', sessionId: s.session.id, on: true, reqId: 'rg1' });
+    await a.wait((m) => m.type === 'remote_result');
+    a.write({ op: 'forget', sessionId: s.session.id, reqId: 'fg1' });
+    await a.wait((m) => m.type === 'forgotten');
+    await sleep(1500);
+    expect(spawnsOf('sess-fg').length).toBe(1);
   });
 
   it('lets the first answer win and tells the other windows', async () => {
@@ -482,6 +573,16 @@ describe('cockpit-daemon', () => {
     expect(exitAt).toBeGreaterThanOrEqual(0);
     expect(exitAt).toBeLessThan(forgottenAt);
     expect(await a.list(project)).toEqual([]);
+  });
+
+  it('tells the other windows when a conversation is forgotten', async () => {
+    const a = await peer('A');
+    const b = await peer('B');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-11'] }));
+    await b.open(project, spec({ args: ['--resume', 'sess-11'] }));
+    a.write({ op: 'forget', sessionId: s.session.id, reqId: 'f2' });
+    const gone: any = await b.wait((m) => m.type === 'gone');
+    expect(gone.sessionId).toBe(s.session.id);
   });
 
   it('replaces a stale socket file and refuses to run twice', async () => {

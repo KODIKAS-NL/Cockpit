@@ -63,11 +63,9 @@ export const ptBR: Partial<Strings> = {
   // Cofre de credenciais (TOTP 2FA)
   'creds.open': 'Cofre de credenciais (2FA)',
   'remote.publish': 'Tornar esta sessão visível no cliente remoto / app',
-  'remote.active': 'Sob Controle remoto — clique para desligar (encerra o terminal)',
-  'remote.connecting': 'Conectando o Controle remoto — aguardando a sessão no terminal',
-  'remote.failed': 'Controle remoto caiu — veja o motivo no terminal; clique para reconectar',
-  'remote.cloud': 'Rodando na nuvem — controlado pelo claude.ai/code ou pelo app; clique para retomar',
-  'remote.offline': 'Controle remoto offline — a conexão caiu; clique para reconectar',
+  'remote.active': 'Controle remoto ligado — o celular e o claude.ai/code acompanham esta sessão; clique para desligar',
+  'remote.connecting': 'Conectando o Controle remoto…',
+  'remote.failed': 'O Controle remoto não pôde iniciar — clique para tentar de novo',
   'creds.title': 'Cofre de credenciais',
   'creds.enroll.intro':
     'Proteja o cofre com um app autenticador (Google Authenticator, Authy…). Um código é exigido para adicionar e para usar qualquer credencial.',
@@ -163,10 +161,7 @@ export const ptBR: Partial<Strings> = {
   'attach.remove': 'Remover anexo',
   'attach.view': 'Ver imagem',
 
-  'activity.working': 'Processando…',
   'activity.compacting': 'Compactando o contexto…',
-  'activity.sent': 'Tokens enviados',
-  'activity.received': 'Tokens recebidos',
 
   'tip.time': 'Horário',
   'tip.details': 'Detalhes',
@@ -653,6 +648,8 @@ export const ptBR: Partial<Strings> = {
   'timeline.hookSkill': 'skill carregada por hook: {0}',
   'timeline.showEarlier': 'Mostrar mensagens anteriores ({0})',
   'timeline.hookContext': 'contexto injetado por hook',
+  'timeline.commandOutput': 'saída do comando',
+  'timeline.sessionGone': 'Esta conversa foi apagada em outra janela. Sua próxima mensagem inicia uma nova.',
   'timeline.engineNotice': 'aviso do engine',
   'timeline.compactAuto': 'contexto compactado (auto)',
   'timeline.compactManual': 'contexto compactado (manual)',

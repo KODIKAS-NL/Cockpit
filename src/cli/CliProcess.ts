@@ -8,6 +8,7 @@
 // Events (EventEmitter): 'event' (ClaudeEvent), 'exit' (code|null), 'stderr' (text).
 // RemoteCliProcess adds 'snapshot', 'settled' and 'remoteUser' (see there).
 import type { EventEmitter } from 'node:events';
+import type { CliOptions } from './CliProcessManager';
 
 export interface CliProcess extends EventEmitter {
   start(): void;
@@ -26,6 +27,11 @@ export interface CliProcess extends EventEmitter {
    * daemon). For a process the extension host owns, there is nothing to let go of: it stops.
    */
   detach(): void;
+  /**
+   * Settings switched live (model, effort, permission mode) that a later restart must keep.
+   * Only the daemon restarts on its own; a local process is respawned from fresh options.
+   */
+  updateOptions?(patch: Partial<CliOptions>): void;
   /** True when the process outlives this window (daemon mode). */
   readonly persistent: boolean;
 }

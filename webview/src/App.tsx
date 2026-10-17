@@ -24,7 +24,7 @@ import type {
 import { send } from './vscodeApi';
 import { createTranslator } from './i18n';
 import { CliMissing } from './components/CliMissing';
-import { Timeline, seedTaskTimings } from './components/Timeline';
+import { Timeline } from './components/Timeline';
 import { Composer } from './components/Composer';
 import { HubView } from './components/HubView';
 import { UsageModal } from './components/UsageModal';
@@ -117,12 +117,23 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
     return () => window.removeEventListener('keydown', h, true);
   }, [view]);
 
+  // Following the output switches off only when the reader scrolls UP. A scroll event caused by
+  // the content growing (a new card, Markdown laying out) leaves the gap to the bottom larger
+  // without the reader having moved, and must not count as "scrolled away".
+  const lastTopRef = useRef(0);
   const onScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
     const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-    atBottomRef.current = bottom;
-    setAtBottom(bottom);
+    const movedUp = el.scrollTop < lastTopRef.current - 1;
+    lastTopRef.current = el.scrollTop;
+    if (bottom) {
+      atBottomRef.current = true;
+      setAtBottom(true);
+    } else if (movedUp) {
+      atBottomRef.current = false;
+      setAtBottom(false);
+    }
   };
   const scrollToBottom = () => {
     const el = scrollRef.current;
@@ -132,7 +143,6 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       const data = e.data as HostToWebview;
-      if (data?.kind === 'taskTimings') seedTaskTimings(data.timings); // host averages for the gauge
       if (data?.kind === 'usageData') setUsage(data.data); // answer to the Usage button (hot data)
       if (data?.kind === 'effortGate') setConfirmEffort({ selected: data.selected, min: data.min });
       if (data?.kind === 'draftRestore' && data.text) setDraftRestore({ text: data.text, images: [] });
@@ -438,6 +448,22 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
   const cliLoading =
     !state.cli.checked || (!!tab?.sessionId && !tab.historyLoaded && tab.items.length === 0);
 
+  // The timeline can grow without `items` changing (Markdown and highlighting settling, a card
+  // collapsing or expanding, an image loading): while following, keep the end in view.
+  useEffect(() => {
+    const el = scrollRef.current;
+    const content = el?.firstElementChild;
+    if (!el || !content || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      if (atBottomRef.current) {
+        el.scrollTop = el.scrollHeight;
+        lastTopRef.current = el.scrollTop;
+      }
+    });
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [state.activeTab, cliLoading, view]);
+
   // Vault modal — shared between Hub and Chat. In the Hub there is no composer, so
   // "use" copies the value to the clipboard; in the Chat it injects into the composer (the
   // host sends 'credsValue' and the handler in onMsg decides by `view`).
@@ -652,11 +678,8 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
             userName={state.config?.userName}
             todos={tab?.todos ?? NO_TODOS}
             answers={tab?.answers}
-            busy={tab?.status === 'busy' || tab?.bgBusy === true}
-            stats={tab?.stats}
             onRewind={tab?.status === 'busy' ? undefined : onRewind}
             verbosity={state.config?.verbosity}
-            compacting={tab?.compacting === true}
           />
         </div>
         <ScrollMarkers scrollRef={scrollRef} items={items} />
@@ -723,6 +746,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
         correctEnabled={state.config?.voiceCorrect === true}
         spellCheck={state.config?.spellCheck === true}
         busy={tab?.status === 'busy'}
+        compacting={tab?.compacting === true}
         disabled={cliMissing}
         slashCommands={tab?.slashCommands ?? NO_SLASH}
         slashMeta={state.slashMeta}
@@ -760,7 +784,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
 
       {credsModalEl}
 
-      {tab?.permission && <PermissionModal t={t} req={tab.permission} onDecision={onPermission} />}
+      {tab?.permission && <PermissionModal t={t} req={tab.permission} onDecision={onPermission} planApproval={state.config?.planApproval} />}
 
       {tab?.ask && <AskQuestionModal t={t} req={tab.ask} onSubmit={onAsk} />}
 

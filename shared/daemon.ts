@@ -61,6 +61,11 @@ export interface SessionSnapshot {
   partial: unknown[];
   /** `control_request`s from the CLI nobody has answered yet, in arrival order. */
   pendingControl: unknown[];
+  /**
+   * This `open` started the process, from the spec it sent. False: the process was already
+   * running with the spec it was started with (settings changed since must be applied live).
+   */
+  started?: boolean;
 }
 
 export type ClientMessage =
@@ -75,8 +80,13 @@ export type ClientMessage =
   | { op: 'detach'; sessionId: string }
   /** Turns Remote Control on/off inside the session's own process. Answered with `remote_result`. */
   | { op: 'remote'; sessionId: string; on: boolean; reqId: string }
-  /** Sets the conversation's auto-compact limit; it applies from the next (re)start of the process. */
+  /** Sets the conversation's auto-compact limit; a running process is restarted to apply it (after the turn, when busy). */
   | { op: 'autocompact'; sessionId: string; value: string }
+  /**
+   * The spec for the session's next (re)start: settings the window switched live (model,
+   * effort, permission mode). The running process is left alone.
+   */
+  | { op: 'respec'; sessionId: string; spawn: SpawnSpec }
   /** One JSON line for the CLI's stdin (the same objects the CLI's stream-json takes). */
   | { op: 'send'; sessionId: string; msg: Record<string, unknown> }
   /** Ends the CLI process; the session stays listed (idle) and restarts on the next send. */
@@ -106,6 +116,8 @@ export type DaemonMessage =
   | { type: 'autocompact_state'; sessionId: string; value: string }
   | { type: 'remote_state'; sessionId: string; on: boolean; url?: string }
   | { type: 'exit'; sessionId: string; code: number | null }
+  /** The conversation was forgotten (deleted) by a window: every attached window lets go of it. */
+  | { type: 'gone'; sessionId: string }
   | { type: 'stderr'; sessionId: string; text: string }
   | { type: 'error'; reqId?: string; sessionId?: string; message: string };
 

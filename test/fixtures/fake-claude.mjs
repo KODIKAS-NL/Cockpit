@@ -16,7 +16,9 @@
 //  - `remote_control` {enabled} → success with a pairing link; once on, a prompt typed on the
 //    phone (`PHONE` in $FAKE_PHONE) starts a turn that no window sent, as a plain user event;
 //  - `FAKE_RC_FLAKY=<path>` makes the first `remote_control` enable after a good one fail once;
-//  - an allow answer carrying a `setMode` update reports that mode (`system/status`).
+//  - an allow answer carrying a `setMode` update reports that mode (`system/status`);
+//  - a text containing CRASH ends the process with code 3, mid-turn;
+//  - `FAKE_EXIT_IF=<path>`: exits with code 3 at start while that file exists (a CLI that keeps crashing).
 // Every line it receives is appended to $FAKE_LOG (argv first), so tests can check what
 // actually reached the CLI.
 import * as fs from 'node:fs';
@@ -27,6 +29,8 @@ const record = (obj) => {
   if (logFile) fs.appendFileSync(logFile, JSON.stringify(obj) + '\n');
 };
 record({ argv: process.argv.slice(2), cwd: process.cwd(), env: { FAKE_FLAG: process.env.FAKE_FLAG, DISABLE_AUTO_COMPACT: process.env.DISABLE_AUTO_COMPACT } });
+
+if (process.env.FAKE_EXIT_IF && fs.existsSync(process.env.FAKE_EXIT_IF)) process.exit(3);
 
 const out = (obj) => process.stdout.write(JSON.stringify(obj) + '\n');
 const resumeAt = process.argv.indexOf('--resume');
@@ -123,6 +127,7 @@ async function turn(msg) {
     out({ type: 'system', subtype: 'init', session_id: sessionId, model: 'fake', slash_commands: ['help'] });
   }
   const text = msg.message?.content?.find?.((b) => b.type === 'text')?.text ?? '';
+  if (text.includes('CRASH')) process.exit(3);
   if (text.includes('EXITPLAN')) {
     out({ type: 'system', subtype: 'status', status: null, permissionMode: 'default' });
     await sleep(150);

@@ -352,6 +352,7 @@ export interface SessionConfig {
   defaultModel?: string; // o que 'Default' resolve (settings.model ou init observado)
   defaultEffort?: string; // settings.effortLevel
   permissionMode: string;
+  planApproval?: string; // the last plan-approval choice: 'default' | 'acceptEdits' | 'auto'
   permissionModes: string[];
   allowAgents: boolean; // liberar agentes (Task) e workflows (Workflow); off economiza tokens
   autoCompact: string; // this conversation's auto-compact: 'auto' | 'off' | window in tokens
@@ -424,6 +425,7 @@ export interface PermissionSuggestion {
 // Item rebuilt from the transcript to render the history when resuming.
 export type HistoryItem =
   | { kind: 'user'; id: string; text: string; images?: string[]; ts?: number }
+  | { kind: 'notice'; id: string; text: string; topic?: string; ts?: number }
   | { kind: 'assistant'; id: string; text: string; thinking: string }
   | {
       kind: 'tool';
@@ -543,7 +545,6 @@ type HostMsg =
   | { kind: 'history'; items: HistoryItem[] }
   | { kind: 'resolvedPath'; requestId: string; text: string }
   | { kind: 'openSessions' }
-  | { kind: 'taskTimings'; timings: Record<string, number> } // averages per type, already in the current (model,effort) scope (gauge)
   | { kind: 'usageData'; data: UsageData } // resposta ao botão "Usage"
   | { kind: 'effortGate'; selected: string; min: string } // effort < the folder CLAUDE.md minimum: confirm first
   | { kind: 'voiceCorrected'; text: string } // ditado: texto corrigido (libera o input)
@@ -583,19 +584,13 @@ type HostMsg =
       trigger?: string;
       durationMs?: number;
     }
-  // The tab was handed over to an interactive Remote Control session in the terminal: the
-  // composer stops being the way in (the terminal / phone is), and the timeline keeps
-  // following the transcript that session writes.
-  // `phase` says what is KNOWN, not what was hoped for: 'connecting' while the interactive
-  // process hasn't registered itself yet, 'active' once it has, 'failed' when it never came up.
-  // After it has been `active`, the handover can end two ways the CLI distinguishes since
-  // 2.1.229: 'cloud' (a cloud/phone peer is still driving the session — it keeps going without
-  // our terminal) and 'offline' (the connection dropped and nobody owns it; the transcript is
-  // intact on disk). `active` stays for the composer's on/off state.
+  // Remote Control's bridge state for this conversation. `phase` says what is KNOWN, not what
+  // was hoped for: 'connecting' while the daemon's bridge has no pairing link yet, 'active' once
+  // it has, 'failed' when it could not be turned on. `active` is the on/off state.
   | {
       kind: 'remoteState';
       active: boolean;
-      phase?: 'connecting' | 'active' | 'failed' | 'cloud' | 'offline';
+      phase?: 'connecting' | 'active' | 'failed';
       detail?: string;
       url?: string; // the pairing link, once the daemon's bridge is up
     }
@@ -718,7 +713,6 @@ export type WebviewToHost =
   | { kind: 'setKeepCacheAlive'; value: boolean } // liga/desliga o keep-alive do cache desta aba
   | { kind: 'openEditor' }
   | { kind: 'openFolder'; path: string }
-  | { kind: 'taskDuration'; type: string; ms: number } // task duration sample (gauge)
   | { kind: 'rewind'; index: number } // rewinds the conversation to the (index)-th user prompt, removing it
   | { kind: 'voiceStart'; language?: string } // ditado: host abre o WS + captura o mic (ffmpeg)
   | { kind: 'voiceStop' } // ditado: finaliza a captura

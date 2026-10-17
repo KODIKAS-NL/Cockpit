@@ -61,11 +61,9 @@ export const en = {
   // Cofre de credenciais (TOTP 2FA)
   'creds.open': 'Credentials vault (2FA)',
   'remote.publish': 'Make this session visible on the remote client / app',
-  'remote.active': 'Under Remote Control — click to turn it off (closes the terminal)',
-  'remote.connecting': 'Connecting Remote Control — waiting for the session in the terminal',
-  'remote.failed': 'Remote Control is down — see the terminal for the reason; click to reconnect',
-  'remote.cloud': 'Running in the cloud — driven from claude.ai/code or the phone; click to take it back',
-  'remote.offline': 'Remote Control offline — the connection dropped; click to reconnect',
+  'remote.active': 'Remote Control is on — the phone and claude.ai/code can follow this session; click to turn it off',
+  'remote.connecting': 'Connecting Remote Control…',
+  'remote.failed': 'Remote Control could not start — click to try again',
   'creds.title': 'Credentials vault',
   'creds.enroll.intro':
     'Protect the vault with an authenticator app (Google Authenticator, Authy…). A code is required to add and to use any credential.',
@@ -149,6 +147,8 @@ export const en = {
   'timeline.showEarlier': 'Show earlier messages ({0})',
   'timeline.hookSkill': 'skill loaded by a hook: {0}',
   'timeline.hookContext': 'context injected by a hook',
+  'timeline.commandOutput': 'command output',
+  'timeline.sessionGone': 'This conversation was deleted in another window. Your next message starts a new one.',
   'timeline.engineNotice': 'engine warning',
   'timeline.compactAuto': 'context compacted (auto)',
   'timeline.compactManual': 'context compacted (manual)',
@@ -225,10 +225,7 @@ export const en = {
   'attach.remove': 'Remove attachment',
   'attach.view': 'View image',
 
-  'activity.working': 'Working…',
   'activity.compacting': 'Compacting the context…',
-  'activity.sent': 'Tokens sent',
-  'activity.received': 'Tokens received',
 
   'tip.time': 'Time',
   'tip.details': 'Details',

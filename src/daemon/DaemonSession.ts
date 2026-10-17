@@ -49,6 +49,8 @@ export interface DaemonSessionHooks {
   log: (msg: string) => void;
   /** Something worth persisting changed (CLI session id, title, spec). */
   changed: () => void;
+  /** Delays between restarts after a crash under Remote Control (tests shorten them). */
+  keepAliveBackoffMs?: number[];
 }
 
 // A runaway turn must not grow the buffer without bound; old deltas are only cosmetic.
@@ -58,6 +60,12 @@ let initSeq = 0;
 let remoteReqSeq = 0;
 const RESYNC_ATTEMPTS = 4;
 const RESYNC_DELAY_MS = 2000;
+// Keeping a Remote Control session's process up: a deliberate stop restarts at once, a crash
+// backs off; a process that lived this long counts as healthy again.
+const KEEPALIVE_AFTER_STOP_MS = 1000;
+const KEEPALIVE_BACKOFF_MS = [2000, 10_000, 30_000, 60_000];
+const KEEPALIVE_MAX_FAILURES = 5;
+const KEEPALIVE_HEALTHY_MS = 120_000;
 
 export class DaemonSession {
   readonly id: string;
@@ -92,6 +100,14 @@ export class DaemonSession {
   private remoteUrl?: string;
   private autoCompact: string;
   private remotePending = new Map<string, { client?: SessionClient; reqId?: string; on: boolean; attempt?: number }>();
+  private resyncTimer?: ReturnType<typeof setTimeout>;
+  // Keep-alive under Remote Control (see keepAlive): the phone can only reach a running process.
+  private disposed = false;
+  private restartTimer?: ReturnType<typeof setTimeout>;
+  private startedAt = 0;
+  private quickFailures = 0;
+  /** A setting the CLI only reads at start changed mid-turn: restart once the turn is over. */
+  private restartWhenIdle = false;
 
   constructor(data: PersistedSession, hooks: DaemonSessionHooks) {
     this.id = data.id;
@@ -117,16 +133,22 @@ export class DaemonSession {
     return this.busy;
   }
 
-  /** Remote Control on: the idle stop must leave the process running for the phone. */
-  /** Stores the conversation's limit; the CLI only reads it at start, so it applies on the next (re)start. */
+  /**
+   * Stores the conversation's limit. The CLI only reads it at start, so a running process is
+   * restarted to apply it: at once when idle, after the turn's `result` when busy.
+   */
   setAutoCompact(value: string): void {
     const v = validCompact(value);
     if (!v || v === this.autoCompact) return;
     this.autoCompact = v;
     this.hooks.changed();
     this.broadcast({ type: 'autocompact_state', sessionId: this.id, value: v });
+    if (!this.proc) return;
+    if (this.busy) this.restartWhenIdle = true;
+    else this.restart();
   }
 
+  /** Remote Control on: the idle stop must leave the process running for the phone. */
   hasRemote(): boolean {
     return this.remoteOn;
   }
@@ -196,6 +218,9 @@ export class DaemonSession {
     this.hooks.log(`[${this.id}] spawn ${this.spec.claudePath} ${args.join(' ')} (cwd=${this.cwd})`);
     this.parser = new StreamParser();
     this.stopping = false;
+    this.restartWhenIdle = false;
+    this.clearRestartTimer();
+    this.startedAt = Date.now();
     const proc = spawn(this.spec.claudePath, args, {
       cwd: this.cwd,
       env: this.processEnv(),
@@ -245,6 +270,44 @@ export class DaemonSession {
 
   private exitWaiters: Array<() => void> = [];
 
+  /**
+   * Remote Control is on: the phone can only reach a running process, so start one. Called
+   * when the daemon starts, and after the process exits (see onExit).
+   */
+  keepAlive(): void {
+    if (this.disposed || !this.remoteOn || this.proc) return;
+    this.hooks.log(`[${this.id}] remote control on: starting the process for the phone`);
+    this.ensureRunning();
+  }
+
+  /** Stops the process and starts it again with the current settings (`--autocompact`). */
+  restart(): void {
+    this.restartWhenIdle = false;
+    if (!this.proc) return;
+    this.hooks.log(`[${this.id}] restart to apply new settings`);
+    void this.whenStopped().then(() => {
+      if (!this.disposed && !this.proc) this.ensureRunning();
+    });
+    this.stop();
+  }
+
+  /** The session is being forgotten or the daemon shuts down: stop, and never come back. */
+  dispose(): void {
+    this.disposed = true;
+    this.clearRestartTimer();
+    this.stop();
+  }
+
+  /** Tells every attached window the session is gone (forgotten), so none keeps sending to it. */
+  announceGone(): void {
+    this.broadcast({ type: 'gone', sessionId: this.id });
+  }
+
+  private clearRestartTimer(): void {
+    if (this.restartTimer) clearTimeout(this.restartTimer);
+    this.restartTimer = undefined;
+  }
+
   stop(): void {
     const proc = this.proc;
     if (!proc) return;
@@ -271,6 +334,7 @@ export class DaemonSession {
    */
   setRemote(client: SessionClient, on: boolean, reqId: string): void {
     this.hooks.log(`[${this.id}] remote control ${on ? 'on' : 'off'} requested by ${client.id}`);
+    if (!on) this.clearRestartTimer();
     this.ensureRunning();
     const go = (): void => {
       const requestId = `daemon-remote-${++remoteReqSeq}`;
@@ -283,6 +347,7 @@ export class DaemonSession {
 
   /** The process (re)started with Remote Control already on: re-enables it, nobody waiting. */
   private resyncRemote(attempt = 1): void {
+    this.resyncTimer = undefined;
     if (!this.remoteOn || !this.proc) return;
     const requestId = `daemon-remote-${++remoteReqSeq}`;
     this.remotePending.set(requestId, { on: true, attempt });
@@ -387,8 +452,8 @@ export class DaemonSession {
             // The intent survives a failed re-enable (the CLI may not be ready right after
             // init): try again before giving up and showing it as off.
             const next = (pend.attempt ?? 1) + 1;
-            const timer = setTimeout(() => this.resyncRemote(next), RESYNC_DELAY_MS * (next - 1));
-            timer.unref?.();
+            this.resyncTimer = setTimeout(() => this.resyncRemote(next), RESYNC_DELAY_MS * (next - 1));
+            this.resyncTimer.unref?.();
             return;
           }
           if (ok) {
@@ -463,6 +528,8 @@ export class DaemonSession {
         break;
     }
     this.broadcast({ type: 'event', sessionId: this.id, event: ev });
+    // The turn a settings change waited for is over (and nothing else is queued or asked).
+    if (ev.type === 'result' && this.restartWhenIdle && !this.busy && this.pending.size === 0) this.restart();
   }
 
   private onExit(code: number | null): void {
@@ -486,12 +553,46 @@ export class DaemonSession {
       }
     }
     this.remotePending.clear();
+    // A retry still waiting belongs to the process that just died.
+    if (this.resyncTimer) clearTimeout(this.resyncTimer);
+    this.resyncTimer = undefined;
+    this.restartWhenIdle = false;
     this.removeTempDir();
     if (this.remoteOn) this.broadcast({ type: 'remote_state', sessionId: this.id, on: true, url: undefined });
     this.broadcast({ type: 'exit', sessionId: this.id, code });
     const waiters = this.exitWaiters;
     this.exitWaiters = [];
     for (const w of waiters) w();
+    this.scheduleKeepAlive(deliberate);
+  }
+
+  /**
+   * Remote Control on and the process gone: start it again for the phone. A deliberate stop
+   * (settings change) comes back at once; a crash backs off, and after too many quick ones in
+   * a row Remote Control is turned off instead of showing "connecting" forever.
+   */
+  private scheduleKeepAlive(deliberate: boolean): void {
+    if (this.disposed || !this.remoteOn || this.proc || this.restartTimer) return;
+    let delay = KEEPALIVE_AFTER_STOP_MS;
+    if (!deliberate) {
+      if (Date.now() - this.startedAt >= KEEPALIVE_HEALTHY_MS) this.quickFailures = 0;
+      this.quickFailures++;
+      if (this.quickFailures >= KEEPALIVE_MAX_FAILURES) {
+        this.hooks.log(`[${this.id}] remote control: the process exited ${this.quickFailures} times in a row, turning it off`);
+        this.quickFailures = 0;
+        this.remoteOn = false;
+        this.hooks.changed();
+        this.broadcast({ type: 'remote_state', sessionId: this.id, on: false, url: undefined });
+        return;
+      }
+      const backoff = this.hooks.keepAliveBackoffMs ?? KEEPALIVE_BACKOFF_MS;
+      delay = backoff[Math.min(this.quickFailures - 1, backoff.length - 1)];
+    }
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = undefined;
+      this.keepAlive();
+    }, delay);
+    this.restartTimer.unref?.();
   }
 
   // ---- helpers ----

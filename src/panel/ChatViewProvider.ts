@@ -63,7 +63,6 @@ import { computeLocalUsage } from '../session/UsageAggregator';
 import { computeDailyTokens } from '../stats/DailyTokens';
 import { registerModelContext, setOneMContextDisabled } from '../stats/StatsAggregator';
 import { readUsageCache } from '../cli/StatuslineCache';
-import { taskTimingsScoped, recordTaskTiming } from '../stats/TaskTimings';
 import { fetchAuthStatus } from '../cli/AuthStatus';
 import { isEnabled as usageTrackingEnabled, enableUsageTracking } from '../cli/StatuslineInstaller';
 import { fetchAccountUsage, usageDiagnostics } from '../cli/UsageApi';
@@ -90,6 +89,9 @@ const PERMISSION_MODES = ['default', 'plan', 'acceptEdits', 'auto', 'dontAsk', '
 // the picker hides itself when there is nothing to choose between.
 // A statusline cache older than this isn't trustworthy as the "real" % (it misleads).
 const USAGE_CACHE_MAX_AGE_MS = 6 * 3600_000; // 6h
+
+// Ways a plan can be approved (the remembered choice may never be bypass).
+const PLAN_APPROVALS = ['default', 'acceptEdits', 'auto'];
 
 // Per-session preferences persisted in globalState (tab override).
 interface SessionPrefs {
@@ -557,10 +559,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // If the dropdowns were edited over the active tab, the choice was for the new
     // context: the previous tab is reverted to the baseline (it isn't mutated unduly).
     if (prev && this.comboBaseline?.tab === prevTab) {
-      prev.modelOverride = this.comboBaseline.model;
-      prev.effortOverride = this.comboBaseline.effort;
-      prev.permissionOverride = this.comboBaseline.permission;
-      prev.allowAgentsOverride = this.comboBaseline.allowAgents;
+      prev.restoreSettings(this.comboBaseline);
       this.saveSessionModel(prev);
       this.pendingRestart = false; // the previous tab is back to the original: no pending restart
     }
@@ -679,10 +678,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     setOneMContextDisabled(oneMContextDisabled(this.workspaceCwd()));
     this.refreshContextLimits();
     const s = tabId ? this.sessions.get(tabId) : undefined;
-    // REAL model resolved by the CLI: the timing scope may have changed
-    // ('default' -> real id). Recalibrates the gauge with the new scope's averages.
     if (tabId) {
-      this.postTaskTimings(tabId);
       // the sessionId now exists: persists the override (when there is one) of this new session.
       if (s) this.saveSessionModel(s);
     }
@@ -1184,7 +1180,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const body = plan.endsWith('\n') ? plan : plan + '\n';
       const recent = findRecentPlan(dir, body);
       if (recent) {
-        void vscode.window.showTextDocument(vscode.Uri.file(recent), { preview: true, preserveFocus: true });
+        openPlanDoc(vscode.Uri.file(recent));
         return path.relative(root, recent).split(path.sep).join('/');
       }
 
@@ -1198,7 +1194,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       fs.writeFileSync(abs, body, 'utf8');
 
       // Open it without stealing focus from the approval card the user is about to act on.
-      void vscode.window.showTextDocument(vscode.Uri.file(abs), { preview: true, preserveFocus: true });
+      openPlanDoc(vscode.Uri.file(abs));
 
       return path.relative(root, abs).split(path.sep).join('/');
     } catch (e) {
@@ -1263,11 +1259,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    // Preview mode ("View" link): markdown -> native preview; the rest -> default opener.
+    // Preview mode ("View" link): markdown -> native preview, unless the user chose an editor for
+    // Markdown files (workbench.editorAssociations): then their choice opens it. VS Code itself
+    // falls back to the text editor when that editor does not exist in this version. The rest ->
+    // default opener.
     if (preview) {
-      const cmd = /\.(md|markdown)$/i.test(uri.fsPath)
-        ? 'markdown.showPreview'
-        : 'vscode.open';
+      const cmd =
+        /\.(md|markdown)$/i.test(uri.fsPath) && !hasMarkdownAssociation() ? 'markdown.showPreview' : 'vscode.open';
       try {
         await vscode.commands.executeCommand(cmd, uri);
       } catch {
@@ -1428,7 +1426,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private async sendUsage(): Promise<void> {
     try {
       await this.refreshUsage(true); // forces a fresh API call (hot data on click)
-      const account = await fetchAuthStatus(this.claudePath());
+      const fetched = await fetchAuthStatus(this.claudePath());
+      // A failed check is not "Not signed in": show what the last good answer would (logged in).
+      const account = fetched.unknown ? { loggedIn: true } : fetched;
       const cache = readUsageCache();
       const scoped = this.lastScoped ?? cache?.weeklyScoped;
       // Session flags (fast mode, model label, effort) come only from the statusline
@@ -1596,10 +1596,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * window keeps working on it. Nothing is stopped or handed over.
    */
   private remoteControl(sessionId: string): void {
-    this.openSession(sessionId); // makes sure the session is open/loaded
-    const entry = [...this.sessions].find(
-      ([, s]) => s.sessionId === sessionId || s.resumeId === sessionId,
-    );
+    // Toggled in place: an open conversation is not focused, and one that is not loaded yet is
+    // loaded in the background — pressing the button on a Hub card must not move the user.
+    let entry = [...this.sessions].find(([, s]) => s.sessionId === sessionId || s.resumeId === sessionId);
+    if (!entry) {
+      const prevActive = this.activeTab;
+      const tab = this.createTab();
+      this.resumeInTab(tab, sessionId);
+      this.activeTab = prevActive;
+      this.postTabs();
+      this.sendConfig();
+      const loaded = this.sessions.get(tab);
+      if (loaded) entry = [tab, loaded];
+    }
     if (!entry) return;
     const [tabId, s] = entry;
     const on = !s.remoteActive;
@@ -2365,6 +2374,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private planApproval(): string {
+    const v = this.memory.get<string>('planApproval');
+    return v && PLAN_APPROVALS.includes(v) ? v : 'default';
+  }
+
   private sendConfig(): void {
     // The picker: 'default' (no --model flag) plus the account's catalogue, straight from
     // discovery. Nothing is hardcoded — see the header comment.
@@ -2389,6 +2403,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         defaultModel,
         defaultEffort: this.defaults.effort,
         permissionMode: this.currentPermissionMode(),
+        planApproval: this.planApproval(),
         permissionModes: PERMISSION_MODES,
         allowAgents: this.currentAllowAgents(),
         autoCompact: this.active().autoCompact(),
@@ -2653,7 +2668,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /** UI-only prefs (thinking/tool cards/name/verbosity): re-pushes the config without touching the session. */
   pushConfig(): void {
     this.sendConfig();
-    if (this.activeTab) this.postTaskTimings(this.activeTab); // verbosity muda o escopo do gauge
   }
 
   /** Opens the session list in the UI (command/shortcut). */
@@ -2674,13 +2688,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (effort === 'default') effort = this.defaults.effort || 'default';
     const verbosity = this.cfg().get<string>('verbosity', 'verbose') || 'verbose';
     return { model, effort, verbosity };
-  }
-
-  /** Sends the averages of the tab's current scope to the surface(s) (calibrated gauge). */
-  private postTaskTimings(tabId: string): void {
-    const s = this.sessions.get(tabId) ?? this.active();
-    const { model, effort, verbosity } = this.timingScope(s);
-    this.post({ kind: 'taskTimings', timings: taskTimingsScoped(model, effort, verbosity) }, tabId);
   }
 
   // ---- Mensagens vindas do webview ----
@@ -2733,7 +2740,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.startDaemonStatusTimer();
         void this.reportDaemonStatus();
         this.reportAuth(); // login state for the Sign in/out button
-        this.postTaskTimings(bound ?? this.activeTab); // scope averages to calibrate the gauge
         this.autoResumeLast();
         this.postTabs();
         // init = a freshly mounted panel (open/reopen/recreate). It ALWAYS forces a replay
@@ -2813,19 +2819,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'newSession':
         this.newSession();
         break;
-      case 'permissionDecision':
+      case 'permissionDecision': {
+        // Remember how a plan was approved: the card highlights it next time. Never bypass.
+        if (m.decision === 'allow' && srcSession().pendingTool(m.requestId) === 'ExitPlanMode') {
+          const choice = m.mode ?? 'default';
+          if (PLAN_APPROVALS.includes(choice) && choice !== this.memory.get<string>('planApproval')) {
+            void this.memory.update('planApproval', choice);
+            this.sendConfig();
+          }
+        }
         srcSession().decide(m.requestId, m.decision, m.message, m.mode);
         break;
+      }
       case 'askResponse':
         srcSession().answer(m.requestId, m.answers);
         break;
       case 'setModel':
         this.snapComboBaseline(srcTab);
-        srcSession().setModel(m.model);
+        // Switched live in the running process: only a refused switch still waits for a restart.
+        if (!srcSession().setModel(m.model)) this.pendingRestart = true;
         this.saveSessionModel(srcSession()); // persiste por contexto
-        this.pendingRestart = true;
         this.sendConfig();
-        this.postTaskTimings(srcTab); // novo escopo: recalibra o gauge
         break;
       case 'removeModel': {
         const baseId = m.model.replace(/\[1m\]/i, '');
@@ -2850,9 +2864,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const cur = srcSession().modelOverride;
         let curCleared = false;
         if (cur && cur.replace(/\[1m\]/i, '').toLowerCase() === key) {
-          srcSession().setModel('default');
+          if (!srcSession().setModel('default')) this.pendingRestart = true;
           this.saveSessionModel(srcSession());
-          this.pendingRestart = true;
           curCleared = true;
         }
         if (removed) {
@@ -2864,24 +2877,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
       case 'setEffort':
         this.snapComboBaseline(srcTab);
-        srcSession().setEffort(m.effort);
+        if (!srcSession().setEffort(m.effort)) this.pendingRestart = true;
         this.saveSessionModel(srcSession()); // persiste por contexto
-        this.pendingRestart = true;
         this.sendConfig();
-        this.postTaskTimings(srcTab); // novo escopo: recalibra o gauge
         break;
-      case 'setPermissionMode':
+      case 'setPermissionMode': {
         this.snapComboBaseline(srcTab);
-        srcSession().setPermission(m.mode);
+        const live = srcSession().setPermission(m.mode);
         this.saveSessionModel(srcSession()); // persiste por contexto
         // The last choice is where new conversations start. Not Bypass: a new chat that
         // silently skips every permission prompt is too easy to miss.
         if (m.mode !== 'bypassPermissions' && PERMISSION_MODES.includes(m.mode)) {
           void this.cfg().update('permissionMode', m.mode, vscode.ConfigurationTarget.Global);
         }
-        this.pendingRestart = true;
+        if (!live) this.pendingRestart = true;
         this.sendConfig();
         break;
+      }
       case 'pinMode': {
         // Pins the current model/effort to a mode for every conversation (user setting).
         if (!PERMISSION_MODES.includes(m.mode)) break;
@@ -2899,9 +2911,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.setTabEngine(srcTab, m.engine === 'tootega' ? 'tootega' : 'claude');
         break;
       case 'setAutoCompact':
-        srcSession().setAutoCompact(m.value);
+        // Daemon mode: the daemon restarts the process itself (after the turn, when busy).
+        if (!srcSession().setAutoCompact(m.value)) this.pendingRestart = true;
         this.saveSessionModel(srcSession());
-        this.pendingRestart = true;
         this.sendConfig();
         break;
       case 'setAllowAgents':
@@ -3030,14 +3042,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.getSpeller().addWord(m.word);
         const cur = loadDictionary();
         saveDictionary({ ...cur, spellWords: this.getSpeller().userDict() });
-        break;
-      }
-      case 'taskDuration': {
-        // Duration sample: aggregated/persisted segmented by (model, effort,
-        // verbosity, type) and returns the current scope's averages to the tab's surface.
-        const { model, effort, verbosity } = this.timingScope(srcSession());
-        recordTaskTiming(model, effort, verbosity, m.type, m.ms);
-        this.postTaskTimings(srcTab);
         break;
       }
       case 'rewind':
@@ -3471,8 +3475,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
     resetAccountKey(); // login/logout may have changed the account → re-resolve the dictionary
     void resolveAccountKey(this.claudePath());
-    void fetchAuthStatus(this.claudePath()).then((a) => this.post({ kind: 'auth', loggedIn: a.loggedIn }));
+    if (this.authChecking) return;
+    this.authChecking = true;
+    void fetchAuthStatus(this.claudePath()).then((a) => {
+      this.authChecking = false;
+      if (!a.unknown) {
+        this.authRetries = 0;
+        this.post({ kind: 'auth', loggedIn: a.loggedIn });
+        return;
+      }
+      // Unknown is not logged out: the button keeps its state, and the check is tried again.
+      log(`auth status: unknown (${a.error ?? 'no reason'})`);
+      const wait = [5000, 15000][this.authRetries++];
+      if (wait !== undefined) setTimeout(() => this.reportAuth(), wait);
+      else this.authRetries = 0;
+    });
   }
+  private authChecking = false;
+  private authRetries = 0;
 
   /** Re-checa o login algumas vezes (o fluxo de login/logout roda no terminal). */
   private scheduleAuthRefresh(): void {
@@ -3677,6 +3697,21 @@ function extractCliResult(out: string): string | undefined {
     /* non-JSON: uses the raw text as a fallback */
   }
   return stripWrappingFence(trimmed);
+}
+
+/** Opens a saved plan without taking focus, in the editor the user chose for Markdown (else text). */
+function openPlanDoc(uri: vscode.Uri): void {
+  if (hasMarkdownAssociation()) {
+    void vscode.commands.executeCommand('vscode.open', uri, { preview: true, preserveFocus: true });
+  } else {
+    void vscode.window.showTextDocument(uri, { preview: true, preserveFocus: true });
+  }
+}
+
+/** The user picked an editor for Markdown files (`*.md`, `*.{md,…}`) in workbench.editorAssociations. */
+function hasMarkdownAssociation(): boolean {
+  const assoc = vscode.workspace.getConfiguration('workbench').get<Record<string, string>>('editorAssociations') ?? {};
+  return Object.keys(assoc).some((k) => /(^|[*{,.])(md|markdown)([,}]|$)/.test(k));
 }
 
 /** Removes a code fence wrapping the whole document (```markdown … ```). */

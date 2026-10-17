@@ -8,6 +8,7 @@ import { CliProcessManager, type CliOptions } from '../cli/CliProcessManager';
 import type { CliProcess } from '../cli/CliProcess';
 import { RemoteCliProcess } from '../cli/RemoteCliProcess';
 import type { DaemonClient } from '../daemon/DaemonClient';
+import { parseLocalCommand } from '../../shared/localCommand';
 import type { SessionSnapshot } from '../../shared/daemon';
 import type { EngineId } from '../cli/Engine';
 import { StatsAggregator } from '../stats/StatsAggregator';
@@ -123,7 +124,11 @@ export class Session {
   // `task_started`, `task_updated`, `task_notification`). It can NOT be deduced from the
   // `<task-notification>` text: when a task finishes with a turn in flight, the CLI queues
   // the notification and it never reaches stdout as a message — only the `system` event arrives.
-  private bgTasks = new Map<string, { tool: string; label: string }>();
+  // `toolUseId`: the tool call that started it. While that call has no result yet it is the
+  // tool card running in the turn (a foreground Bash the CLI also registers as a task), not
+  // background work: it stays out of the list until its result arrives and the task goes on.
+  private bgTasks = new Map<string, { tool: string; label: string; toolUseId?: string }>();
+  private openToolCalls = new Set<string>();
 
   // tool_use id → tool name, to name the task when `task_started` arrives
   // (the event brings the tool_use id, not the name). It only keeps what can still become a task.
@@ -166,6 +171,9 @@ export class Session {
   /** Prompts this window already has on screen (its own and other windows'), by uuid: their CLI echo must not draw them again. */
   private shownUser = new Set<string>();
   private replayEcho = false;
+  // Settings changed while no process was attached (daemon mode, after a reload): the
+  // daemon's process may already be running with the old ones. Applied live on attach.
+  private dirtyLive = new Set<LiveSetting>();
   // We interrupted a turn that has messages waiting: its error result is expected, and the
   // CLI goes on with the queue.
   private interrupting = false;
@@ -219,17 +227,98 @@ export class Session {
     return this.autoCompactOverride ?? this.hooks.settings().autoCompact ?? 'auto';
   }
 
-  setModel(m: string): void {
+  // Model, effort and permission mode switch in the running process: a restart would abort the
+  // turn, and in daemon mode end the process every window and the phone share. Each returns
+  // true when nothing waits for a restart.
+  setModel(m: string): boolean {
     this.modelOverride = m;
-    this.stop();
+    return this.applyLive(['model']);
   }
-  setEffort(e: string): void {
+  setEffort(e: string): boolean {
     this.effortOverride = e;
-    this.stop();
+    return this.applyLive(['effort']);
   }
-  setPermission(p: string): void {
+  setPermission(p: string): boolean {
     this.permissionOverride = p;
-    this.applyModePin(p, false); // the restart below starts on the pinned model/effort
+    const pinned = this.applyModePin(p, false);
+    return this.applyLive(pinned ? ['permission', 'model', 'effort'] : ['permission']);
+  }
+
+  /**
+   * Puts back the model/effort/mode a tab had before its dropdowns were edited (the choice was
+   * for a new tab): what was switched live in the running process is switched back.
+   */
+  restoreSettings(b: { model?: string; effort?: string; permission?: string; allowAgents?: boolean }): void {
+    const kinds: LiveSetting[] = [];
+    if (b.model !== this.modelOverride) kinds.push('model');
+    if (b.effort !== this.effortOverride) kinds.push('effort');
+    if (b.permission !== this.permissionOverride) kinds.push('permission');
+    this.modelOverride = b.model;
+    this.effortOverride = b.effort;
+    this.permissionOverride = b.permission;
+    this.allowAgentsOverride = b.allowAgents;
+    if (kinds.length > 0) this.applyLive(kinds);
+  }
+
+  /** Brings the process in step with the settings in `kinds`, without restarting it. */
+  private applyLive(kinds: LiveSetting[]): boolean {
+    const cli = this.cli;
+    if (!cli) {
+      for (const k of kinds) this.dirtyLive.add(k);
+      return true;
+    }
+    cli.updateOptions?.(this.liveOptions());
+    if (cli.isRunning()) {
+      void this.sendLive(kinds);
+    } else if (cli instanceof RemoteCliProcess) {
+      // Attaching, or attached to a session with no process: the spec covers a new process,
+      // the snapshot tells whether one is already running with the old settings.
+      for (const k of kinds) this.dirtyLive.add(k);
+    } else {
+      this.stop(); // a local process that is not running: the next one starts from fresh options
+    }
+    return true;
+  }
+
+  /** The control requests the mode pins use too. A refusal falls back to a restart. */
+  private async sendLive(kinds: LiveSetting[]): Promise<void> {
+    const cli = this.cli;
+    if (!cli) return;
+    const model = this.model();
+    const effort = this.effort();
+    const results = await Promise.all(
+      kinds.map((k) => {
+        if (k === 'model') return cli.requestControl('set_model', 5000, { model: model === 'default' ? null : model });
+        if (k === 'effort') {
+          return cli.requestControl('apply_flag_settings', 5000, { settings: { effortLevel: effort === 'default' ? null : effort } });
+        }
+        return cli.requestControl('set_permission_mode', 5000, { mode: this.permission() });
+      }),
+    );
+    dlog('session', `live ${kinds.join('+')}: ${results.map((r) => (r === undefined ? 'failed' : 'ok')).join(', ')}`);
+    if (results.some((r) => r === undefined) && this.cli === cli) {
+      log(`[session] live switch of ${kinds.join('+')} was refused: restarting the process`);
+      this.restartWithSettings();
+    }
+  }
+
+  /** The settings a live switch changes, as process options (what a later restart must keep). */
+  private liveOptions(): Partial<CliOptions> {
+    const model = this.model();
+    const effort = this.effort();
+    return {
+      model: model && model !== 'default' ? model : undefined,
+      effort: effort && effort !== 'default' ? effort : undefined,
+      permissionMode: this.permission(),
+    };
+  }
+
+  /**
+   * Settings the CLI only reads at start: stop, and the next message starts it with them. In
+   * daemon mode the daemon gets the new spec first (it restarts on its own under Remote Control).
+   */
+  private restartWithSettings(): void {
+    this.cli?.updateOptions?.(this.cliOptions());
     this.stop();
   }
 
@@ -256,22 +345,30 @@ export class Session {
   }
   setAllowAgents(v: boolean): void {
     this.allowAgentsOverride = v;
-    this.stop();
+    this.restartWithSettings();
   }
-  setAutoCompact(v: string): void {
+  /** True when the change needs no restart from this window (daemon mode). */
+  setAutoCompact(v: string): boolean {
     this.autoCompactOverride = v;
     // In daemon mode the limit belongs to the conversation: the daemon keeps it, so it survives a
-    // restart and holds in every window (and under Remote Control). The process reads it at start.
-    if (this.cli instanceof RemoteCliProcess) this.cli.setAutoCompact(v);
+    // restart and holds in every window (and under Remote Control). The process reads it at
+    // start, so the daemon restarts it — after the turn, when one is running. Attaching first
+    // makes sure the choice reaches the daemon even right after a window reload.
+    if (!this.cli && this.engine() === 'claude' && this.hooks.daemon?.()) this.ensureCli();
+    if (this.cli instanceof RemoteCliProcess) {
+      this.cli.setAutoCompact(v);
+      return true;
+    }
     this.stop();
+    return false;
   }
 
-  ensureCli(): void {
-    if (this.cli) return;
+  /** Everything a new process starts with. */
+  private cliOptions(): CliOptions {
     const model = this.model();
     const effort = this.effort();
     const engine = this.engine();
-    const opts: CliOptions = {
+    return {
       claudePath: this.hooks.claudePath(engine),
       cwd: this.hooks.cwd(),
       engine,
@@ -298,6 +395,12 @@ export class Session {
       ),
       forceThinkingOff: this.hooks.settings().thinking === 'off',
     };
+  }
+
+  ensureCli(): void {
+    if (this.cli) return;
+    const opts = this.cliOptions();
+    const engine = opts.engine ?? 'claude';
     // Daemon mode is for the Claude engine only: the local agent keeps its own lifecycle.
     const daemon = engine === 'claude' ? this.hooks.daemon?.() : undefined;
     this.replayEcho = engine === 'claude'; // buildClaudeArgs passes --replay-user-messages
@@ -307,10 +410,14 @@ export class Session {
       remote.on('settled', (requestId: string) => this.onPromptSettled(requestId));
       remote.on('remoteUser', (message: unknown, uuid?: string) => this.onRemoteUser(message, uuid));
       remote.on('autoCompact', (value: string) => this.adoptAutoCompact(value));
+      remote.on('gone', () =>
+        this.emit({ kind: 'engineNotice', id: `gone:${Date.now()}`, text: '', topic: 'session_gone' }),
+      );
       remote.on('remoteState', (on: boolean, url?: string) => this.onRemoteState(on, url));
       this.cli = remote;
     } else {
       this.cli = new CliProcessManager(opts);
+      this.dirtyLive.clear(); // a local process starts from these options
     }
     this.cli.on('event', (e: ClaudeEvent) => this.onCliEvent(e));
     this.cli.on('stderr', (t: string) => {
@@ -319,6 +426,9 @@ export class Session {
     });
     this.cli.on('exit', (code) => {
       log(`CLI exited (${code})`);
+      // Its prompts died with it (the daemon drops them too): close the cards, or answering
+      // one later would go nowhere.
+      this.settleAllPrompts();
       // Death mid-turn (busy still on = it wasn't stop()/interrupt(),
       // which clear busy first): the process aborted without emitting `result`. Without a warning the
       // indicator disappears and the user thinks it is still running. Finish and warn.
@@ -430,8 +540,7 @@ export class Session {
   /** Stops the process; keeps the statistics. The next message respawns it. */
   stop(): void {
     this.resetStreamingState();
-    this.pendingPerm.clear();
-    this.pendingPromptMsg.clear();
+    this.settleAllPrompts();
     this.clearQueue();
     this.stats.endTurn(); // closes the turn in flight (idle time after it isn't counted)
     this.persist();
@@ -482,7 +591,9 @@ export class Session {
    * prompts still waiting for an answer.
    */
   private onSnapshot(snap: SessionSnapshot): void {
-    if (snap.session.autoCompact) this.adoptAutoCompact(snap.session.autoCompact);
+    // A choice this window just made is on its way to the daemon: don't take the old value back.
+    const ownCompact = this.cli instanceof RemoteCliProcess && this.cli.hasPendingCompact();
+    if (snap.session.autoCompact && !ownCompact) this.adoptAutoCompact(snap.session.autoCompact);
     const cliId = snap.session.cliSessionId;
     if (cliId && !this.resumeId) this.resumeId = cliId;
     if (snap.session.state === 'busy' && !this.busy) {
@@ -496,11 +607,25 @@ export class Session {
     } finally {
       this.replaying = false;
     }
+    if (this.dirtyLive.size > 0) {
+      // Changed while detached: a process already running still has the old settings, and
+      // kept its own spec (the one this window opened with was not used).
+      const kinds = [...this.dirtyLive];
+      this.dirtyLive.clear();
+      this.cli?.updateOptions?.(this.liveOptions());
+      if (!snap.started && snap.session.state !== 'idle') void this.sendLive(kinds);
+    }
     dlog(
       'session',
       `daemon attach ${snap.session.id} (${cliId ?? 'new'}): ${snap.session.state}, ` +
         `${snap.partial.length} partial, ${snap.pendingControl.length} prompts`,
     );
+  }
+
+  /** The process is gone: every prompt it was waiting on is closed. */
+  private settleAllPrompts(): void {
+    const ids = new Set([...this.pendingPerm.keys(), ...this.pendingPromptMsg.keys()]);
+    for (const id of ids) this.onPromptSettled(id);
   }
 
   /** Another window answered this prompt: close it here. */
@@ -581,6 +706,7 @@ export class Session {
     if (end) this.stop();
     else this.detach();
     this.sessionId = undefined;
+    this.seenModel = undefined;
     // Also clears the resumeId: a REALLY new conversation. Without this, after "clear
     // context" on a resumed session the next send() would respawn with --resume of the
     // old session (it wouldn't clear) — and the init pinning would keep that id glued on.
@@ -678,7 +804,7 @@ export class Session {
     if (value === 'on') delete this.skillOverrides[name];
     else this.skillOverrides[name] = value;
     this.stats.setSkillOverrides(this.skillOverrides);
-    this.stop();
+    this.restartWithSettings();
     this.emit({ kind: 'stats', stats: this.stats.snapshot() });
     dlog('session', `skillOverride ${name}=${value}`);
   }
@@ -689,6 +815,11 @@ export class Session {
   }
 
   // ---- control protocol (permission / AskUserQuestion) ----
+
+  /** Name of the tool a pending permission prompt is for. */
+  pendingTool(requestId: string): string | undefined {
+    return this.pendingPerm.get(requestId)?.tool;
+  }
 
   decide(requestId: string, decision: 'allow' | 'deny' | 'allow_always', message?: string, mode?: string): void {
     const pend = this.pendingPerm.get(requestId);
@@ -764,10 +895,10 @@ export class Session {
   }
 
   /** Inserts or refines it (`task_started` arrives later and knows the real tool). */
-  private addBgTask(id: string, tool: string, label: string): void {
+  private addBgTask(id: string, tool: string, label: string, toolUseId?: string): void {
     const cur = this.bgTasks.get(id);
-    if (cur && cur.tool === tool && cur.label === label) return;
-    this.bgTasks.set(id, { tool, label });
+    if (cur && cur.tool === tool && cur.label === label && (cur.toolUseId || !toolUseId)) return;
+    this.bgTasks.set(id, { tool, label, toolUseId: toolUseId ?? cur?.toolUseId });
     this.emitBackground();
   }
 
@@ -794,7 +925,11 @@ export class Session {
     }
     for (const [id, t] of live) {
       if (this.bgTasks.has(id)) continue;
-      this.bgTasks.set(id, { tool: taskTool(t.task_type), label: String(t.description ?? id) });
+      this.bgTasks.set(id, {
+        tool: taskTool(t.task_type),
+        label: String(t.description ?? id),
+        toolUseId: typeof t.tool_use_id === 'string' ? t.tool_use_id : undefined,
+      });
       changed = true;
     }
     if (changed) this.emitBackground();
@@ -803,13 +938,16 @@ export class Session {
   /** Clears the background state (session stop/cleanup). */
   private resetBgTasks(): void {
     this.toolNames.clear();
+    this.openToolCalls.clear();
     if (this.bgTasks.size === 0) return;
     this.bgTasks.clear();
     this.emitBackground();
   }
 
   private emitBackground(): void {
-    const tasks = [...this.bgTasks.entries()].map(([id, v]) => ({ id, tool: v.tool, label: v.label }));
+    const tasks = [...this.bgTasks.entries()]
+      .filter(([, v]) => !v.toolUseId || !this.openToolCalls.has(v.toolUseId))
+      .map(([id, v]) => ({ id, tool: v.tool, label: v.label }));
     this.emit({ kind: 'background', tasks });
   }
 
@@ -850,7 +988,7 @@ export class Session {
         if (s.subtype === 'task_started') {
           const tool = this.toolNames.get(s.tool_use_id) ?? taskTool(s.task_type);
           this.toolNames.delete(s.tool_use_id);
-          this.addBgTask(String(s.task_id), tool, String(s.description ?? s.task_id));
+          this.addBgTask(String(s.task_id), tool, String(s.description ?? s.task_id), s.tool_use_id);
           break;
         }
         if (s.subtype === 'task_notification' || s.subtype === 'task_updated') {
@@ -1192,6 +1330,7 @@ export class Session {
   }
 
   private onAssistant(ev: AssistantEvent): void {
+    this.followModel((ev.message as { model?: unknown } | undefined)?.model);
     const id = ev.message?.id ?? this.currentAssistantId ?? `m_${this.emittedTools.size}`;
     const blocks = ev.message?.content ?? [];
     if (!this.streamedText.has(id)) {
@@ -1211,6 +1350,7 @@ export class Session {
         if (!this.emittedTools.has(t.id)) {
           this.emittedTools.add(t.id);
           this.emit({ kind: 'toolUse', id: t.id, name: t.name, input: t.input });
+          this.openToolCalls.add(t.id);
           this.hooks.onToolUse?.(t.name, t.input);
           // Background launch (Workflow, or a tool with run_in_background): stores the
           // name so the task can be named when the matching `task_started` arrives.
@@ -1267,6 +1407,10 @@ export class Session {
       if ((b as any).type === 'tool_result') {
         const r = b as ToolResultBlock;
         this.emit({ kind: 'toolResult', toolUseId: r.tool_use_id, content: r.content, isError: r.is_error });
+        // The call is over: a task it started that goes on is background work now.
+        if (this.openToolCalls.delete(r.tool_use_id) && [...this.bgTasks.values()].some((v) => v.toolUseId === r.tool_use_id)) {
+          this.emitBackground();
+        }
       }
     }
   }
@@ -1285,9 +1429,40 @@ export class Session {
     const blocks = typeof c === 'string' ? [{ type: 'text', text: c }] : Array.isArray(c) ? c : [];
     if (blocks.some((b: any) => b?.type === 'tool_result')) return false;
     if (!blocks.some((b: any) => b?.type === 'text' && typeof b.text === 'string' && b.text.trim() !== '')) return false;
+    // Output of a local slash command (/model, ...): a notice, never a prompt. The command
+    // line itself is already on screen where it was typed.
+    const local = parseLocalCommand(blocks.map((b: any) => (b?.type === 'text' ? String(b.text) : '')).join(''));
+    if (local) {
+      if (local.kind === 'output' && local.text) {
+        this.emit({
+          kind: 'engineNotice',
+          id: ev.uuid ?? `cmd:${local.text}`.slice(0, 200),
+          text: local.text,
+          topic: local.error ? 'local_command_error' : 'local_command',
+        });
+      }
+      return true;
+    }
     this.onRemoteUser(ev.message, ev.uuid);
     return true;
   }
+
+  /**
+   * The model that actually answered, from each assistant message. When it changes to one the
+   * picker does not show, someone switched it elsewhere (`/model` in the chat or on the phone
+   * over Remote Control): the picker follows. The first message only sets the baseline.
+   */
+  private followModel(id: unknown): void {
+    if (typeof id !== 'string' || !id || id === '<synthetic>') return;
+    const prev = this.seenModel;
+    this.seenModel = id;
+    if (prev === undefined || prev === id || this.replaying) return;
+    const sel = this.model().replace(/\[1m\]/i, '').toLowerCase();
+    if (sel !== 'default' && id.toLowerCase().includes(sel)) return;
+    this.modelOverride = id;
+    this.hooks.onModeChanged?.();
+  }
+  private seenModel?: string;
 
   private clearQueue(): void {
     this.unconsumed.clear();
@@ -1306,6 +1481,9 @@ export class Session {
 
 // The permission modes the picker knows; since CLI 2.1.285 the default one may be called
 // `manual`. Anything else (an internal mode) is not followed.
+/** Settings a running process can switch without a restart. */
+type LiveSetting = 'model' | 'effort' | 'permission';
+
 const KNOWN_MODES = new Set(['default', 'plan', 'acceptEdits', 'auto', 'dontAsk', 'bypassPermissions']);
 function cliMode(mode: unknown): string | undefined {
   if (typeof mode !== 'string') return undefined;

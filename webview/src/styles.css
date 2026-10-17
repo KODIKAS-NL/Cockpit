@@ -883,121 +883,9 @@ body {
   color: #d97757;
   opacity: 1;
 }
-/* Indicador de atividade: última linha do timeline enquanto o turno corre.
-   Ícone da extensão + spinner + contador de tokens enviados/recebidos. */
-.activity {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 90%;
-  margin: 6px auto 2px 0;
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  color: var(--vscode-descriptionForeground, #8a8a8a);
-  /* Opaque: it stays pinned to the bottom of the view (sticky) over the conversation, so
-     a running turn is visible however far up you have scrolled. */
-  background: color-mix(
-    in srgb,
-    var(--vscode-foreground, #cccccc) 6%,
-    var(--vscode-sideBar-background, var(--vscode-editor-background, #ffffff))
-  );
-  position: sticky;
-  bottom: 0;
-  z-index: 4;
-}
-.activity-icon {
-  flex: none;
-  display: block;
-  opacity: 0.95;
-}
-.activity-spinner {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid color-mix(in srgb, currentColor 28%, transparent);
-  border-top-color: #d97757;
-  animation: activity-spin 0.8s linear infinite;
-}
 @keyframes activity-spin {
   to {
     transform: rotate(360deg);
-  }
-}
-.activity-label {
-  font-weight: 500;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.activity-tokens {
-  display: flex;
-  gap: 10px;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-/* Gauge de progresso restante (assintótico): à direita do "Working". A largura
-   do fill é dirigida por JS (decaimento exponencial); a transition só suaviza
-   entre os ticks de 100ms. */
-.activity-gauge {
-  position: relative;
-  flex: 1 1 auto;
-  min-width: 60px;
-  height: 16px;
-  border-radius: 999px;
-  background: color-mix(in srgb, currentColor 18%, transparent);
-  overflow: hidden;
-}
-.activity-gauge-fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--vscode-focusBorder, #3794ff);
-  transition: width 0.12s linear;
-}
-/* Rótulo do percentual já percorrido, centrado sobre a barra. Sombra p/ legibilidade
-   tanto sobre o trecho preenchido (azul) quanto sobre o trilho. */
-.activity-gauge-pct {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--vscode-foreground, #e0e0e0);
-  text-shadow: 0 0 2px var(--vscode-editor-background, #1e1e1e),
-    0 0 2px var(--vscode-editor-background, #1e1e1e);
-  pointer-events: none;
-}
-/* Tempo decorrido do turno (min:seg), encostado à direita da barra, logo após o
-   percentual centrado. Mesma sombra p/ legibilidade sobre fill/trilho. */
-.activity-gauge-time {
-  position: absolute;
-  top: 0;
-  right: 8px;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  font-size: 10px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--vscode-foreground, #e0e0e0);
-  text-shadow: 0 0 2px var(--vscode-editor-background, #1e1e1e),
-    0 0 2px var(--vscode-editor-background, #1e1e1e);
-  pointer-events: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .activity-spinner {
-    animation: none;
-  }
-  .activity-gauge-fill {
-    transition: none;
   }
 }
 /* Elementos vindos do Claude (texto + tools): 90% da largura da webview,
@@ -1084,6 +972,11 @@ body {
 }
 .caret {
   animation: blink 1s steps(2) infinite;
+}
+/* The typing caret closes the turn: it sits below the latest step, not beside the role name. */
+.caret-row {
+  padding: 2px 0 0 4px;
+  line-height: 1;
 }
 .canceled-tag {
   margin-left: 8px;
@@ -1414,6 +1307,34 @@ body {
   max-height: 50vh;
   overflow: auto;
 }
+/* Collapsed Bash card: the command in at most 3 lines, the last one fading out when cut. */
+.tool-peek {
+  padding: 0 8px 6px;
+  cursor: pointer;
+}
+.tool-peek-code {
+  margin: 0;
+  background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.1));
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  max-height: calc(3 * 1.4em + 8px);
+  white-space: pre;
+  overflow: hidden;
+}
+.tool-peek-code code {
+  display: block;
+  background: transparent;
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tool-peek.cut .tool-peek-code {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 1.6em), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 1.6em), transparent);
+}
+
 /* Edições mescladas (mesmo arquivo, seguidas): separador entre cada diff. */
 .tool-merge-part {
   margin-top: 8px;
@@ -3601,7 +3522,7 @@ body {
   font-size: 11px;
   padding: 2px 10px;
 }
-/* Botão de Controle remoto ligado: a conversa está sendo conduzida pelo terminal. */
+/* Remote Control button when on: the conversation is open to the phone / claude.ai/code. */
 .composer-side-btn.remote-btn.on {
   color: var(--vscode-charts-green, #89d185);
   border-color: color-mix(in srgb, var(--vscode-charts-green, #89d185) 60%, transparent);
@@ -3616,6 +3537,39 @@ body {
 .notice-banner.compact-banner .notice-banner-mark,
 .notice-banner.compact-banner .notice-banner-label {
   color: var(--vscode-charts-blue, #3794ff);
+}
+
+/* Compaction in progress: the blue spinner of the Stop button, static under reduced motion. */
+.notice-banner-spinner {
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 35%, transparent);
+  border-top-color: var(--vscode-charts-blue, #3794ff);
+  animation: activity-spin 0.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .notice-banner-spinner {
+    animation: none;
+  }
+}
+/* Output of a local slash command (/model, ...): a quiet line, not a warning. */
+.notice-banner.local-command {
+  border-style: solid;
+  border-color: var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+}
+.notice-banner.local-command .notice-banner-mark {
+  color: var(--vscode-descriptionForeground, #8a8a8a);
+}
+.notice-banner.local-command.error {
+  border-color: color-mix(in srgb, var(--vscode-errorForeground, #f14c4c) 55%, transparent);
+}
+.notice-banner.local-command.error .notice-banner-mark {
+  color: var(--vscode-errorForeground, #f14c4c);
+}
+.notice-banner.local-command code {
+  font-family: var(--vscode-editor-font-family, monospace);
 }
 
 /* Acessos que o sandbox recusou, destacados acima da saída: é a CAUSA da falha do comando. */
@@ -5800,8 +5754,8 @@ body {
 .bubble.assistant {
   width: 100%;
 }
-/* The assistant header only shows while it has something to say (typing caret, canceled). */
-.bubble .role.role-assistant:not(:has(.caret, .canceled-tag)) {
+/* The assistant header only shows while it has something to say (canceled). */
+.bubble .role.role-assistant:not(:has(.canceled-tag)) {
   display: none;
 }
 .bubble.user {
@@ -6396,6 +6350,35 @@ body {
   justify-content: center;
   border-radius: 8px;
 }
+/* Stop button while a turn runs: a spinner; the square (= Stop) on hover and keyboard focus. */
+.composer-side .btn.stop .stop-spinner {
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: activity-spin 0.8s linear infinite;
+}
+.composer-side .btn.stop .stop-square {
+  display: none;
+}
+.composer-side .btn.stop:hover .stop-spinner,
+.composer-side .btn.stop:focus-visible .stop-spinner {
+  display: none;
+}
+.composer-side .btn.stop:hover .stop-square,
+.composer-side .btn.stop:focus-visible .stop-square {
+  display: block;
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer-side .btn.stop .stop-spinner {
+    display: none;
+  }
+  .composer-side .btn.stop .stop-square {
+    display: block;
+  }
+}
 .composer-side .btn.send.send-icon {
   color: var(--vscode-button-foreground, #fff);
   background: var(--vscode-button-background);
@@ -6559,10 +6542,6 @@ body {
 .info-tip-icon:hover,
 .tt-wrap.info-tip:focus-visible .info-tip-icon {
   opacity: 1;
-}
-/* While a turn runs, the pinned "Working…" row takes the bottom: the jump-to-end button sits above it. */
-.scroll-wrap:has(.activity) .scroll-bottom {
-  bottom: 58px;
 }
 
 /* Model + effort in one chip ("Opus 5.5 Medium"); its popup opens upward over the prompt box,

@@ -3,6 +3,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { parseLocalCommand } from '../../shared/localCommand';
 import type { SessionInfo, HistoryItem } from '../../shared/protocol';
 
 /**
@@ -307,6 +308,21 @@ export function loadTranscript(cwd: string, sessionId: string): HistoryItem[] {
 
     if (o.type === 'user' && o.message) {
       const c = o.message.content;
+      const local = parseLocalCommand(textOfContent(c));
+      if (local) {
+        if (local.kind === 'command') {
+          items.push({ kind: 'user', id: o.uuid ?? rid(), text: `${local.name} ${local.args}`.trim(), ts: tsOf(o) });
+        } else if (local.kind === 'output' && local.text) {
+          items.push({
+            kind: 'notice',
+            id: o.uuid ?? rid(),
+            text: local.text,
+            topic: local.error ? 'local_command_error' : 'local_command',
+            ts: tsOf(o),
+          });
+        }
+        continue;
+      }
       if (Array.isArray(c)) {
         for (const b of c) {
           if (b?.type === 'tool_result') {

@@ -1,20 +1,11 @@
 # Open issues
 
-Local issue log (no GitHub issue yet). Newest first.
+Local issue log (no GitHub issue yet). Fixed items are removed; see the git history.
 
-## Remote Control state appears reset after respawn or reconnect
+## Remote Control: respawn/reconnect still unverified
 
-- **Reported:** by the maintainer; the chat reports Remote Control as reset after a process respawn (auto-compact change, model change, stop and send) or a window reconnect to the daemon.
-- **Expected:** the daemon re-enables the bridge after init (`resyncRemote`), and every window shows it as on.
-- **To check:**
-  - Does `resyncRemote` in `src/daemon/DaemonSession.ts` run on every respawn, and is `remote_state` broadcast afterwards?
-  - Does a reconnecting window read `DaemonSessionInfo.remote` from the snapshot and apply it in `Session.onSnapshot`, or default to off?
-  - The pairing link may change when the bridge is re-enabled; that must not read as off.
-- **Findings:** the daemon log had no remote-control lines at all, and `sessions.json` held no `remoteOn` for the active conversation, so the intent had been dropped. The real CLI answers `remote_control` right after init fine (probed, fresh and resumed), so the cause is not confirmed. One path clears the intent for good: a single failed re-enable after a respawn.
-- **Change:** the daemon now logs every remote-control request/answer, and retries a failed re-enable up to 4 times (2s, 4s, 6s) before showing it as off. Needs the daemon app rebuilt.
-- **Repro lead:** installing a new `.vsix` (extension host reload) while Remote Control is on made it look closed. The daemon log shows no process exit or respawn then, and `sessions.json` kept `remoteOn` true, so the daemon's state was right; suspect the reloaded window's own state/indicator. Two window-sent `off` requests (16:32:31, 16:35:10 on 2026-10-17) are not explained yet.
-- **Also seen:** a prompt typed on the phone was not drawn in the window's timeline (only a notice that Remote Control went off). Fixed in `Session.showPhonePrompt`. The unexplained `off` at 16:39:43 came from the only open window (iPad, browser); which action sent it is still unknown.
-- **Root cause found (2026-10-17):** `Composer.tsx` turned Remote Control off whenever the local composer sent a message (a leftover from when Remote Control handed the process over). The window log showed the toggle 3 ms before `sendMessage`. Removed; sending from a window no longer touches Remote Control.
-- **Verified 2026-10-17:** after the fix, Remote Control stayed on through sends from the iPad, a `.vsix` redeploy and a window reload; phone prompts show in the iPad timeline.
-- **Also (2026-10-17):** while Remote Control was on, messages sent from the window drew no bubble in its own timeline: `App.tsx` `onSend` returned early for a remote tab (old hand-over behaviour, when the host refused the send). Removed in 1.0.295.
-- **Status:** fixed in 1.0.293; the respawn/reconnect part (daemon state after a process restart) is still unverified. If it recurs, `~/.cockpit/daemon.log` now says why (`remote control on (resync): failed (...)`).
+The window-side cause is fixed (1.0.293: sending no longer turns Remote Control off) and verified on the iPad. What is still unverified is the daemon state after a process restart or a window reconnect. If it recurs, `~/.cockpit/daemon.log` says why (`remote control on (resync): failed (...)`). Two window-sent `off` requests on 2026-10-17 (16:32:31, 16:35:10) were never explained.
+
+## Known limitation: approving a plan on the phone always continues in default mode
+
+The Remote Control card in the Claude app (iPhone, claude.ai/code) offers only "approve" for a plan, with no mode choice: the CLI then continues in default mode and every step asks for permission. Cockpit's remembered plan-approval choice (auto / accept edits) is not applied there. Applying it from a window after a phone approval (seen as a `control_cancel_request` for `ExitPlanMode`) was considered and rejected: with two Cockpit windows open on the same conversation, both would react and could conflict. Workaround: switch the mode in a Cockpit window (or with `/permissions` on the phone) after approving. Nothing to do on our side unless the app adds a mode choice.
