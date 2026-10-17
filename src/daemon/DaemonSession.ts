@@ -270,6 +270,7 @@ export class DaemonSession {
    * it any earlier races the CLI's own startup).
    */
   setRemote(client: SessionClient, on: boolean, reqId: string): void {
+    this.hooks.log(`[${this.id}] remote control ${on ? 'on' : 'off'} requested by ${client.id}`);
     this.ensureRunning();
     const go = (): void => {
       const requestId = `daemon-remote-${++remoteReqSeq}`;

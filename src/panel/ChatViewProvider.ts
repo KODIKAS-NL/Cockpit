@@ -1603,6 +1603,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (!entry) return;
     const [tabId, s] = entry;
     const on = !s.remoteActive;
+    log(`remote control toggle for tab ${tabId}: window believed it was ${s.remoteActive ? 'on' : 'off'}, asking for ${on ? 'on' : 'off'}`);
     if (on) this.post({ kind: 'remoteState', active: true, phase: 'connecting' }, tabId);
     void s.setRemote(on).then((r) => {
       if (!r.ok) {
