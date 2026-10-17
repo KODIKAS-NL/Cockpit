@@ -40,6 +40,7 @@ function Bar({ t, locale, label, tone, b }: { t: Translator; locale: string; lab
 }
 
 // The account's limit windows as small bars on the dashboard. Click opens the Usage modal.
+// (Touched only to test redeploying the extension while Remote Control is on.)
 export function LimitBars({ t, locale, fiveHour, sevenDay, weeklyScoped, onClick }: Props) {
   // Reset times are relative: re-render every minute so they keep counting down.
   const [, tick] = useState(0);
