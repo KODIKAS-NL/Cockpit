@@ -38,7 +38,8 @@ That is what the fork adds to the original:
 - **Daemon mode.** Claude runs in `cockpit-daemon`, a small background service on the machine that
   holds the code, instead of as a child of the VS Code window. Any window on that machine can attach
   to a running conversation. The first answer to a permission prompt wins and closes it everywhere.
-  On a Mac you can run the daemon from the included menu bar app. See
+  On a Mac you can run the daemon from the menu bar app, a signed and notarized download from the
+  [GitHub releases](https://github.com/KODIKAS-NL/Cockpit/releases). See
   [Docs/daemon-mode.md](Docs/daemon-mode.md).
 - **Chat in the side bar**, next to the code, with a strip of conversation tabs. A conversation is in
   the side bar or in an editor tab, one place at a time.
@@ -87,8 +88,10 @@ The full list is in [Docs/features.md](Docs/features.md), and
 2. Install and sign in to Claude Code if you have not: follow Anthropic's instructions, then run
    `claude` once and log in. If `claude` is not on the `PATH`, set `cockpitDaemon.claudePath`.
 3. Start the daemon. Run **Cockpit Daemon: Install daemon** from the command palette (a launchd agent
-   on macOS, a background process elsewhere). On a Mac you can use the menu bar app instead, see
-   [mac/CockpitDaemon](mac/CockpitDaemon/README.md).
+   on macOS, a background process elsewhere). On a Mac you can use the menu bar app instead: download the signed and notarized
+   `CockpitDaemon-<version>.zip` from the [GitHub releases](https://github.com/KODIKAS-NL/Cockpit/releases),
+   unzip it and move it to Applications (or build it yourself, see
+   [mac/CockpitDaemon](mac/CockpitDaemon/README.md)).
 4. Open a project folder and open Cockpit with **Ctrl+Alt+C** (Cmd+Alt+C on a Mac), or from the
    status bar. Pick a model, effort and permission mode, or keep the defaults, type a message and
    press **Enter**. **Shift+Enter** inserts a line break.
