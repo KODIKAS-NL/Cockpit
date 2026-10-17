@@ -572,7 +572,7 @@ export class DaemonSession {
     this.restartWhenIdle = false;
     this.removeTempDir();
     if (this.remoteOn) this.broadcast({ type: 'remote_state', sessionId: this.id, on: true, url: undefined });
-    this.broadcast({ type: 'exit', sessionId: this.id, code });
+    this.broadcast({ type: 'exit', sessionId: this.id, code, ...(deliberate ? { stopped: true } : {}) });
     const waiters = this.exitWaiters;
     this.exitWaiters = [];
     for (const w of waiters) w();

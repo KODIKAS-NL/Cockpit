@@ -149,6 +149,8 @@ export const en = {
   'timeline.hookSkill': 'skill loaded by a hook: {0}',
   'timeline.hookContext': 'context injected by a hook',
   'timeline.commandOutput': 'command output',
+  'timeline.stoppedElsewhere': 'The turn was stopped from another window.',
+  'timeline.daemonRestarted': 'The daemon restarted; the turn in progress was lost. Send again to continue.',
   'timeline.sessionGone': 'This conversation was deleted in another window. Your next message starts a new one.',
   'timeline.engineNotice': 'engine warning',
   'timeline.compactAuto': 'context compacted (auto)',

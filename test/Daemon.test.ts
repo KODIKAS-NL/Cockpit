@@ -327,6 +327,18 @@ describe('cockpit-daemon', () => {
     expect((await b.list()).find((x) => x.id === s.session.id).autoCompact).toBe('off');
   });
 
+  it('says a requested stop was deliberate, and a crash was not', async () => {
+    const a = await peer('A');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-st'] }));
+    a.user(s.session.id, 'hello');
+    await a.wait((m) => m.type === 'event' && (m as any).event.type === 'result');
+    a.write({ op: 'stop', sessionId: s.session.id });
+    expect(((await a.wait((m) => m.type === 'exit')) as any).stopped).toBe(true);
+    a.msgs.length = 0;
+    a.user(s.session.id, 'CRASH now');
+    expect(((await a.wait((m) => m.type === 'exit')) as any).stopped).toBeUndefined();
+  });
+
   it('applies an auto-compact change made mid-turn once the turn is over', async () => {
     const a = await peer('A');
     const s = await a.open(project, spec({ args: ['--resume', 'sess-cb'] }));

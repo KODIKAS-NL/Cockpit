@@ -27,6 +27,8 @@ export interface TabState {
   id: string;
   title: string;
   status: 'idle' | 'busy' | 'error';
+  /** The last turn's error banner. Per tab; cleared when a new turn starts. */
+  error?: string;
   // Background tasks (Workflow / run_in_background) still running after the
   // turn ended. Independent of `status`: the composer stays enabled, but the
   // timeline and the Hub card show the "running" spinner and the list of what
@@ -76,7 +78,6 @@ export interface UiState {
   slashResearching: boolean; // AI research in progress (indicator on the button)
   showSessions: boolean;
   showContext: boolean;
-  error?: string;
   loggedIn: boolean; // login state (Sign in vs Sign out). Optimistic until confirmed.
   selectionRef?: string; // @file#a-b of the editor's active selection (shareable)
   tabs: TabState[];
@@ -166,7 +167,7 @@ export function reducer(state: UiState, action: Action): UiState {
     return { ...state, showContext: action.open };
   }
   if (action.type === 'clearError') {
-    return state.error ? { ...state, error: undefined } : state;
+    return patchTab(state, state.activeTab, (tab) => (tab.error ? { ...tab, error: undefined } : tab));
   }
   if (action.type === 'interruptUi') {
     // Stop killed the CLI without 'assistantDone': ends the streaming and marks it cancelled.
@@ -216,7 +217,7 @@ export function reducer(state: UiState, action: Action): UiState {
     case 'auth':
       return { ...state, loggedIn: msg.loggedIn };
     case 'error':
-      return { ...state, error: msg.message };
+      return patchTab(state, (msg as { tab?: string }).tab ?? state.activeTab, (tab) => ({ ...tab, error: msg.message }));
     case 'tabs': {
       const existing = new Map(state.tabs.map((t) => [t.id, t]));
       const tabs = msg.tabs.map((info) => {
@@ -227,7 +228,9 @@ export function reducer(state: UiState, action: Action): UiState {
           info.status !== 'busy' && prev.items.some((i) => i.kind === 'user' && i.queued)
             ? prev.items.map((i) => (i.kind === 'user' && i.queued ? { ...i, queued: false } : i))
             : prev.items;
-        return { ...prev, items, title: info.title, status: info.status, sessionId: info.sessionId, surface: info.surface };
+        // A new turn (from the phone, another window…) means the conversation moved on.
+        const error = info.status === 'busy' ? undefined : prev.error;
+        return { ...prev, items, error, title: info.title, status: info.status, sessionId: info.sessionId, surface: info.surface };
       });
       return { ...state, tabs, activeTab: msg.activeTab, chatTab: msg.chatTab };
     }

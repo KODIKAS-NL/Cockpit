@@ -5,7 +5,7 @@
 //  - RemoteCliProcess:  the process lives in cockpit-daemon and survives the window; this
 //    class relays the same JSON lines over a Unix socket.
 //
-// Events (EventEmitter): 'event' (ClaudeEvent), 'exit' (code|null), 'stderr' (text).
+// Events (EventEmitter): 'event' (ClaudeEvent), 'exit' (code|null, reason?: 'stopped' | 'daemon' — the daemon stopped it on request / went away), 'stderr' (text).
 // RemoteCliProcess adds 'snapshot', 'settled' and 'remoteUser' (see there).
 import type { EventEmitter } from 'node:events';
 import type { CliOptions } from './CliProcessManager';

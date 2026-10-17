@@ -455,7 +455,7 @@ export class Session {
       log(`[cli stderr] ${t.trim()}`);
       if (isAuthError(t)) this.hooks.onAuthRequired();
     });
-    this.cli.on('exit', (code) => {
+    this.cli.on('exit', (code: number | null, reason?: 'stopped' | 'daemon') => {
       log(`CLI exited (${code})`);
       // Its prompts died with it (the daemon drops them too): close the cards, or answering
       // one later would go nowhere.
@@ -474,7 +474,17 @@ export class Session {
       this.setBusy(false);
       this.resetBgTasks(); // processo morto → nenhuma tarefa em background sobrevive
       if (abortedMidTurn) {
-        this.hooks.onTurnError?.({ kind: 'aborted', code });
+        if (reason) {
+          // Not a crash: another window stopped it, or the daemon restarted. A notice, not an error.
+          this.emit({
+            kind: 'engineNotice',
+            id: `exit:${randomUUID()}`,
+            text: '',
+            topic: reason === 'stopped' ? 'stopped_elsewhere' : 'daemon_restarted',
+          });
+        } else {
+          this.hooks.onTurnError?.({ kind: 'aborted', code });
+        }
         this.emit({ kind: 'stats', stats: this.stats.snapshot() });
       }
     });

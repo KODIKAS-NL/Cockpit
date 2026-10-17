@@ -707,9 +707,9 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
         )}
       </div>
 
-      {state.error && (
+      {activeTab(state)?.error && (
         <div className="turn-error" role="alert">
-          <span className="turn-error-text">{state.error}</span>
+          <span className="turn-error-text">{activeTab(state)?.error}</span>
           <button
             type="button"
             className="turn-error-x"

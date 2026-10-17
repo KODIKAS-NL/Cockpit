@@ -115,7 +115,7 @@ export type DaemonMessage =
   /** The conversation's auto-compact limit changed (any window). */
   | { type: 'autocompact_state'; sessionId: string; value: string }
   | { type: 'remote_state'; sessionId: string; on: boolean; url?: string }
-  | { type: 'exit'; sessionId: string; code: number | null }
+  | { type: 'exit'; sessionId: string; code: number | null; stopped?: boolean }
   /** The conversation was forgotten (deleted) by a window: every attached window lets go of it. */
   | { type: 'gone'; sessionId: string }
   | { type: 'stderr'; sessionId: string; text: string }

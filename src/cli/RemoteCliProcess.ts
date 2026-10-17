@@ -262,7 +262,7 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
         this.running = false;
         for (const done of this.pendingControl.values()) done(undefined);
         this.pendingControl.clear();
-        this.emit('exit', m.code);
+        this.emit('exit', m.code, m.stopped ? 'stopped' : undefined);
         return;
       case 'gone':
         // Another window deleted this conversation: let go for good. This instance is done (the
@@ -279,7 +279,7 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
         this.running = false;
         for (const done of this.pendingControl.values()) done(undefined);
         this.pendingControl.clear();
-        this.emit('exit', null);
+        this.emit('exit', null, 'daemon');
         return;
       default:
         return;

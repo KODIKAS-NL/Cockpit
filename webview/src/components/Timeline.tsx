@@ -520,6 +520,16 @@ const NoticeBanner = memo(function NoticeBanner({ item, t }: { item: NoticeItem;
       </div>
     );
   }
+  if (item.topic === 'stopped_elsewhere' || item.topic === 'daemon_restarted') {
+    return (
+      <div className="notice-banner" id={`msg-${item.id}`}>
+        <span className="notice-banner-mark">⚠</span>
+        <span className="notice-banner-text">
+          {t(item.topic === 'stopped_elsewhere' ? 'timeline.stoppedElsewhere' : 'timeline.daemonRestarted')}
+        </span>
+      </div>
+    );
+  }
   if (item.topic === 'session_gone') {
     return (
       <div className="notice-banner" id={`msg-${item.id}`}>

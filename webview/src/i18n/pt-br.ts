@@ -650,6 +650,8 @@ export const ptBR: Partial<Strings> = {
   'timeline.showEarlier': 'Mostrar mensagens anteriores ({0})',
   'timeline.hookContext': 'contexto injetado por hook',
   'timeline.commandOutput': 'saída do comando',
+  'timeline.stoppedElsewhere': 'O turno foi interrompido em outra janela.',
+  'timeline.daemonRestarted': 'O daemon reiniciou; o turno em andamento foi perdido. Envie de novo para continuar.',
   'timeline.sessionGone': 'Esta conversa foi apagada em outra janela. Sua próxima mensagem inicia uma nova.',
   'timeline.engineNotice': 'aviso do engine',
   'timeline.compactAuto': 'contexto compactado (auto)',

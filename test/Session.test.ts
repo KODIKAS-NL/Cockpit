@@ -195,6 +195,26 @@ describe('Session — continuidade de contexto (anti-duplicação)', () => {
     expect(emitted.some((m) => m.kind === 'assistantDone' && m.id === 'm-1')).toBe(true);
   });
 
+  it('an exit mid-turn with no reason is a crash, with one it is a notice', () => {
+    const errors: any[] = [];
+    const emitted: any[] = [];
+    const hooks = { onTurnError: (e: any) => errors.push(e) };
+    const make = () => {
+      const s = makeSession((m) => emitted.push(m));
+      (s as any).hooks.onTurnError = hooks.onTurnError;
+      s.send('p');
+      return s;
+    };
+    make();
+    spawns.at(-1).emit('exit', 143);
+    expect(errors).toEqual([{ kind: 'aborted', code: 143 }]);
+    errors.length = 0;
+    make();
+    spawns.at(-1).emit('exit', 143, 'stopped');
+    expect(errors).toEqual([]);
+    expect(emitted.some((m) => m.kind === 'engineNotice' && m.topic === 'stopped_elsewhere')).toBe(true);
+  });
+
   it('a mode the CLI switched to reaches the process options kept for a restart', () => {
     const s = makeSession();
     s.send('p');

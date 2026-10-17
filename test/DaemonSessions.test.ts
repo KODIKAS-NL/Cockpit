@@ -333,6 +333,21 @@ describe('two windows on one daemon session', () => {
     b.session.detach();
   });
 
+  it('a process another window stopped mid-turn is a notice, not a crash', async () => {
+    const sock = path.join(dir, 'd.sock');
+    const a = makeWindow(sock);
+    a.session.send('ASK may I?'); // the turn waits for an answer: it is still running when stopped
+    await until(() => kinds(a, 'permissionRequest').length === 1 && !!a.session.sessionId, 'A is mid-turn');
+    const b = makeWindow(sock);
+    b.session.resume(a.session.sessionId ?? '');
+    b.session.ensureCli();
+    await until(() => b.session.isPersistent() && b.session.busy, 'B attached mid-turn');
+    a.session.stop();
+    await until(() => kinds(b, 'engineNotice').some((m) => m.topic === 'stopped_elsewhere'), 'B gets the notice');
+    expect(b.errors).toEqual([]);
+    b.session.detach();
+  });
+
   it('closes a prompt whose process ended', async () => {
     const sock = path.join(dir, 'd.sock');
     const a = makeWindow(sock);
