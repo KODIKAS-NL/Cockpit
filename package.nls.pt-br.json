@@ -1,5 +1,5 @@
 {
-  "ext.description": "GUI rica para o Claude Code: transparência de contexto, cache, custo e limites da conta, inline diffs, plan mode e checkpoints — operando através do Claude Code CLI.",
+  "ext.description": "Conversas do Claude Code que sobrevivem à janela: comece uma tarefa em um dispositivo, continue em outro, até pelo celular. Uma GUI sobre o Claude Code CLI, com contexto, cache e custo em tempo real.",
   "view.cockpit.name": "Painel",
   "cmd.open": "Abrir Cockpit",
   "cmd.newSession": "Nova sessão",

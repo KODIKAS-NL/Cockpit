@@ -12,9 +12,11 @@
 > testing, and none on Linux or Windows. Expect rough edges and report what you find. This note
 > will be removed once the fork has had more use.
 
-Cockpit is a VS Code extension that gives Claude Code a graphical interface. It runs the `claude`
-command line tool for you and shows what the tool is doing: the conversation, the tool calls, diffs,
-permission prompts, and how much context, cache and budget you have used.
+Cockpit keeps your Claude Code conversations running when your window goes away. A small background
+service, the daemon, owns the `claude` process, so you can start a task on one device, continue it on
+another, and follow it from your phone. On top of that it is a VS Code extension with a graphical
+interface that shows what the tool is doing: the conversation, the tool calls, diffs, permission
+prompts, and how much context, cache and budget you have used.
 
 It is a fork of [Tootega Cockpit for Claude Code](https://github.com/HermesSilva/Cockpit) by Tootega
 Pesquisa e Inovação (HermesSilva). Almost everything good in it starts with their work: a thorough
