@@ -3,8 +3,8 @@
   "displayName": "Cockpit for Claude Code",
   "description": "%ext.description%",
   "icon": "media/icon.png",
-  "version": "1.0.305",
-  "publisher": "KODIKAS",
+  "version": "1.0.306",
+  "publisher": "KODIKAS-NL",
   "license": "MIT",
   "author": {
     "name": "Tootega Pesquisa e Inovação",

@@ -8,7 +8,7 @@ and the project adopts semantic versioning.
 
 ### Changed
 - **New extension identity, new namespace.** This fork is its own extension
-  (`KODIKAS.cockpit-claude-code-daemon`) and can be installed next to the original. Every command,
+  (`KODIKAS-NL.cockpit-claude-code-daemon`) and can be installed next to the original. Every command,
   setting, view and context key moved from `tootega.*` to `cockpitDaemon.*` (for example
   `cockpitDaemon.preferredLocation`, `cockpitDaemon.daemon.socketPath`), so the two extensions no
   longer register the same ids. Settings you had under `tootega.*` are not read any more: rename the

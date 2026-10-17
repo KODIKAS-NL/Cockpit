@@ -79,7 +79,7 @@ On a session card in the dashboard, a small icon tab holds: **details** (always 
 active session), **remote control** (phone icon), **reload**, **rename** and **delete**. The others
 show when you point at the card.
 
-URI handler: `vscode://KODIKAS.cockpit-claude-code-daemon/open` opens the Cockpit.
+URI handler: `vscode://KODIKAS-NL.cockpit-claude-code-daemon/open` opens the Cockpit.
 
 ## Slash commands
 

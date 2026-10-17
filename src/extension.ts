@@ -336,7 +336,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
-  // URI handler: vscode://KODIKAS.cockpit-claude-code-daemon/open
+  // URI handler: vscode://KODIKAS-NL.cockpit-claude-code-daemon/open
   context.subscriptions.push(
     vscode.window.registerUriHandler({
       handleUri: (uri) => {
