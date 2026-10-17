@@ -108,6 +108,8 @@ export class DaemonSession {
   private quickFailures = 0;
   /** A setting the CLI only reads at start changed mid-turn: restart once the turn is over. */
   private restartWhenIdle = false;
+  /** Background tasks the CLI reports running (a restart would kill them). */
+  private bgTasks = 0;
 
   constructor(data: PersistedSession, hooks: DaemonSessionHooks) {
     this.id = data.id;
@@ -144,7 +146,7 @@ export class DaemonSession {
     this.hooks.changed();
     this.broadcast({ type: 'autocompact_state', sessionId: this.id, value: v });
     if (!this.proc) return;
-    if (this.busy) this.restartWhenIdle = true;
+    if (this.busy || this.bgTasks > 0) this.restartWhenIdle = true;
     else this.restart();
   }
 
@@ -497,6 +499,9 @@ export class DaemonSession {
           this.cliSessionId = ev.session_id;
           this.hooks.changed();
         }
+        if (ev.subtype === 'background_tasks_changed') {
+          this.bgTasks = Array.isArray(ev.tasks) ? ev.tasks.length : 0;
+        }
         // A background task that finished opens a turn on its own.
         if (ev.subtype === 'task_notification' && (ev.status === 'completed' || ev.status === 'failed')) {
           this.busy = true;
@@ -529,7 +534,14 @@ export class DaemonSession {
     }
     this.broadcast({ type: 'event', sessionId: this.id, event: ev });
     // The turn a settings change waited for is over (and nothing else is queued or asked).
-    if (ev.type === 'result' && this.restartWhenIdle && !this.busy && this.pending.size === 0) this.restart();
+    // Idle means no turn, no prompt waiting and no background task: a restart would kill them.
+    const settled =
+      (ev.type === 'result' || (ev.type === 'system' && ev.subtype === 'background_tasks_changed')) &&
+      this.restartWhenIdle &&
+      !this.busy &&
+      this.pending.size === 0 &&
+      this.bgTasks === 0;
+    if (settled) this.restart();
   }
 
   private onExit(code: number | null): void {
@@ -537,6 +549,7 @@ export class DaemonSession {
     this.hooks.log(`[${this.id}] exit ${code}${deliberate ? ' (stopped)' : ''}`);
     this.proc = null;
     this.busy = false;
+    this.bgTasks = 0;
     this.unconsumed = 0;
     this.stopping = false;
     this.partial = [];

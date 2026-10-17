@@ -1,7 +1,7 @@
 // The surface Session uses to talk to an engine process, whoever owns it.
 //
 // Two implementations:
-//  - CliProcessManager: spawns the CLI as a child of the extension host (the original mode).
+//  - CliProcessManager: spawns the CLI as a child of the extension host (the Tootega engine's agent).
 //  - RemoteCliProcess:  the process lives in cockpit-daemon and survives the window; this
 //    class relays the same JSON lines over a Unix socket.
 //
@@ -29,9 +29,9 @@ export interface CliProcess extends EventEmitter {
   detach(): void;
   /**
    * Settings switched live (model, effort, permission mode) that a later restart must keep.
-   * Only the daemon restarts on its own; a local process is respawned from fresh options.
+   * Only the daemon restarts on its own; the Tootega process is respawned from these options.
    */
   updateOptions?(patch: Partial<CliOptions>): void;
-  /** True when the process outlives this window (daemon mode). */
+  /** True when the process outlives this window (the daemon's). */
   readonly persistent: boolean;
 }

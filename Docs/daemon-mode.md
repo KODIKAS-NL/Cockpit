@@ -1,6 +1,6 @@
-# Daemon mode: architecture and operations
+# The daemon: architecture and operations
 
-Daemon mode lets a Claude Code conversation outlive the VS Code window that started it. The
+Every Claude Code conversation runs in the daemon, so it can outlive the VS Code window that started it. The
 Claude process runs inside **cockpit-daemon**, a small background service, instead of as a
 child of the window's extension host. Windows attach to it, follow it, and let go of it; the
 conversation keeps running in between.
@@ -160,7 +160,7 @@ daemon** detects it and installs nothing.
 
 On the machine that holds the code (the Mac mini):
 
-1. Install the Cockpit `.vsix` in every VS Code server that should use daemon mode. The
+1. Install the Cockpit `.vsix` in every VS Code server that should use the daemon. The
    Remote-SSH server and code-server keep separate extension folders.
 2. Open any window there and run **Cockpit Daemon: Install daemon** from the command palette.
 
@@ -330,9 +330,9 @@ knows the session id, so a restart always continues the same transcript.
 | `src/daemon/paths.ts` | Socket location and folder normalization, shared by both sides. |
 | `src/daemon/service.ts` | launchd install/restart, detached start on other platforms, probe for a running daemon. |
 | `mac/CockpitDaemon/` | The macOS menu bar app that can run the daemon instead of launchd. |
-| `src/cli/CliProcess.ts` | The interface `Session` uses for either kind of process. |
+| `src/cli/CliProcess.ts` | The interface `Session` uses for either kind of process (the daemon's, or the Tootega engine's). |
 | `src/cli/RemoteCliProcess.ts` | `CliProcess` relayed through the daemon. |
-| `src/cli/CliProcessManager.ts` | The local process (unchanged behaviour); exports the argument builder both share. |
+| `src/cli/CliProcessManager.ts` | The Tootega engine's child process; exports the argument builder both share. |
 | `src/session/Session.ts` | Snapshot replay, prompts settled elsewhere, other windows' messages, refusals. |
 | `src/panel/ChatViewProvider.ts` | Auto-attach on open, live badges, detach on close, one plan file per plan. |
 | `shared/daemon.ts` | Protocol types. |

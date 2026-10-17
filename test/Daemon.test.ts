@@ -343,6 +343,21 @@ describe('cockpit-daemon', () => {
     expect(argv[argv.indexOf('--autocompact') + 1]).toBe('400000');
   });
 
+  it('waits for background tasks before applying an auto-compact change', async () => {
+    const a = await peer('A');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-bg'] }));
+    a.user(s.session.id, 'BGSTART task');
+    await a.wait((m) => m.type === 'event' && (m as any).event.type === 'result');
+    a.write({ op: 'autocompact', sessionId: s.session.id, value: '350000' });
+    await a.wait((m) => m.type === 'autocompact_state');
+    await sleep(150);
+    expect(spawnsOf('sess-bg').length).toBe(1); // a restart would kill the task
+    a.user(s.session.id, 'BGEND task');
+    await until(() => spawnsOf('sess-bg').length === 2);
+    const argv = spawnsOf('sess-bg').pop().argv as string[];
+    expect(argv[argv.indexOf('--autocompact') + 1]).toBe('350000');
+  });
+
   it('starts the next process from a spec a window switched live', async () => {
     const a = await peer('A');
     const s = await a.open(project, spec({ args: ['--resume', 'sess-sp', '--model', 'old-model'] }));

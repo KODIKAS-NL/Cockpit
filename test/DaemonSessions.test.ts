@@ -284,6 +284,7 @@ describe('two windows on one daemon session', () => {
     b.session.resume(cliId);
     const from = cliLines().length;
     expect(b.session.setAutoCompact('250000')).toBe(true);
+    b.session.ensureCli(); // the choice waits for the attach, then reaches the daemon
     await until(() => cliLines(from).some((l) => l.argv?.includes('250000')), 'restarted with B\'s choice');
     expect(b.session.autoCompact()).toBe('250000');
     b.session.detach();
@@ -296,9 +297,9 @@ describe('two windows on one daemon session', () => {
     a.session.send('SLOW long one');
     await until(() => kinds(a, 'assistantDelta').length > 0 || cliLines(from).some((l) => l.type === 'user'), 'the turn runs');
     await until(() => a.session.isPersistent() && a.session.busy, 'attached and busy');
-    expect(a.session.setModel('claude-opus-x')).toBe(true);
-    expect(a.session.setEffort('high')).toBe(true);
-    expect(a.session.setPermission('acceptEdits')).toBe(true);
+    a.session.setModel('claude-opus-x');
+    a.session.setEffort('high');
+    a.session.setPermission('acceptEdits');
     await until(() => kinds(a, 'turnComplete').length === 1, 'the turn ends');
     const lines = cliLines(from);
     expect(lines.filter((l) => l.argv).length).toBe(1); // never restarted

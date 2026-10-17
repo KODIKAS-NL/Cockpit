@@ -51,6 +51,7 @@ export const ptBR: Partial<Strings> = {
   'composer.placeholder': 'Pergunte ao Claude Code…  (Enter envia, Shift+Enter quebra linha)',
   'composer.send': 'Enviar',
   'composer.stop': 'Parar',
+  'composer.stopCompacting': 'Compactando o contexto… · Parar',
   'composer.tools': 'Ferramentas',
   'composer.sendNow': 'Enviar agora',
   'composer.sendNowHint': 'Interrompe o turno atual e envia esta mensagem imediatamente',

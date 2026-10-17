@@ -325,7 +325,6 @@ function PlanModal({ t, req, onDecision, planApproval }: Props) {
                 key={mode}
                 type="button"
                 className={`btn${remembered === mode ? ' send' : ''}`}
-                autoFocus={remembered === mode}
                 onClick={() => onDecision('allow', undefined, mode === 'default' ? undefined : mode)}
               >
                 {t(key)}

@@ -1030,7 +1030,7 @@ export const Composer = memo(function Composer({
               type="button"
               className="btn stop send-icon"
               onClick={onStop}
-              title={compacting ? `${t('activity.compacting')} · ${t('composer.stop')}` : t('composer.stop')}
+              title={t(compacting ? 'composer.stopCompacting' : 'composer.stop')}
               aria-label={t('composer.stop')}
             >
               {/* A spinner while the turn runs; on hover/focus it turns into the square (= Stop). */}

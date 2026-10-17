@@ -52,6 +52,11 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
     return this.attached && this.running;
   }
 
+  /** Resolves once the attach in progress (if any) is done. */
+  async whenAttached(): Promise<void> {
+    if (this.opening) await this.opening;
+  }
+
   setResumeId(id: string): void {
     if (id) this.opts.resumeSessionId = id;
   }
@@ -260,11 +265,10 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
         this.emit('exit', m.code);
         return;
       case 'gone':
-        // Another window deleted this conversation: let go. The next message opens a new one.
-        this.attached = false;
-        this.running = false;
-        for (const done of this.pendingControl.values()) done(undefined);
-        this.pendingControl.clear();
+        // Another window deleted this conversation: let go for good. This instance is done (the
+        // Session drops it); a new one opens a fresh conversation, with nothing to resume.
+        this.opts.resumeSessionId = undefined;
+        this.close();
         this.emit('gone');
         this.emit('exit', null);
         return;

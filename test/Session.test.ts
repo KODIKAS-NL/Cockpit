@@ -15,6 +15,8 @@ const { spawns, MockCli } = vi.hoisted(() => {
     controls: { subtype: string; payload?: Record<string, unknown> }[] = [];
     started = false;
     stopped = false;
+    persistent = true;
+    autoCompact?: string;
     constructor(public opts: CliOptions) {
       spawns.push(this);
     }
@@ -26,6 +28,21 @@ const { spawns, MockCli } = vi.hoisted(() => {
     }
     start() {
       this.started = true;
+    }
+    hasPendingCompact() {
+      return false;
+    }
+    setAutoCompact(v: string) {
+      this.autoCompact = v;
+    }
+    setRemote() {
+      return Promise.resolve({ ok: true });
+    }
+    whenAttached() {
+      return Promise.resolve();
+    }
+    detach() {
+      this.stopped = true;
     }
     sendUserMessage(text: string) {
       this.sent.push(text);
@@ -55,7 +72,8 @@ const { spawns, MockCli } = vi.hoisted(() => {
   return { spawns, MockCli };
 });
 
-vi.mock('../src/cli/CliProcessManager', () => ({ CliProcessManager: MockCli }));
+// Claude runs through RemoteCliProcess (the daemon's client): the mock stands in for it.
+vi.mock('../src/cli/RemoteCliProcess', () => ({ RemoteCliProcess: MockCli }));
 // No disk side effects in the test (keeps the other exports real).
 vi.mock('../src/stats/StatsStore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/stats/StatsStore')>()),
@@ -80,6 +98,7 @@ function makeSession(emit: SessionHooks['emit'] = () => {}): Session {
     askLanguage: () => 'en',
     extraSystemPrompt: () => extraPrompt,
     quietPrompt: () => quietPrompt,
+    daemon: () => ({}) as never,
   };
   return new Session(hooks);
 }
@@ -114,9 +133,9 @@ describe('Session — continuidade de contexto (anti-duplicação)', () => {
     s.send('p');
     spawns[0].fireInit('sess-A');
 
-    expect(s.setModel('claude-opus-4-8')).toBe(true);
-    expect(s.setEffort('high')).toBe(true);
-    expect(s.setPermission('plan')).toBe(true);
+    s.setModel('claude-opus-4-8');
+    s.setEffort('high');
+    s.setPermission('plan');
     s.send('p2');
 
     expect(spawns).toHaveLength(1);
@@ -127,10 +146,12 @@ describe('Session — continuidade de contexto (anti-duplicação)', () => {
     ]);
   });
 
-  it('a refused live switch falls back to a respawn with the new model', async () => {
+  it('a refused live switch while idle falls back to a respawn with the new model', async () => {
     const s = makeSession();
-    s.send('p');
+    s.send('p', undefined, 'u1');
     spawns[0].fireInit('sess-A');
+    spawns[0].emit('event', { type: 'user', uuid: 'u1', isReplay: true, message: { role: 'user', content: 'p' } }); // taken in
+    spawns[0].emit('event', { type: 'result', subtype: 'success', usage: {} }); // the turn is over
     spawns[0].requestControl = () => Promise.resolve(undefined);
 
     s.setModel('claude-opus-4-8');
@@ -140,6 +161,58 @@ describe('Session — continuidade de contexto (anti-duplicação)', () => {
     expect(spawns).toHaveLength(2);
     expect(spawns[1].opts.model).toBe('claude-opus-4-8');
     expect(spawns[1].opts.resumeSessionId).toBe('sess-A');
+  });
+
+  it('a refused live switch mid-turn leaves the turn alone and restarts after it', async () => {
+    const s = makeSession();
+    s.send('p', undefined, 'u1');
+    spawns[0].fireInit('sess-A');
+    spawns[0].emit('event', { type: 'user', uuid: 'u1', isReplay: true, message: { role: 'user', content: 'p' } }); // taken in
+    spawns[0].requestControl = () => Promise.resolve(undefined);
+
+    s.setModel('claude-opus-4-8');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(spawns[0].stopped).toBe(false); // the turn keeps running
+
+    spawns[0].emit('event', { type: 'result', subtype: 'success', usage: {} });
+    expect(spawns[0].stopped).toBe(true);
+    s.send('p2');
+    expect(spawns).toHaveLength(2);
+    expect(spawns[1].opts.model).toBe('claude-opus-4-8');
+    expect(spawns[1].opts.resumeSessionId).toBe('sess-A');
+  });
+
+  it('stopping mid-message closes the message, so no caret is left blinking', () => {
+    const emitted: any[] = [];
+    const s = makeSession((m) => emitted.push(m));
+    s.send('p');
+    spawns[0].fireInit('sess-A');
+    spawns[0].emit('event', {
+      type: 'stream_event',
+      event: { type: 'message_start', message: { id: 'm-1', role: 'assistant' } },
+    });
+    s.stop();
+    expect(emitted.some((m) => m.kind === 'assistantDone' && m.id === 'm-1')).toBe(true);
+  });
+
+  it('a mode the CLI switched to reaches the process options kept for a restart', () => {
+    const s = makeSession();
+    s.send('p');
+    spawns[0].fireInit('sess-A');
+    spawns[0].updated = [];
+    spawns[0].updateOptions = (patch: any) => spawns[0].updated.push(patch);
+    spawns[0].emit('event', { type: 'system', subtype: 'status', status: null, permissionMode: 'acceptEdits' });
+    expect(spawns[0].updated.at(-1)).toMatchObject({ permissionMode: 'acceptEdits' });
+  });
+
+  it('a conversation deleted elsewhere is let go: the next message starts a new one', () => {
+    const s = makeSession();
+    s.send('p');
+    spawns[0].fireInit('sess-A');
+    spawns[0].emit('gone');
+    s.send('again');
+    expect(spawns).toHaveLength(2);
+    expect(spawns[1].opts.resumeSessionId).toBeUndefined();
   });
 
   it('a prompt still open when the process exits is closed', () => {
@@ -441,6 +514,15 @@ describe('model switched elsewhere', () => {
     expect(s.model()).toBe('sonnet');
     answer('claude-opus-5-5', 'm2'); // /model opus typed on the phone
     expect(s.model()).toBe('claude-opus-5-5');
+  });
+
+  it('does not replace "default" with whatever answered', () => {
+    const s = makeSession(() => {});
+    s.send('p');
+    spawns[0].fireInit('sess-D');
+    answer('claude-sonnet-5-5', 'm1');
+    answer('claude-opus-5-5', 'm2');
+    expect(s.model()).toBe('default');
   });
 
   it('keeps the picker when it already matches', () => {

@@ -389,9 +389,14 @@ export class CliProcessManager extends EventEmitter implements CliProcess {
     });
   }
 
-  /** A local process belongs to this window: letting go of it means ending it. */
+  /** This process belongs to the window: letting go of it means ending it. */
   detach(): void {
     this.stop();
+  }
+
+  /** Settings switched live that a later respawn must keep. */
+  updateOptions(patch: Partial<CliOptions>): void {
+    Object.assign(this.opts, patch);
   }
 
   stop(): void {

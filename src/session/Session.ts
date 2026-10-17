@@ -42,6 +42,8 @@ export interface SessionHooks {
   modePin?: (mode: string) => { model?: string; effort?: string } | undefined;
   /** The CLI switched mode on its own (e.g. a plan was approved): the picks changed with it. */
   onModeChanged?: () => void;
+  /** The picker followed a model chosen elsewhere: show it, but do not persist it as a choice. */
+  onModelFollowed?: () => void;
   /** The conversation's auto-compact limit was changed by another window: the picks changed with it. */
   onCompactChanged?: () => void;
   onInit: (model?: string, slashCommands?: string[]) => void;
@@ -86,9 +88,9 @@ export interface SessionHooks {
   extraSystemPrompt: () => string | undefined;
   // Diretiva "quiet" (settings): vai no início do texto injetado. Vazio = não injeta.
   quietPrompt: () => string | undefined;
-  // Daemon mode: when this returns a client, the Claude process lives in cockpit-daemon and
-  // outlives the window. Undefined (or no hook) = a local child process, as before.
-  daemon?: () => DaemonClient | undefined;
+  // The Claude process lives in cockpit-daemon and outlives the window; this is its client.
+  // (The Tootega engine is the exception: its process is a child of the extension host.)
+  daemon: () => DaemonClient;
 }
 
 export class Session {
@@ -139,7 +141,7 @@ export class Session {
   // Tootega tab side by side is the intended use: different processes, and the
   // Claude ones never touch the local server.
   engineOverride?: EngineId;
-  /** Empty history already announced for this tab (local engine only). */
+  /** Empty history already announced for this tab (Tootega engine only). */
   private historyAnnounced = false;
   modelOverride?: string;
   effortOverride?: string;
@@ -171,7 +173,7 @@ export class Session {
   /** Prompts this window already has on screen (its own and other windows'), by uuid: their CLI echo must not draw them again. */
   private shownUser = new Set<string>();
   private replayEcho = false;
-  // Settings changed while no process was attached (daemon mode, after a reload): the
+  // Settings changed while no process was attached (e.g. after a reload): the
   // daemon's process may already be running with the old ones. Applied live on attach.
   private dirtyLive = new Set<LiveSetting>();
   // We interrupted a turn that has messages waiting: its error result is expected, and the
@@ -228,20 +230,19 @@ export class Session {
   }
 
   // Model, effort and permission mode switch in the running process: a restart would abort the
-  // turn, and in daemon mode end the process every window and the phone share. Each returns
-  // true when nothing waits for a restart.
-  setModel(m: string): boolean {
+  // turn, and end the process every window and the phone share. None waits for a restart.
+  setModel(m: string): void {
     this.modelOverride = m;
-    return this.applyLive(['model']);
+    this.applyLive(['model']);
   }
-  setEffort(e: string): boolean {
+  setEffort(e: string): void {
     this.effortOverride = e;
-    return this.applyLive(['effort']);
+    this.applyLive(['effort']);
   }
-  setPermission(p: string): boolean {
+  setPermission(p: string): void {
     this.permissionOverride = p;
     const pinned = this.applyModePin(p, false);
-    return this.applyLive(pinned ? ['permission', 'model', 'effort'] : ['permission']);
+    this.applyLive(pinned ? ['permission', 'model', 'effort'] : ['permission']);
   }
 
   /**
@@ -261,23 +262,22 @@ export class Session {
   }
 
   /** Brings the process in step with the settings in `kinds`, without restarting it. */
-  private applyLive(kinds: LiveSetting[]): boolean {
+  private applyLive(kinds: LiveSetting[]): void {
     const cli = this.cli;
     if (!cli) {
       for (const k of kinds) this.dirtyLive.add(k);
-      return true;
+      return;
     }
     cli.updateOptions?.(this.liveOptions());
     if (cli.isRunning()) {
       void this.sendLive(kinds);
-    } else if (cli instanceof RemoteCliProcess) {
+    } else if (cli.persistent) {
       // Attaching, or attached to a session with no process: the spec covers a new process,
       // the snapshot tells whether one is already running with the old settings.
       for (const k of kinds) this.dirtyLive.add(k);
     } else {
-      this.stop(); // a local process that is not running: the next one starts from fresh options
+      this.stop(); // a process that is not running: the next one starts from fresh options
     }
-    return true;
   }
 
   /** The control requests the mode pins use too. A refusal falls back to a restart. */
@@ -297,9 +297,24 @@ export class Session {
     );
     dlog('session', `live ${kinds.join('+')}: ${results.map((r) => (r === undefined ? 'failed' : 'ok')).join(', ')}`);
     if (results.some((r) => r === undefined) && this.cli === cli) {
-      log(`[session] live switch of ${kinds.join('+')} was refused: restarting the process`);
-      this.restartWithSettings();
+      const failed = kinds.filter((_, i) => results[i] === undefined).join('+');
+      cli.updateOptions?.(this.cliOptions());
+      if (this.busy) {
+        // A restart now would abort the turn (and, on the daemon, the process every window shares).
+        log(`[session] live switch of ${failed} failed mid-turn: restarting after the turn`);
+        this.restartAfterTurn = true;
+      } else {
+        log(`[session] live switch of ${failed} failed: restarting the process`);
+        this.restartWithSettings();
+      }
     }
+  }
+  /** A live switch failed while a turn ran: the process restarts when the turn ends. */
+  private restartAfterTurn = false;
+
+  /** The CLI changed a setting on its own: the daemon's spec follows, so a restart keeps it. */
+  private syncSpec(): void {
+    if (!this.replaying) this.cli?.updateOptions?.(this.liveOptions());
   }
 
   /** The settings a live switch changes, as process options (what a later restart must keep). */
@@ -315,7 +330,7 @@ export class Session {
 
   /**
    * Settings the CLI only reads at start: stop, and the next message starts it with them. In
-   * daemon mode the daemon gets the new spec first (it restarts on its own under Remote Control).
+   * the daemon gets the new spec first (it restarts on its own under Remote Control).
    */
   private restartWithSettings(): void {
     this.cli?.updateOptions?.(this.cliOptions());
@@ -347,21 +362,27 @@ export class Session {
     this.allowAgentsOverride = v;
     this.restartWithSettings();
   }
-  /** True when the change needs no restart from this window (daemon mode). */
+  /** True when the change needs no restart from this window (Claude: the daemon restarts). */
   setAutoCompact(v: string): boolean {
     this.autoCompactOverride = v;
-    // In daemon mode the limit belongs to the conversation: the daemon keeps it, so it survives a
+    // For Claude the limit belongs to the conversation: the daemon keeps it, so it survives a
     // restart and holds in every window (and under Remote Control). The process reads it at
-    // start, so the daemon restarts it — after the turn, when one is running. Attaching first
-    // makes sure the choice reaches the daemon even right after a window reload.
-    if (!this.cli && this.engine() === 'claude' && this.hooks.daemon?.()) this.ensureCli();
+    // start, so the daemon restarts it — after the turn, when one is running. With no process
+    // yet, the choice only waits: the first start carries it.
     if (this.cli instanceof RemoteCliProcess) {
       this.cli.setAutoCompact(v);
+      return true;
+    }
+    if (!this.cli && this.engine() === 'claude') {
+      this.compactChosenDetached = true;
       return true;
     }
     this.stop();
     return false;
   }
+
+  /** The user picked an auto-compact limit while no process was attached: the attach sends it. */
+  private compactChosenDetached = false;
 
   /** Everything a new process starts with. */
   private cliOptions(): CliOptions {
@@ -401,23 +422,33 @@ export class Session {
     if (this.cli) return;
     const opts = this.cliOptions();
     const engine = opts.engine ?? 'claude';
-    // Daemon mode is for the Claude engine only: the local agent keeps its own lifecycle.
-    const daemon = engine === 'claude' ? this.hooks.daemon?.() : undefined;
+    // Claude runs in the daemon; the Tootega agent keeps its own lifecycle, as a child process.
     this.replayEcho = engine === 'claude'; // buildClaudeArgs passes --replay-user-messages
-    if (daemon) {
-      const remote = new RemoteCliProcess(opts, daemon);
+    if (engine === 'claude') {
+      const remote = new RemoteCliProcess(opts, this.hooks.daemon());
       remote.on('snapshot', (snap: SessionSnapshot) => this.onSnapshot(snap));
       remote.on('settled', (requestId: string) => this.onPromptSettled(requestId));
       remote.on('remoteUser', (message: unknown, uuid?: string) => this.onRemoteUser(message, uuid));
       remote.on('autoCompact', (value: string) => this.adoptAutoCompact(value));
-      remote.on('gone', () =>
-        this.emit({ kind: 'engineNotice', id: `gone:${Date.now()}`, text: '', topic: 'session_gone' }),
-      );
+      remote.on('gone', () => {
+        // Deleted elsewhere: the timeline stays, but the next message starts a new conversation.
+        this.cli = undefined;
+        this.sessionId = undefined;
+        this.resumeId = undefined;
+        this.seenModel = undefined;
+        this.historyAnnounced = false;
+        this.emit({ kind: 'engineNotice', id: `gone:${Date.now()}`, text: '', topic: 'session_gone' });
+      });
       remote.on('remoteState', (on: boolean, url?: string) => this.onRemoteState(on, url));
+      // A limit chosen before any process: it goes to the daemon right after attaching.
+      if (this.compactChosenDetached && this.autoCompactOverride !== undefined) {
+        remote.setAutoCompact(this.autoCompactOverride);
+      }
+      this.compactChosenDetached = false;
       this.cli = remote;
     } else {
       this.cli = new CliProcessManager(opts);
-      this.dirtyLive.clear(); // a local process starts from these options
+      this.dirtyLive.clear(); // a new process starts from these options
     }
     this.cli.on('event', (e: ClaudeEvent) => this.onCliEvent(e));
     this.cli.on('stderr', (t: string) => {
@@ -539,6 +570,9 @@ export class Session {
 
   /** Stops the process; keeps the statistics. The next message respawns it. */
   stop(): void {
+    // Close the message in flight, or the timeline keeps its caret blinking.
+    if (this.currentAssistantId) this.emit({ kind: 'assistantDone', id: this.currentAssistantId });
+    this.restartAfterTurn = false;
     this.resetStreamingState();
     this.settleAllPrompts();
     this.clearQueue();
@@ -552,8 +586,8 @@ export class Session {
   }
 
   /**
-   * The window is done with this tab, but in daemon mode the conversation goes on without
-   * it: lets go of the process instead of ending it. A local process just stops.
+   * The window is done with this tab, but the Claude conversation goes on without it (in the
+   * daemon): lets go of the process instead of ending it. The Tootega process just stops.
    */
   detach(): void {
     if (!this.cli?.persistent) {
@@ -573,7 +607,7 @@ export class Session {
     this.resetBgTasks();
   }
 
-  /** True when the process outlives this window (daemon mode). */
+  /** True when the process outlives this window (the daemon's). */
   isPersistent(): boolean {
     return !!this.cli?.persistent;
   }
@@ -583,7 +617,7 @@ export class Session {
     for (const msg of this.pendingPromptMsg.values()) this.emit(msg);
   }
 
-  // ---- daemon mode: staying in step with other windows ----
+  // ---- the daemon: staying in step with other windows ----
 
   /**
    * Attached to a daemon session: catch up. History comes from the transcript (the host
@@ -613,7 +647,7 @@ export class Session {
       const kinds = [...this.dirtyLive];
       this.dirtyLive.clear();
       this.cli?.updateOptions?.(this.liveOptions());
-      if (!snap.started && snap.session.state !== 'idle') void this.sendLive(kinds);
+      if (snap.started || snap.session.state !== 'idle') void this.sendLive(kinds);
     }
     dlog(
       'session',
@@ -664,10 +698,15 @@ export class Session {
     return this.cli instanceof RemoteCliProcess;
   }
 
+  /** Resolves once the daemon attach in progress (if any) is done. */
+  async whenAttached(): Promise<void> {
+    if (this.cli instanceof RemoteCliProcess) await this.cli.whenAttached();
+  }
+
   /** Turns Remote Control on or off; the state itself comes back through `onRemoteState`. */
   async setRemote(on: boolean): Promise<{ ok: boolean; url?: string; error?: string }> {
     this.ensureCli();
-    if (!(this.cli instanceof RemoteCliProcess)) return { ok: false, error: 'daemon mode is off' };
+    if (!(this.cli instanceof RemoteCliProcess)) return { ok: false, error: 'not available for this engine' };
     return this.cli.setRemote(on);
   }
 
@@ -700,9 +739,9 @@ export class Session {
 
   /** Clears the conversation entirely (new/resume): also resets the statistics. */
   clearConversation(end = false): void {
-    // Daemon mode: the conversation this tab leaves keeps running (another window, or this
-    // one later, can pick it up). Local mode: detach() is stop(). `end`: the conversation is
-    // being deleted, so it must not keep running.
+    // The conversation this tab leaves keeps running in the daemon (another window, or this
+    // one later, can pick it up); detach() is stop() for the Tootega process. `end`: the
+    // conversation is being deleted, so it must not keep running.
     if (end) this.stop();
     else this.detach();
     this.sessionId = undefined;
@@ -1018,6 +1057,7 @@ export class Session {
           if (mode && mode !== cliMode(this.permission())) {
             this.permissionOverride = mode;
             this.applyModePin(mode, !this.replaying);
+            this.syncSpec();
             this.hooks.onModeChanged?.();
           }
           const status = String(s.status ?? '');
@@ -1230,6 +1270,11 @@ export class Session {
         this.setBusy(false);
         this.hooks.onResult();
         this.resetStreamingState();
+        if (this.restartAfterTurn && this.unconsumed.size === 0 && !this.replaying) {
+          this.restartAfterTurn = false;
+          this.restartWithSettings();
+          break;
+        }
         // Messages still in the CLI's queue run as the next turn, right away.
         if (this.unconsumed.size > 0) {
           this.setBusy(true);
@@ -1458,9 +1503,11 @@ export class Session {
     this.seenModel = id;
     if (prev === undefined || prev === id || this.replaying) return;
     const sel = this.model().replace(/\[1m\]/i, '').toLowerCase();
-    if (sel !== 'default' && id.toLowerCase().includes(sel)) return;
+    // 'default' (or an alias) names no concrete model: whatever answers is the default's choice.
+    if (sel === 'default' || id.toLowerCase().includes(sel)) return;
     this.modelOverride = id;
-    this.hooks.onModeChanged?.();
+    this.syncSpec();
+    this.hooks.onModelFollowed?.();
   }
   private seenModel?: string;
 

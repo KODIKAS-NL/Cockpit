@@ -43,7 +43,7 @@ const { spawns, MockCli } = vi.hoisted(() => {
   return { spawns, MockCli };
 });
 
-vi.mock('../src/cli/CliProcessManager', () => ({ CliProcessManager: MockCli }));
+vi.mock('../src/cli/RemoteCliProcess', () => ({ RemoteCliProcess: MockCli }));
 vi.mock('../src/stats/StatsStore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/stats/StatsStore')>()),
   loadStats: () => undefined,
@@ -73,6 +73,7 @@ function makeSession(permission: string): Session {
     askLanguage: () => 'en',
     extraSystemPrompt: () => undefined,
     quietPrompt: () => undefined,
+    daemon: () => ({}) as never,
     savePlan: (p: string) => {
       savedPlans.push(p);
       return '/tmp/proj/Planing/plan.md';

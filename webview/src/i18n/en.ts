@@ -49,6 +49,7 @@ export const en = {
   'composer.placeholder': 'Ask Claude Code…  (Enter to send, Shift+Enter for newline)',
   'composer.send': 'Send',
   'composer.stop': 'Stop',
+  'composer.stopCompacting': 'Compacting the context… · Stop',
   'composer.tools': 'Tools',
   'composer.sendNow': 'Send now',
   'composer.sendNowHint': 'Stop the current turn and send this message right away',

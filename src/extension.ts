@@ -90,7 +90,7 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       // A daemon that runs without our launchd agent (the Cockpit Daemon menu bar app, or one
       // started by hand) already does the job: installing a second one would fight it for the
-      // socket. Just switch daemon mode on.
+      // socket. Nothing to install.
       const runningPid = await probeDaemon(socketPath);
       if (runningPid && !launchAgentInstalled()) {
         void vscode.window.showInformationMessage(

@@ -128,6 +128,9 @@ async function turn(msg) {
   }
   const text = msg.message?.content?.find?.((b) => b.type === 'text')?.text ?? '';
   if (text.includes('CRASH')) process.exit(3);
+  // BGSTART / BGEND: a background task starts (and keeps running past the turn) / ends.
+  if (text.includes('BGSTART')) out({ type: 'system', subtype: 'background_tasks_changed', tasks: [{ task_id: 'bg1' }] });
+  if (text.includes('BGEND')) out({ type: 'system', subtype: 'background_tasks_changed', tasks: [] });
   if (text.includes('EXITPLAN')) {
     out({ type: 'system', subtype: 'status', status: null, permissionMode: 'default' });
     await sleep(150);

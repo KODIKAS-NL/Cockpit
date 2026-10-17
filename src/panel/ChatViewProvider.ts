@@ -148,10 +148,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   // Tabs: each one is a Session (CLI runtime + stats + streaming) in parallel.
   private sessions = new Map<string, Session>();
   // Claude processes live in cockpit-daemon and outlive this window (the Tootega engine is the
-  // only one that still runs a local process). One connection per window, shared by every tab.
+  // only one that still runs a child process). One connection per window, shared by every tab.
   private daemon?: DaemonClient;
   private daemonWarned = false;
-  // Daemon mode: deciding which running conversation the first tab attaches to. Priming
+  // On open: deciding which running conversation the first tab attaches to. Priming
   // slash commands meanwhile would start a throwaway session in its place.
   private daemonAutoAttachPending = false;
   // Last daemon listing for this folder (the hub's live badges, auto-attach on open).
@@ -282,7 +282,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // On Windows a child does NOT die with its parent, so each reload of the
     // host left the previous engines running — seven agent.exe at once, on a
     // machine where each one is a live conversation.
-    // In daemon mode the processes are not ours to end: the window lets go and the
+    // Claude's processes are not ours to end: the window lets go and the
     // conversations keep running for the next window that opens them.
     for (const s of this.sessions.values()) s.detach();
     this.daemon?.dispose();
@@ -329,7 +329,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         return s.keepAlivePing() ? 'pinged' : 'busy';
       }
     }
-    // Daemon mode: a closed tab's conversation may still have its process in the daemon.
+    // A closed tab's conversation may still have its process in the daemon.
     // An ephemeral `--resume` next to it would be two processes on one transcript: skip it.
     if (this.daemonSessions.some((d) => d.cliSessionId === sessionId && d.state !== 'idle')) return 'busy';
     return 'none';
@@ -377,6 +377,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         if (s) this.saveSessionModel(s);
         if (tabId === this.activeTab) this.sendConfig();
       },
+      onModelFollowed: () => {
+        // Shown, not saved: a fallback model that answered once is not the user's choice.
+        if (tabId === this.activeTab) this.sendConfig();
+      },
       onCompactChanged: () => {
         if (tabId === this.activeTab) this.sendConfig();
       },
@@ -419,7 +423,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     };
   }
 
-  // ---- Daemon mode ----
+  // ---- The daemon ----
 
   /** Socket the daemon listens on (setting, `~` expanded). */
   daemonSocketPath(): string {
@@ -586,8 +590,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private closeTab(tabId: string): void {
     const s = this.sessions.get(tabId);
     if (!s) return;
-    // Closing the tab is not ending the conversation in daemon mode: it keeps running and
-    // shows as live in the session list. (Local mode: detach() just stops it.)
+    // Closing the tab is not ending the conversation: it keeps running in the daemon and
+    // shows as live in the session list. (The Tootega process is the exception: detach() stops it.)
     s.detach();
     const p = this.panels.get(tabId);
     if (p) {
@@ -721,7 +725,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private usageStarted = false;
 
   /** Starts (once) the periodic computation of local usage (5h/7d). */
-  /** Tells the dashboard whether daemon mode is on and the daemon answers. Cheap: one connect. */
+  /** Tells the dashboard whether the daemon (Claude's engine) is in use and answers. Cheap: one connect. */
   async reportDaemonStatus(): Promise<void> {
     // The Tootega engine runs locally: nothing to report for it.
     if (currentEngine() !== 'claude') {
@@ -1502,7 +1506,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Daemon mode, on open: attach the active tab to the most recently active live session of
+   * On open: attach the active tab to the most recently active live session of
    * this folder (one with a process). Without one, falls back to the latest transcript (the
    * usual auto-resume), whose process the daemon starts on the first message.
    */
@@ -1595,7 +1599,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * the phone / claude.ai/code joins the live session as one more client and every Cockpit
    * window keeps working on it. Nothing is stopped or handed over.
    */
-  private remoteControl(sessionId: string): void {
+  private async remoteControl(sessionId: string): Promise<void> {
     // Toggled in place: an open conversation is not focused, and one that is not loaded yet is
     // loaded in the background — pressing the button on a Hub card must not move the user.
     let entry = [...this.sessions].find(([, s]) => s.sessionId === sessionId || s.resumeId === sessionId);
@@ -1611,6 +1615,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
     if (!entry) return;
     const [tabId, s] = entry;
+    // The attach tells whether Remote Control is already on: read it before deciding what to do.
+    s.ensureCli();
+    await s.whenAttached();
     const on = !s.remoteActive;
     log(`remote control toggle for tab ${tabId}: window believed it was ${s.remoteActive ? 'on' : 'off'}, asking for ${on ? 'on' : 'off'}`);
     if (on) this.post({ kind: 'remoteState', active: true, phase: 'connecting' }, tabId);
@@ -2263,7 +2270,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /**
    * Before a transcript is deleted: ends the conversation's process everywhere. Detaching is
-   * not enough in daemon mode, since the process lives on in the daemon and writes the
+   * not enough for Claude, since the process lives on in the daemon and writes the
    * transcript again as it exits, so the "deleted" conversation comes back as an empty one.
    * Resolves once the daemon's processes have exited.
    */
@@ -2836,8 +2843,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'setModel':
         this.snapComboBaseline(srcTab);
-        // Switched live in the running process: only a refused switch still waits for a restart.
-        if (!srcSession().setModel(m.model)) this.pendingRestart = true;
+        srcSession().setModel(m.model); // switched live in the running process
         this.saveSessionModel(srcSession()); // persiste por contexto
         this.sendConfig();
         break;
@@ -2864,7 +2870,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const cur = srcSession().modelOverride;
         let curCleared = false;
         if (cur && cur.replace(/\[1m\]/i, '').toLowerCase() === key) {
-          if (!srcSession().setModel('default')) this.pendingRestart = true;
+          srcSession().setModel('default');
           this.saveSessionModel(srcSession());
           curCleared = true;
         }
@@ -2877,20 +2883,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
       case 'setEffort':
         this.snapComboBaseline(srcTab);
-        if (!srcSession().setEffort(m.effort)) this.pendingRestart = true;
+        srcSession().setEffort(m.effort);
         this.saveSessionModel(srcSession()); // persiste por contexto
         this.sendConfig();
         break;
       case 'setPermissionMode': {
         this.snapComboBaseline(srcTab);
-        const live = srcSession().setPermission(m.mode);
+        srcSession().setPermission(m.mode);
         this.saveSessionModel(srcSession()); // persiste por contexto
         // The last choice is where new conversations start. Not Bypass: a new chat that
         // silently skips every permission prompt is too easy to miss.
         if (m.mode !== 'bypassPermissions' && PERMISSION_MODES.includes(m.mode)) {
           void this.cfg().update('permissionMode', m.mode, vscode.ConfigurationTarget.Global);
         }
-        if (!live) this.pendingRestart = true;
         this.sendConfig();
         break;
       }
@@ -2911,7 +2916,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.setTabEngine(srcTab, m.engine === 'tootega' ? 'tootega' : 'claude');
         break;
       case 'setAutoCompact':
-        // Daemon mode: the daemon restarts the process itself (after the turn, when busy).
+        // Claude: the daemon restarts the process itself (after the turn, when busy).
         if (!srcSession().setAutoCompact(m.value)) this.pendingRestart = true;
         this.saveSessionModel(srcSession());
         this.sendConfig();
@@ -2938,7 +2943,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.reloadSession(m.sessionId);
         break;
       case 'remoteControl':
-        this.remoteControl(m.sessionId);
+        void this.remoteControl(m.sessionId);
         break;
       case 'deleteSession':
         // Confirmation already done in the webview (elegant modal). Detaches the live tab
@@ -3473,12 +3478,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.post({ kind: 'auth', loggedIn: true });
       return;
     }
+    // A check already running may have started before the login changed: ask for one more after it.
+    if (this.authChecking) {
+      this.authAgain = true;
+      return;
+    }
     resetAccountKey(); // login/logout may have changed the account → re-resolve the dictionary
     void resolveAccountKey(this.claudePath());
-    if (this.authChecking) return;
     this.authChecking = true;
     void fetchAuthStatus(this.claudePath()).then((a) => {
       this.authChecking = false;
+      if (this.authAgain) {
+        this.authAgain = false;
+        this.reportAuth();
+        return;
+      }
       if (!a.unknown) {
         this.authRetries = 0;
         this.post({ kind: 'auth', loggedIn: a.loggedIn });
@@ -3492,6 +3506,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     });
   }
   private authChecking = false;
+  private authAgain = false;
   private authRetries = 0;
 
   /** Re-checa o login algumas vezes (o fluxo de login/logout roda no terminal). */
