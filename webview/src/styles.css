@@ -6914,3 +6914,6 @@ body {
   font-size: 10px;
   color: var(--vscode-descriptionForeground, #8a8a8a);
 }
+.md-list .md-list {
+  margin: 2px 0 4px;
+}

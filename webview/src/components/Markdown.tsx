@@ -41,11 +41,58 @@ function renderBlocks(src: string): ReactNode[] {
   return nodes;
 }
 
+interface ListItem {
+  indent: number;
+  ordered: boolean;
+  num: number;
+  text: string;
+}
+
+/** Leading whitespace width; a tab counts as 4 columns. */
+function indentOf(ws: string): number {
+  return ws.replace(/\t/g, '    ').length;
+}
+
+/**
+ * One list level starting at `pos.i`: consecutive items of the same kind at `indent`. Items
+ * indented deeper than an item become its nested list(s). A change of kind (bullet <-> number)
+ * at the same indent ends the list; the caller starts the next one. An ordered list keeps its
+ * first number, so a list a code block or paragraph interrupted carries on counting.
+ */
+function buildList(items: ListItem[], pos: { i: number }, indent: number, nextKey: () => number): ReactNode {
+  const first = items[pos.i];
+  const lis: ReactNode[] = [];
+  while (pos.i < items.length) {
+    const it = items[pos.i];
+    if (it.indent < indent || it.ordered !== first.ordered) break;
+    pos.i++;
+    const children: ReactNode[] = [];
+    while (pos.i < items.length && items[pos.i].indent > it.indent) {
+      children.push(buildList(items, pos, items[pos.i].indent, nextKey));
+    }
+    lis.push(
+      <li key={lis.length}>
+        {renderInline(it.text)}
+        {children}
+      </li>,
+    );
+  }
+  return first.ordered ? (
+    <ol key={nextKey()} className="md-list" start={first.num !== 1 ? first.num : undefined}>
+      {lis}
+    </ol>
+  ) : (
+    <ul key={nextKey()} className="md-list">
+      {lis}
+    </ul>
+  );
+}
+
 function renderText(text: string, nextKey: () => number): ReactNode[] {
   const lines = text.split('\n');
   const out: ReactNode[] = [];
   let para: string[] = [];
-  let list: { ordered: boolean; items: string[] } | null = null;
+  let list: ListItem[] = [];
 
   const flushPara = () => {
     if (para.length) {
@@ -64,22 +111,11 @@ function renderText(text: string, nextKey: () => number): ReactNode[] {
     }
   };
   const flushList = () => {
-    if (list) {
-      const cur = list;
-      const items = cur.items.map((it, i) => <li key={i}>{renderInline(it)}</li>);
-      out.push(
-        cur.ordered ? (
-          <ol key={nextKey()} className="md-list">
-            {items}
-          </ol>
-        ) : (
-          <ul key={nextKey()} className="md-list">
-            {items}
-          </ul>
-        ),
-      );
-      list = null;
-    }
+    if (!list.length) return;
+    const items = list;
+    list = [];
+    const pos = { i: 0 };
+    while (pos.i < items.length) out.push(buildList(items, pos, items[pos.i].indent, nextKey));
   };
 
   for (let li = 0; li < lines.length; li++) {
@@ -124,8 +160,8 @@ function renderText(text: string, nextKey: () => number): ReactNode[] {
     }
 
     const heading = line.match(/^(#{1,6})\s+(.*)$/);
-    const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
-    const ordered = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    const bullet = line.match(/^(\s*)[-*+]\s+(.*)$/);
+    const ordered = line.match(/^(\s*)(\d+)[.)]\s+(.*)$/);
 
     if (heading) {
       flushPara();
@@ -139,18 +175,10 @@ function renderText(text: string, nextKey: () => number): ReactNode[] {
       );
     } else if (bullet) {
       flushPara();
-      if (!list || list.ordered) {
-        flushList();
-        list = { ordered: false, items: [] };
-      }
-      list.items.push(bullet[1]);
+      list.push({ indent: indentOf(bullet[1]), ordered: false, num: 0, text: bullet[2] });
     } else if (ordered) {
       flushPara();
-      if (!list || !list.ordered) {
-        flushList();
-        list = { ordered: true, items: [] };
-      }
-      list.items.push(ordered[1]);
+      list.push({ indent: indentOf(ordered[1]), ordered: true, num: Number(ordered[2]), text: ordered[3] });
     } else if (line.trim() === '') {
       flushPara();
       flushList();
