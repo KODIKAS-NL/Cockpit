@@ -211,6 +211,10 @@ A whiteboard tied to a conversation, for the things that are easier to show than
 
 - **Model** and **Effort** are *session overrides* (they do not change global settings);
   switching restarts the CLI session.
+- **Model per mode.** The pin in the model popup ties the current model and effort to the current
+  permission mode (`cockpitDaemon.modePins`, for every conversation). Entering the mode, also when
+  Claude leaves plan mode after an approved plan, switches live. Claude Code's `opusplan` alias covers
+  the Opus-to-plan, Sonnet-to-build pair only.
 - **The model list is not hardcoded anywhere.** The CLI has no `models` subcommand, so the
   catalogue comes from **`/v1/models`** — id, `display_name` (the label shown),
   `max_input_tokens` (the context column, and what decides the `[1m]` suffix) and

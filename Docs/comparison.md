@@ -26,6 +26,7 @@ Legend: ✓ yes · partial · – no · n/a not applicable · planned.
 |---|:--:|:--:|---|
 | Permission approval (Allow / Always / Deny) | ✓ | ✓ | per-tool preview; `Ctrl+Enter`/`Esc` |
 | Permission modes (plan/acceptEdits/auto/…) | ✓ | ✓ | dropdown; official cycles via the mode indicator |
+| Model and effort pinned per permission mode | partial | ✓ | official: the CLI's `opusplan` alias (Opus to plan, Sonnet to build); Cockpit: any model and effort per mode (`modePins`), switched live |
 | Plan mode (review, edit & approve) | ✓ | ✓ | Cockpit: Edit/Preview toggle; "Keep planning (send my notes)" feeds edits back to the agent |
 | Composed questions (AskUserQuestion) | ✓ | ✓ | tabs, multi-select, "Other" |
 | Questions asked in your language | ✓ | – | steers AskUserQuestion to the configured voice/UI language |

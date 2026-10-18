@@ -14,6 +14,11 @@ interface that shows what the tool is doing: the conversation, the tool calls, d
 prompts, and how much context, cache and budget you have used. A **scratchpad** tied to each
 conversation lets you annotate a screenshot or sketch an idea and hand it to Claude as an image.
 
+You do not need a second device. On a single machine you still get conversations that survive
+closing or reloading the window, the scratchpad, the usage and limit figures, and model, effort and
+mode switches without a restart. The setup is the same as for several devices: the daemon runs in
+the background either way, so start it in step 3 of [Install](#install).
+
 It is a fork of [Tootega Cockpit for Claude Code](https://github.com/HermesSilva/Cockpit) by Tootega
 Pesquisa e Inovação (HermesSilva). Almost everything good in it starts with their work: a thorough
 GUI for Claude Code that keeps its figures honest and gives you fine control. Thank you for building
@@ -23,8 +28,9 @@ it in the open under the MIT license, which is what makes this fork possible.
 
 ## What it is for
 
-You keep your code, and Claude Code, on one machine that is always on, such as a Mac mini or a home
-server, and you reach it from other devices with Remote-SSH or code-server. A conversation should
+The case it was built for: you keep your code, and Claude Code, on one machine that is always on,
+such as a Mac mini or a home server, and you reach it from other devices with Remote-SSH or
+code-server. A conversation should
 not die when you close the laptop lid or the connection drops. You start a task on one device, come
 back an hour later on another, and the conversation is still running, with its output and any
 permission prompt waiting for you.
@@ -48,6 +54,11 @@ That is what the fork adds to the original:
 - **Controls that belong to a chat stay with the chat.** Model, effort and permission mode are chips
   in the prompt box. A menu there holds agents and workflows, the engine, a custom model id and an
   auto-compact setting per conversation. The dashboard keeps what is global.
+- **A model per mode.** Pin a model and effort to a permission mode, for example Opus on high effort
+  in plan mode and Sonnet in auto mode. Changing mode, including when Claude leaves plan mode after
+  you approve a plan, switches the model live with no restart. Claude Code's own `opusplan` alias
+  covers one pairing (Opus to plan, Sonnet to build); pins work for any model and effort in any
+  mode. Pin from the model popup, or see `modePins` in [Docs/settings.md](Docs/settings.md).
 - **Its own copy of the Claude Code CLI**, if you do not have one. The extension offers to download
   it from Anthropic's release server, verifies the checksum, and keeps it up to date.
 - **A quieter interface**, closer to the official extension.
