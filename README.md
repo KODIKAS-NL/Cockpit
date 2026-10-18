@@ -2,11 +2,6 @@
 
 *by KODIKAS*
 
-> **Early version.** This fork is a first version. Daemon mode, the side bar chat, the managed CLI
-> download and the per-chat controls work in day-to-day use on macOS, but they have had little
-> testing, and none on Linux or Windows. Expect rough edges and report what you find. This note
-> will be removed once the fork has had more use.
-
 Cockpit keeps your Claude Code conversations running when your window goes away. A small background
 service, the daemon, owns the `claude` process, so you can start a task on one device, continue it on
 another, and follow it from your phone. On top of that it is a VS Code extension with a graphical

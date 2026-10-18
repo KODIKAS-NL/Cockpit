@@ -34,6 +34,12 @@ and the project adopts semantic versioning.
 - The language label of a code block no longer overlaps its copy button.
 
 ### Changed
+- **Tool card headers.** The status (Error, Running) comes before the (i), the empty gap after the (i) is gone,
+  and the collapse chevron is a larger icon that points down when collapsed and up when expanded, with a short
+  rotation animation (off under reduced motion).
+- **Time stamps move into the (i).** Tool cards and notices such as command output (`/model`) show their date and
+  time in the (i) details instead of inline, and the (i) sits at the right edge of the row, as it does on the
+  prompt box's header (which keeps its date and time).
 - **New extension identity, new namespace.** This fork is its own extension
   (`KODIKAS-NL.cockpit-claude-code-daemon`) and can be installed next to the original. Every command,
   setting, view and context key moved from `tootega.*` to `cockpitDaemon.*` (for example

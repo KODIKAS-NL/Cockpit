@@ -519,7 +519,7 @@ const NoticeBanner = memo(function NoticeBanner({ item, t }: { item: NoticeItem;
           {dropped !== undefined && dropped > 0 && ` · −${fmtTk(dropped)}`}
           {c.durationMs !== undefined && ` · ${fmtMs(c.durationMs)}`}
         </span>
-        {item.ts && <span className="notice-banner-time">{fmtStamp(item.ts)}</span>}
+        {item.ts && <InfoTip t={t} title={t(c.trigger === 'manual' ? 'timeline.compactManual' : 'timeline.compactAuto')} rows={[{ label: t('tip.time'), value: fmtStamp(item.ts) }]} />}
       </div>
     );
   }
@@ -528,7 +528,7 @@ const NoticeBanner = memo(function NoticeBanner({ item, t }: { item: NoticeItem;
       <div className="notice-banner compact-banner" id={`msg-${item.id}`}>
         <span className="notice-banner-spinner" aria-hidden="true" />
         <span className="notice-banner-label">{t('activity.compacting')}</span>
-        {item.ts && <span className="notice-banner-time">{fmtStamp(item.ts)}</span>}
+        {item.ts && <InfoTip t={t} title={t('activity.compacting')} rows={[{ label: t('tip.time'), value: fmtStamp(item.ts) }]} />}
       </div>
     );
   }
@@ -576,7 +576,7 @@ const NoticeBanner = memo(function NoticeBanner({ item, t }: { item: NoticeItem;
             ),
           )}
         </span>
-        {item.ts && <span className="notice-banner-time">{fmtStamp(item.ts)}</span>}
+        {item.ts && <InfoTip t={t} title={t('timeline.commandOutput')} rows={[{ label: t('tip.time'), value: fmtStamp(item.ts) }]} />}
       </div>
     );
   }
@@ -585,7 +585,7 @@ const NoticeBanner = memo(function NoticeBanner({ item, t }: { item: NoticeItem;
       <span className="notice-banner-mark">⚠</span>
       <span className="notice-banner-label">{t('timeline.engineNotice')}</span>
       <span className="notice-banner-text">{item.text}</span>
-      {item.ts && <span className="notice-banner-time">{fmtStamp(item.ts)}</span>}
+      {item.ts && <InfoTip t={t} title={t('timeline.engineNotice')} rows={[{ label: t('tip.time'), value: fmtStamp(item.ts) }]} />}
     </div>
   );
 });
@@ -628,8 +628,6 @@ const UserBubble = memo(function UserBubble({
       <div className={`bubble user ${pinned ? 'pinned' : ''}`} id={`msg-${item.id}`}>
         <div className="role role-user">
           <span className="role-name">{userName || t('role.user')}</span>
-          {item.ts && <span className="bubble-time">{fmtStamp(item.ts)}</span>}
-          <InfoTip t={t} title={t('role.user')} rows={userRows(item, t)} />
           {item.queued && (
             <span className="bubble-queued" title={t('bubble.queuedHint')}>
               {t('bubble.queued')}
@@ -655,6 +653,8 @@ const UserBubble = memo(function UserBubble({
               ↶
             </button>
           )}
+          {item.ts && <span className="bubble-time">{fmtStamp(item.ts)}</span>}
+          <InfoTip t={t} title={t('role.user')} rows={userRows(item, t)} />
         </div>
         {item.images && item.images.length > 0 && (
           <div className="bubble-images">
@@ -788,32 +788,32 @@ function ToolCard({
     <div className={`tool-card ${statusCls}${name === 'EndConversation' ? ' end-conversation' : ''}`}>
       <button type="button" className="tool-head" onClick={() => setOpen((o) => !o)}>
         <span className="tool-icon">{toolIcon(name)}</span>
-        <span className="tool-name">{name}{merged && <span className="tool-count">×{items.length}</span>}</span>
-        {description && <span className="tool-head-desc" title={description}>{description}</span>}
-        {filePath && (
-          <span
-            className="tool-file"
-            title={filePath}
-            role="link"
-            onClick={(e) => {
-              e.stopPropagation();
-              send({ kind: 'openLink', href: filePath });
-            }}
-          >
-            {basename(filePath)}
-          </span>
-        )}
-        {/* Skill cujo corpo entrou no contexto: o custo fica visível no momento em que
-            acontece, não só no painel. Sem tamanho informado, mostra só o selo. */}
-        {item.skillLoaded && (
-          <span className="tool-skill-load" title={t('skills.legend.active')}>
-            ⚡ <span className="tool-skill-name">{item.skillLoaded}</span>
-            {' · '}
-            {item.skillTokens != null ? t('skills.activeTokens', fmtTk(item.skillTokens)) : t('skills.obs.active')}
-          </span>
-        )}
-        {last.ts && <span className="tool-time">{fmtStamp(last.ts)}</span>}
-        <InfoTip t={t} title={name} rows={toolRows(item, t)} focusable={false} />
+        <span className="tool-label">
+          <span className="tool-name">{name}{merged && <span className="tool-count">×{items.length}</span>}</span>
+          {description && <span className="tool-head-desc" title={description}>{description}</span>}
+          {filePath && (
+            <span
+              className="tool-file"
+              title={filePath}
+              role="link"
+              onClick={(e) => {
+                e.stopPropagation();
+                send({ kind: 'openLink', href: filePath });
+              }}
+            >
+              {basename(filePath)}
+            </span>
+          )}
+          {/* Skill cujo corpo entrou no contexto: o custo fica visível no momento em que
+              acontece, não só no painel. Sem tamanho informado, mostra só o selo. */}
+          {item.skillLoaded && (
+            <span className="tool-skill-load" title={t('skills.legend.active')}>
+              ⚡ <span className="tool-skill-name">{item.skillLoaded}</span>
+              {' · '}
+              {item.skillTokens != null ? t('skills.activeTokens', fmtTk(item.skillTokens)) : t('skills.obs.active')}
+            </span>
+          )}
+        </span>
         {filePath && hasPreview(filePath) && (
           <span
             className="tool-view"
@@ -827,10 +827,13 @@ function ToolCard({
             {t('tool.view')}
           </span>
         )}
-        <span className="tool-status">
-          {statusCls === 'err' ? t('tool.error') : statusCls === 'busy' ? t('tool.running') : ''}
-        </span>
-        <span className="chevron">{open ? '▾' : '▸'}</span>
+        {statusCls !== 'ok' && (
+          <span className="tool-status">{statusCls === 'err' ? t('tool.error') : t('tool.running')}</span>
+        )}
+        <InfoTip t={t} title={name} rows={toolRows(item, t)} focusable={false} />
+        <svg className={`chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
       {name === 'EndConversation' && (
         <div className="tool-end-banner">
@@ -1145,7 +1148,7 @@ function toolRows(item: ToolItem, t: Translator): TooltipRow[] {
   if (typeof inp.file_path === 'string' && inp.file_path) {
     rows.push({ label: t('tip.file'), value: basename(inp.file_path), accent: true });
   }
-  if (item.ts) rows.push({ label: t('tip.time'), value: fmtClock(item.ts) });
+  if (item.ts) rows.push({ label: t('tip.time'), value: fmtStamp(item.ts) });
   rows.push({ label: t('tip.inputSize'), value: fmtBytes(byteLen(stringify(item.input))) });
   if (item.result !== undefined) {
     const out = toText(item.result);

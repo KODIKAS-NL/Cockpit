@@ -1248,10 +1248,21 @@ body {
 }
 .tool-name {
   font-weight: 600;
+  flex: none;
+  white-space: nowrap;
+}
+/* The name, description and file take the free width, so the (i), status and chevron sit at the right. */
+.tool-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
 }
 .tool-head-desc {
   min-width: 0;
-  flex: 1 1 0;
+  flex: 0 1 auto;
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1305,11 +1316,23 @@ body {
 .tool-status {
   font-size: 11px;
   opacity: 0.7;
-  margin-left: 4px;
+  white-space: nowrap;
 }
 .tool-head .chevron {
-  margin-left: auto;
-  opacity: 0.6;
+  opacity: 0.7;
+  flex: none;
+  transition: transform 0.2s ease;
+}
+.tool-head .chevron.open {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tool-head .chevron {
+    transition: none;
+  }
+}
+.tool-head .tt-wrap.info-tip {
+  margin-left: 0;
 }
 .tool-body {
   padding: 6px 8px;
