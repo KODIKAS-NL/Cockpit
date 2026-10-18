@@ -14,9 +14,22 @@ body,
   flex-wrap: nowrap;
   gap: 8px;
 }
+.pad-actions {
+  position: relative;
+}
+/* Floats under the buttons so a message never pushes them out of view. */
 .pad-note {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
   font-size: 12px;
-  opacity: 0.8;
+  white-space: nowrap;
+  background: var(--vscode-editorWidget-background, #fff);
+  border: 1px solid var(--vscode-button-border, rgba(127, 127, 127, 0.4));
+  color: var(--vscode-foreground, inherit);
 }
 .pad-btn {
   padding: 6px 12px;
@@ -27,6 +40,56 @@ body,
   cursor: pointer;
   font: inherit;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pad-btn svg {
+  display: none;
+}
+.pad-btn {
+  position: relative;
+}
+/* Own tooltip: the native title one is unreliable in webviews and absent on touch. */
+@media (hover: hover) {
+  .pad-btn[data-tip]:hover::after,
+  .pad-btn[data-tip]:focus-visible::after {
+    content: attr(data-tip);
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 220px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: normal;
+    text-align: center;
+    background: #000;
+    color: #fff;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .pad-btn.primary[data-tip]:hover::after,
+  .pad-btn.primary[data-tip]:focus-visible::after {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+}
+/* Narrow tab: icons only (the label stays in the tooltip); the send button and a pending confirm keep their text. */
+@media (max-width: 1400px) {
+  .pad-btn svg {
+    display: block;
+  }
+  .pad-btn:not(.keep) .pad-label {
+    display: none;
+  }
+  .pad-btn:not(.keep) {
+    padding: 6px 8px;
+  }
 }
 .pad-btn.primary {
   background: var(--vscode-button-background, #0e639c);

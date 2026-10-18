@@ -43,6 +43,20 @@ function naturalSize(url: string): Promise<{ w: number; h: number }> {
   });
 }
 
+const svg = (d: string) => (
+  <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d={d} />
+  </svg>
+);
+// Icons for the narrow layout, where only the primary button keeps its text.
+const ICONS = {
+  clipboard: svg('M5.5 3h5v2h-5zM4 4h-.5A1.5 1.5 0 0 0 2 5.5v8A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5v-8A1.5 1.5 0 0 0 12.5 4H12'),
+  chatImage: svg('M2 3.5h12v8H8l-3 2.5v-2.5H2zM5 9l2-2.5 1.5 1.5L10 6.5 11.5 9'),
+  newBoard: svg('M8 3v10M3 8h10'),
+  save: svg('M8 2v8M4.5 7 8 10.5 11.5 7M3 13.5h10'),
+  send: svg('M2 8 14 2.5 10.5 14 8 9z'),
+};
+
 function App() {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const [initial, setInitial] = useState<{ data: unknown; image?: ImageAttachment } | null>(null);
@@ -209,20 +223,25 @@ function App() {
         renderTopRightUI={() => (
           <div className="pad-actions">
             {note && <span className="pad-note">{note}</span>}
-            <button type="button" className="pad-btn" title={t('fromClipboardTip')} onClick={() => void fromClipboard()}>
-              {t('fromClipboard')}
+            <button type="button" className="pad-btn" data-tip={t('fromClipboardTip')} aria-label={t('fromClipboardTip')} onClick={() => void fromClipboard()}>
+              {ICONS.clipboard}
+              <span className="pad-label">{t('fromClipboard')}</span>
             </button>
-            <button type="button" className="pad-btn" title={t('latestImageTip')} onClick={() => post({ kind: 'latestImage' })}>
-              {t('latestImage')}
+            <button type="button" className="pad-btn" data-tip={t('latestImageTip')} aria-label={t('latestImageTip')} onClick={() => post({ kind: 'latestImage' })}>
+              {ICONS.chatImage}
+              <span className="pad-label">{t('latestImage')}</span>
             </button>
-            <button type="button" className={`pad-btn${confirmNew ? ' warn' : ''}`} onClick={newBoard}>
-              {confirmNew ? t('newConfirm') : t('newBoard')}
+            <button type="button" className={`pad-btn${confirmNew ? ' warn keep' : ''}`} data-tip={t('newBoard')} aria-label={t('newBoard')} onClick={newBoard}>
+              {ICONS.newBoard}
+              <span className="pad-label">{confirmNew ? t('newConfirm') : t('newBoard')}</span>
             </button>
-            <button type="button" className="pad-btn" onClick={() => void render('export')}>
-              {t('export')}
+            <button type="button" className="pad-btn" data-tip={t('export')} aria-label={t('export')} onClick={() => void render('export')}>
+              {ICONS.save}
+              <span className="pad-label">{t('export')}</span>
             </button>
-            <button type="button" className="pad-btn primary" title={t('sendTip')} onClick={() => void render('send')}>
-              {t('send')}
+            <button type="button" className="pad-btn primary keep" data-tip={t('sendTip')} aria-label={t('sendTip')} onClick={() => void render('send')}>
+              {ICONS.send}
+              <span className="pad-label">{t('send')}</span>
             </button>
           </div>
         )}
