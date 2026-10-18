@@ -1,0 +1,44 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+.pad-root {
+  height: 100vh;
+}
+.pad-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+.pad-note {
+  font-size: 12px;
+  opacity: 0.8;
+}
+.pad-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--vscode-button-border, rgba(127, 127, 127, 0.4));
+  background: var(--vscode-button-secondaryBackground, rgba(127, 127, 127, 0.15));
+  color: var(--vscode-button-secondaryForeground, inherit);
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+}
+.pad-btn.primary {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+  border-color: transparent;
+}
+.pad-btn.warn {
+  border-color: var(--vscode-errorForeground, #f14c4c);
+  color: var(--vscode-errorForeground, #f14c4c);
+}
+/* The library implies something permanent and shared across conversations; a pad belongs to one. */
+.default-sidebar-trigger,
+.sidebar-trigger {
+  display: none !important;
+}

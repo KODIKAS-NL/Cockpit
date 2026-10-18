@@ -116,7 +116,7 @@ Available scripts ([`package.json`](../package.json)):
 
 | Script | Does |
 |---|---|
-| `build` | `node esbuild.mjs` — bundles `extension.js` + `webview/main.js` + CSS |
+| `build` | `node esbuild.mjs` — bundles `extension.js`, `daemon.js`, `webview/main.js`, `scratchpad/main.js` + CSS, and copies the scratchpad fonts |
 | `watch` | build in watch mode |
 | `typecheck` | `tsc --noEmit` over both tsconfigs (host and webview) |
 | `test` / `test:watch` | Vitest |
@@ -127,7 +127,7 @@ Available scripts ([`package.json`](../package.json)):
 On Windows there are also `package-vsix.ps1` / `package-vsix.cmd` as shortcuts; on
 macOS/Linux use `./package-vsix.sh [out.vsix]`. For the dev host, `./run-dev.sh` mirrors
 `run-dev.ps1`.
-Build output lands in `dist/` (`extension.js`, `webview/main.js`, `webview/main.css`).
+Build output lands in `dist/` (`extension.js`, `daemon.js`, `webview/main.js`, `webview/main.css`, and the scratchpad bundle in `scratchpad/`).
 Packaging boundaries are controlled by [`.vscodeignore`](../.vscodeignore) — only `dist/`,
 `l10n/`, `media/`, `package.nls*.json`, `LICENSE`, and `README.md` ship in the `.vsix`.
 
@@ -138,11 +138,14 @@ src/                  Extension host (TypeScript)
   extension.ts        Activation, commands, config listeners, URI handler, status bar
   cli/                Spawn, stream-json parser, model discovery, statusline, settings
   panel/              ChatViewProvider (host ↔ webview bridge; editor panel + hub view)
-  session/            Session store (~/.claude/projects), usage aggregation
+  session/            Session (one conversation's runtime in a window), session store, usage aggregation
+  daemon/             cockpit-daemon (Node, no vscode): server, per-conversation sessions, client
+  scratchpad/         Scratchpad panels (host side): store in ~/.cockpit/scratchpads, messages, live reload
   stats/              Context/cache/cost/tokens aggregator
   i18n/               Host i18n
   util/               Logger
-webview/              UI in React + Vite
+webview/              UI in React (bundled with esbuild)
+  scratchpad/         The scratchpad page (Excalidraw), its own bundle, loaded on demand
   src/components/     Composer, Timeline, DiffView, modals, Todos, etc.
   src/i18n/           en / pt-BR catalogs
   src/store.ts        Webview state
@@ -150,6 +153,7 @@ webview/              UI in React + Vite
 shared/               Event contract and host ↔ webview protocol
 l10n/                 Runtime strings (vscode.l10n)
 media/                Icons
+mac/CockpitDaemon/    The macOS menu bar app that runs the daemon
 package.nls*.json     Manifest strings
 test/                 Vitest unit tests (StreamParser)
 Docs/                 Planning, comparison with the official GUI, status

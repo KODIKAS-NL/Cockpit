@@ -75,6 +75,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('cockpitDaemon.open', () => {
       provider.openPreferred();
     }),
+    vscode.commands.registerCommand('cockpitDaemon.scratchpad', () => provider.openScratchpad()),
     vscode.commands.registerCommand('cockpitDaemon.openInSidebar', () => {
       provider.moveToSidebar();
     }),

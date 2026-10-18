@@ -161,6 +161,8 @@ export const ptBR: Partial<Strings> = {
   'composer.newSession': 'Nova sessão',
   'attach.remove': 'Remover anexo',
   'attach.view': 'Ver imagem',
+  'pad.open': 'Rascunho: desenhe ou anote e anexe o resultado',
+  'pad.annotate': 'Anotar',
 
   'activity.compacting': 'Compactando o contexto…',
 

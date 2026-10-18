@@ -1,5 +1,5 @@
 {
-  "ext.description": "Conversas do Claude Code que sobrevivem à janela: comece uma tarefa em um dispositivo, continue em outro, até pelo celular. Uma GUI sobre o Claude Code CLI, com contexto, cache e custo em tempo real.",
+  "ext.description": "Conversas do Claude Code que sobrevivem à janela: comece uma tarefa em um dispositivo, continue em outro, até pelo celular. Uma GUI sobre o Claude Code CLI, com contexto, cache e custo em tempo real, e um quadro de rascunho para anotar capturas de tela e desenhar para o Claude.",
   "view.cockpit.name": "Painel",
   "cmd.open": "Abrir Cockpit",
   "cmd.newSession": "Nova sessão",
@@ -64,6 +64,7 @@
   "cfg.thinking": "Raciocínio estendido (thinking) dos processos do Claude que o Cockpit inicia.",
   "cfg.thinking.cli": "Segue a sua configuração do Claude Code (padrão).",
   "cfg.thinking.off": "Força o thinking desligado (MAX_THINKING_TOKENS=0 e alwaysThinkingEnabled=false), como as versões anteriores do Cockpit sempre faziam.",
+  "cmd.scratchpad": "Abrir quadro de rascunho",
   "cmd.openInSidebar": "Mover para o chat da barra lateral",
   "cfg.preferredLocation": "Onde as novas conversas abrem: no chat da barra lateral (como a extensão oficial) ou em uma aba do editor. Uma conversa fica em um lugar por vez; \"Abrir no editor\" e \"Mover para o chat da barra lateral\" a movem.",
   "cfg.preferredLocation.sidebar": "Chat da barra lateral (direita)",

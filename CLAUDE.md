@@ -112,6 +112,7 @@ claude -p --output-format stream-json --input-format stream-json --include-parti
 |--------|-----------|
 | Extension (host) | TypeScript, VS Code Extension API |
 | UI (webview) | React 18, bundled with esbuild, CSS with VSCode theme tokens (`var(--vscode-*)`) |
+| Scratchpad | Excalidraw (MIT) in its own webview bundle and panel, loaded on demand |
 | Daemon | Node.js (`src/daemon/`, bundled to `dist/daemon.js`), no `vscode` dependency; Unix socket with NDJSON (`shared/daemon.ts`) |
 | macOS app | Swift menu bar app that runs the daemon (`mac/CockpitDaemon/`), signed with a Developer ID and notarized |
 | Webview ↔ host communication | `postMessage` / `acquireVsCodeApi()` |
@@ -227,6 +228,7 @@ claude -p --output-format stream-json --input-format stream-json --include-parti
 | D5 | Model, effort and permission mode **switch live**, with no restart | CLI | P1 |
 | D6 | Side bar chat next to the code, and a Hub with live badges of running conversations | Cockpit | P1 |
 | D7 | macOS menu bar app that runs the daemon (start at login, live log, signed and notarized) | Cockpit | P2 |
+| D8 | Session-bound scratchpad (Excalidraw): annotate screenshots, sketch, attach the result to the prompt | Cockpit | P2 |
 
 ---
 
@@ -248,6 +250,7 @@ claude -p --output-format stream-json --input-format stream-json --include-parti
 | `src/extension.ts`, `src/panel/` | Extension entry, the chat view provider (the host side of the UI) |
 | `src/session/` | `Session` (one conversation's runtime in a window), `SessionStore` (transcripts) |
 | `src/cli/` | Engine contract (`CliProcess`), the daemon client (`RemoteCliProcess`), the Tootega runner (`CliProcessManager`), usage, models, plugins, auth |
+| `src/scratchpad/`, `webview/scratchpad/` | The scratchpad: host-side panels and storage (`~/.cockpit/scratchpads`), and the Excalidraw page (own bundle `dist/scratchpad/`) |
 | `src/daemon/` | `cockpit-daemon`: server, per-conversation sessions, client, install helpers |
 | `shared/` | Types used by host, webview and daemon: `events.ts`, `protocol.ts`, `daemon.ts` |
 | `webview/src/` | The React UI (`App.tsx`, `store.ts`, `components/`, `i18n/`) |

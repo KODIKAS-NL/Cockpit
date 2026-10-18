@@ -1,14 +1,19 @@
 # Execution Plan
 
-**Product:** Tootega Cockpit for Claude Code *(working name)*
-**Authorship:** Tootega Pesquisa e Inovação · **License:** MIT
-**Companion document:** [../CLAUDE.md](../CLAUDE.md)
+**Product:** Cockpit for Claude Code
+**Authorship:** Tootega Pesquisa e Inovação (original author); this fork is maintained by Jeroen Versteege (KODIKAS) · **License:** MIT
+**Companion documents:** [../CLAUDE.md](../CLAUDE.md) (directives and feature catalog) · [features.md](features.md) (what is implemented, per feature) · [daemon-mode.md](daemon-mode.md) (the daemon)
+
+> **Status of this document.** The roadmap below was written for the original project, starting
+> from an empty repository. Phases 0 to 4 are built; the fork then added the daemon (Phase 8).
+> Each phase carries a **Status** line. For the state of an individual feature, [features.md](features.md)
+> is the source of truth, not this file.
 
 ---
 
 ## 0. Purpose of this document
 
-Define **what**, **in which order**, and **with which definition of done** to build the extension. The target is not "one more AI chat in VSCode", but the **most transparent and controllable GUI** for Claude Code: everything the CLI knows about **context, cache, cost, and account limits** stays visible and actionable on screen.
+Define **what**, **in which order**, and **with which definition of done** to build the extension. The target is not "one more AI chat in VSCode": it is the GUI for Claude Code where **conversations outlive the window and follow you across devices** (the daemon), with **everything the CLI knows about context, cache, cost, and account limits** visible and actionable on screen.
 
 ---
 
@@ -29,27 +34,28 @@ Define **what**, **in which order**, and **with which definition of done** to bu
 
 | Channel | Mechanism | Content |
 |-------|-----------|----------|
-| Engine → UI | `claude -p --output-format stream-json --verbose` (stdout NDJSON) | messages, thinking, tool_use, tool_result, usage, session events |
-| UI → Engine | `--input-format stream-json` (stdin) | user messages, answers to questions, permission decisions |
-| Session | `--resume <id>` / `--continue` | resume conversations |
+| Window ↔ daemon | Unix socket, NDJSON (`shared/daemon.ts`) | open/attach, relayed CLI lines, prompts settled elsewhere, auto-compact, Remote Control, stop/forget |
+| Engine → daemon → UI | `claude -p --output-format stream-json --include-partial-messages --verbose …` (stdout NDJSON, relayed by the daemon) | messages, thinking, tool_use, tool_result, usage, session events |
+| UI → daemon → Engine | `--input-format stream-json` (stdin, relayed by the daemon) | user messages, answers to questions, permission decisions (`--permission-prompt-tool stdio`), live `set_model` / `apply_flag_settings` / `set_permission_mode` |
+| Session | `--resume <id>` (added by the daemon on every restart) | resume conversations |
 | Stats/account | **statusline** hook (JSON) | `model`, `context_window`, `cost`, `rate_limits.limits[]` (`session`, `weekly_all`, `weekly_scoped`), `workspace` |
 | On-demand stats | `/usage`, `/context`, `/cost` | context breakdown, cost, limits |
 | Persistence | `~/.claude/` (sessions, settings, projects) | history, configs, CLAUDE.md |
 
 ### 2.2. Internal components
 
-- **CliProcessManager** — spawn, lifecycle, retry, version/capability detection of `claude`.
-- **StreamParser** — NDJSON → typed events; tolerant of unknowns.
-- **SessionStore** — session state, history, message→checkpoint mapping.
-- **StatsAggregator** — accumulates usage per turn/session; computes cache hit-rate, cost, pacing.
-- **AccountPoller** — reads statusline/`/usage` for 5h/7d limits and plan.
-- **PermissionBroker** — implements the client side of Allow/Deny and plan mode.
-- **DiffService** — bridge to the VSCode diff API.
-- **WebviewBridge** — typed `postMessage` between host and React.
+- **Daemon** (`src/daemon/`) — `Daemon` (socket server, session registry, persistence), `DaemonSession` (one conversation: spawns and supervises `claude`, keep-alive, auto-compact restarts, Remote Control), `DaemonClient` (the window's connection), `service` (launchd install, probing).
+- **RemoteCliProcess** (`src/cli/`) — the window's `CliProcess` for Claude: relays the CLI's lines over the daemon socket. `CliProcessManager` spawns the Tootega engine directly and holds the shared argument builder.
+- **StreamParser** — NDJSON → typed events; tolerant of unknowns (`shared/events.ts` is the contract).
+- **Session** (`src/session/Session.ts`) — one conversation's runtime in a window: streaming state, permission and question prompts, live setting switches, follows what other windows do. **SessionStore** reads transcripts and lists sessions.
+- **StatsAggregator** (`src/stats/`) — accumulates usage per turn/session; computes cache hit-rate, cost and timing.
+- **Account** — `UsageApi` (the real OAuth `/usage`), `AuthStatus`, and the statusline cache for the 5h/weekly limits and plan.
+- **ChatViewProvider** (`src/panel/`) — the host side of the UI: tabs, permission and plan handling (including the native diff API), settings, the Hub.
+- **Webview** (`webview/src/`) — React; talks to the host through typed `postMessage` (`shared/protocol.ts`).
 
-### 2.3. Event contract (to be specified in Phase 1)
+### 2.3. Event contract
 
-> Before coding, **map the real schema** of the `stream-json` events for the target `claude` version and freeze a versioned contract (`schemas/`). Everything the UI consumes goes through this contract.
+The `stream-json` events are described in `shared/events.ts`, and the parser ignores what it does not know, so a newer CLI does not break the UI. A fake `claude` (`test/fixtures/fake-claude.mjs`) drives the daemon and session tests. A versioned `schemas/` directory was planned and not built; the shared types play that role.
 
 ---
 
@@ -59,9 +65,10 @@ Each phase has **entry**, **deliverables**, and **definition of done (DoD)**.
 
 ### Phase 0 — Foundation *(P0)*
 
-**Entry:** empty repository (current).
+**Entry:** empty repository.
+**Status:** done.
 **Deliverables:**
-- Extension scaffold (TS) + webview (React/Vite).
+- Extension scaffold (TS) + webview (React, bundled with esbuild).
 - **i18n infrastructure set up in the scaffold itself**: `vscode.l10n` on the host, an i18n layer in the webview, `l10n/` with `pt-BR` + `en` (base). Every string is born as a key.
 - `CliProcessManager` spawns `claude` and captures stdout/stderr.
 - "Hello world": send a prompt and render the response as plain text.
@@ -73,6 +80,8 @@ Each phase has **entry**, **deliverables**, and **definition of done (DoD)**.
 
 ### Phase 1 — Contract and parser *(P0)*
 
+**Status:** done (`shared/events.ts`, `StreamParser`; see 2.3 for the schemas note).
+
 **Deliverables:**
 - `schemas/` with the schema of the `stream-json` events (message, thinking, tool_use, tool_result, usage, session).
 - `StreamParser` covering all known types + graceful fallback.
@@ -83,6 +92,8 @@ Each phase has **entry**, **deliverables**, and **definition of done (DoD)**.
 ---
 
 ### Phase 2 — Conversation and timeline *(P0)*
+
+**Status:** done.
 
 **Features:** C1, C3, C6, C8, P1, P2.
 **Deliverables:**
@@ -98,6 +109,8 @@ Each phase has **entry**, **deliverables**, and **definition of done (DoD)**.
 
 ### Phase 3 — Editing, diff, and permissions *(P0)*
 
+**Status:** done except K1 (automatic checkpoints), which is still planned.
+
 **Features:** E1, E3, E6, K1.
 **Deliverables:**
 - Inline diff before writing (VSCode diff API).
@@ -109,7 +122,9 @@ Each phase has **entry**, **deliverables**, and **definition of done (DoD)**.
 
 ---
 
-### Phase 4 — Statistics and consumption panel *(P0/P1) — central differentiator*
+### Phase 4 — Statistics and consumption panel *(P0/P1)*
+
+**Status:** done, apart from the context breakdown via `/context` and the historical charts (see features.md).
 
 **Features:** S1, S4, S6, S8 (P0) → S2, S3, S5, S9 (P1).
 **Deliverables:**
@@ -127,6 +142,8 @@ Each phase has **entry**, **deliverables**, and **definition of done (DoD)**.
 
 ### Phase 5 — Recovery and fine-grained control *(P1)*
 
+**Status:** partial. Conversation rewind, the permission modes and the Tasks panel exist; file restore through Git checkpoints and per-hunk accept/reject are planned.
+
 **Features:** K2, K3, K4, E2, E4, E5, E8.
 **Deliverables:**
 - Rewind per message; 3 restore modes (Files / Files Only / Files & Task).
@@ -139,6 +156,8 @@ Each phase has **entry**, **deliverables**, and **definition of done (DoD)**.
 ---
 
 ### Phase 6 — Extensibility *(P1)*
+
+**Status:** mostly done (slash commands, skills, MCP, plugins, model and effort); custom subagents and the `CLAUDE.md` editor are planned.
 
 **Features:** X1, X2, X3, X4, X6, X7, M2.
 **Deliverables:**
@@ -154,6 +173,8 @@ Each phase has **entry**, **deliverables**, and **definition of done (DoD)**.
 
 ### Phase 7 — Differentiators and polish *(P2)*
 
+**Status:** partial (tabs, compaction visibility, shortcuts and i18n exist). Check features.md for the rest.
+
 **Features:** C7, C9, C10, E7, S7, S10, S11, M1, M3, M4, M5, M6, P3, P4, P5.
 **Deliverables:**
 - Message queue; subagent threads; sorting sessions by cost/token.
@@ -162,6 +183,23 @@ Each phase has **entry**, **deliverables**, and **definition of done (DoD)**.
 - Full shortcuts; configurable density. *(i18n is already foundation since Phase 0 — see §4.7.)*
 
 **DoD:** a "phenomenal" experience — the UI becomes the preferred way to use Claude Code, not a poor substitute for the terminal.
+
+---
+
+### Phase 8 — Daemon and multi-device *(P0/P1/P2 — added by this fork)*
+
+**Status:** built and in daily use on macOS; little testing on Linux or Windows.
+**Features:** D1 to D7 (see CLAUDE.md §4.8).
+**Deliverables:**
+- `cockpit-daemon` owns the Claude process; windows attach, follow and let go of it.
+- Prompts answered once, everywhere; messages sent from any window or the phone appear in all.
+- The daemon restarts the process by itself (keep-alive, auto-compact, changed settings) without cutting a running turn.
+- Remote Control for the phone; live model, effort and mode switches.
+- Side bar chat and a Hub with live badges.
+- The Cockpit Daemon macOS app (signed and notarized), as an alternative to the launchd agent.
+- Distribution: Visual Studio Marketplace, Open VSX and GitHub releases (see [releasing.md](releasing.md)).
+
+**DoD:** a task started on one device can be closed, left running, and picked up on another device or the phone, with the same conversation, prompts and settings.
 
 ---
 
@@ -224,7 +262,9 @@ Each phase has **entry**, **deliverables**, and **definition of done (DoD)**.
 | `stream-json` schema changes between versions | Parsing breaks | Versioned contract + tolerant parser + tests with per-version fixtures |
 | Account data (5h/7d limits) not exposed programmatically | Gap in S6 | Use the statusline hook as source; fallback to `/usage`; degrade with a warning |
 | Imprecise $ cost | User trust | Label as estimate; base it on the active model's pricing table |
-| Parity with the official extension (moving target) | Perpetual effort | Focus on the differentiator (consumption/control), not on cloning 1:1 |
+| Parity with the official extension (moving target) | Perpetual effort | Focus on the differentiators (the daemon, consumption and control), not on cloning 1:1 |
+| The CLI's Remote Control or control-request behaviour changes | Phone sync or live switches break | Keep the daemon's relay generic; fall back to a restart when a live switch is refused; record known limits in `Docs/issues.md` |
+| Daemon and extension drift apart (they ship separately) | Protocol mismatch | `shared/daemon.ts` stays backward compatible; rebuild the daemon app with daemon-side changes |
 | Permissions/security | Real risk | Never bypass prompts; respect the CLI model; do not log secrets |
 
 ---
@@ -239,11 +279,11 @@ Each phase has **entry**, **deliverables**, and **definition of done (DoD)**.
 
 ---
 
-## 7. Immediate next steps
+## 7. Next steps
 
-1. Confirm the product **name** and the extension ID.
-2. Capture **real fixtures** of the `stream-json` from the target `claude` version (entry for Phase 1).
-3. Validate the programmatic availability of the **account/limits** fields (statusline vs. `/usage`).
-4. Phase 0 scaffold.
+1. Test the signed Cockpit Daemon app on a second Mac and on Intel.
+2. Verify the Remote Control respawn and reconnect paths (open note in [issues.md](issues.md)).
+3. Check the daemon and extension on Linux and Windows, where there is little testing so far.
+4. Pick the next planned features from [features.md](features.md): automatic checkpoints and file restore, per-hunk accept/reject, custom subagents, the `CLAUDE.md` editor, the context breakdown.
 
-> Open decisions should be recorded in this document as they are settled.
+> Open decisions are recorded in this document as they are settled. Settled: the product name is *Cockpit for Claude Code*; the extension ID is `KODIKAS-NL.cockpit-claude-code-daemon`.

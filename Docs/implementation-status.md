@@ -1,5 +1,8 @@
 # Implementation status
 
+> This page records the first build cycle and is no longer kept up to date. For what exists today see
+> [features.md](features.md); for what is next see [roadmap.md](roadmap.md).
+
 Updated per the first build cycle. Tracks the [execution plan](execution-plan.md).
 
 ## Current state: **functional scaffold, compiling** ✅

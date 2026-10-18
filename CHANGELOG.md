@@ -6,6 +6,14 @@ and the project adopts semantic versioning.
 
 ## [Unreleased]
 
+### Added
+- **Scratchpad.** A board (Excalidraw) tied to each conversation, in its own editor tab, for annotating
+  screenshots and sketching. Open it from the pencil button in the prompt box, the **Annotate** button in
+  the image viewer, or **Cockpit Daemon: Open scratchpad**. **Send to chat** attaches the board as an image
+  to the prompt (nothing is sent until you press send). Boards are saved per conversation in
+  `~/.cockpit/scratchpads/`, shared by every VS Code server on the machine (code-server and Remote-SSH
+  alike), and an open board updates when another window saves it. **New board** clears it. The `.vsix` grows by about 4 MB.
+
 ### Changed
 - **New extension identity, new namespace.** This fork is its own extension
   (`KODIKAS-NL.cockpit-claude-code-daemon`) and can be installed next to the original. Every command,

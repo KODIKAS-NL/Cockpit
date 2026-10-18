@@ -75,6 +75,7 @@ Empacotadas no bundle (`dist/`) via esbuild:
 - `qrcode` (MIT) — geração de QR Code.
 - `ws` (MIT) — cliente WebSocket (ditado por voz).
 - `react`, `react-dom` (MIT) — UI do webview.
+- `@excalidraw/excalidraw` (MIT) — quadro de rascunho (`dist/scratchpad/`), com suas fontes (OFL/MIT, ver `node_modules/@excalidraw/excalidraw`).
 
 As licenças completas de cada pacote estão nos respectivos diretórios em
 `node_modules/` no repositório de origem.

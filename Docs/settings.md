@@ -36,7 +36,7 @@ All under **Settings → Extensions → Cockpit for Claude Code** (prefix `cockp
 
 ## Commands and keyboard shortcuts
 
-Commands (palette, **Tootega** category):
+Commands (palette, **Cockpit Daemon** category):
 
 | Command | ID | Shortcut |
 |---|---|---|
@@ -49,6 +49,7 @@ Commands (palette, **Tootega** category):
 | Sessions | `cockpitDaemon.openSessions` | — |
 | Settings | `cockpitDaemon.settings` | — |
 | Open in editor (resizable) | `cockpitDaemon.openInEditor` | — |
+| Open scratchpad | `cockpitDaemon.scratchpad` | — |
 | Sign in / Sign out to Claude (CLI) | `cockpitDaemon.login` / `cockpitDaemon.logout` | — |
 | Toggle language (pt-BR / English) | `cockpitDaemon.toggleLanguage` | — |
 | **Set / Remove Anthropic API key** (model discovery, stored in the OS keychain) | `cockpitDaemon.setApiKey` / `cockpitDaemon.clearApiKey` | — |

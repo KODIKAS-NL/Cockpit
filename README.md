@@ -2,11 +2,6 @@
 
 *by KODIKAS*
 
-> **Unofficial.** Not affiliated with, endorsed by, or sponsored by Anthropic.
-> "Claude", "Claude Code" and "Anthropic" are trademarks of Anthropic, PBC, used here
-> only to describe interoperability. This project talks to the official Claude Code CLI;
-> it does not bundle or redistribute it.
-
 > **Early version.** This fork is a first version. Daemon mode, the side bar chat, the managed CLI
 > download and the per-chat controls work in day-to-day use on macOS, but they have had little
 > testing, and none on Linux or Windows. Expect rough edges and report what you find. This note
@@ -16,7 +11,8 @@ Cockpit keeps your Claude Code conversations running when your window goes away.
 service, the daemon, owns the `claude` process, so you can start a task on one device, continue it on
 another, and follow it from your phone. On top of that it is a VS Code extension with a graphical
 interface that shows what the tool is doing: the conversation, the tool calls, diffs, permission
-prompts, and how much context, cache and budget you have used.
+prompts, and how much context, cache and budget you have used. A **scratchpad** tied to each
+conversation lets you annotate a screenshot or sketch an idea and hand it to Claude as an image.
 
 It is a fork of [Tootega Cockpit for Claude Code](https://github.com/HermesSilva/Cockpit) by Tootega
 Pesquisa e Inovação (HermesSilva). Almost everything good in it starts with their work: a thorough
@@ -41,6 +37,12 @@ That is what the fork adds to the original:
   On a Mac you can run the daemon from the menu bar app, a signed and notarized download from the
   [GitHub releases](https://github.com/KODIKAS-NL/Cockpit/releases). See
   [Docs/daemon-mode.md](Docs/daemon-mode.md).
+- **A scratchpad per conversation.** A whiteboard (Excalidraw) in its own editor tab: paste a
+  screenshot, mark it up with arrows, boxes and text, or sketch from scratch, with a mouse, a
+  trackpad or an Apple Pencil on the iPad. **Send to chat** attaches the board to your prompt as an
+  image. Boards are saved with the conversation in `~/.cockpit/scratchpads/`, shared by every VS Code
+  server on the machine, and an open board updates when another window saves it. Open it from the
+  pencil button in the prompt box, or from **Annotate** on any image.
 - **Chat in the side bar**, next to the code, with a strip of conversation tabs. A conversation is in
   the side bar or in an editor tab, one place at a time.
 - **Controls that belong to a chat stay with the chat.** Model, effort and permission mode are chips
@@ -50,7 +52,7 @@ That is what the fork adds to the original:
   it from Anthropic's release server, verifies the checksum, and keeps it up to date.
 - **A quieter interface**, closer to the official extension.
 
-The extension can be installed next to the original. Its commands and settings are under
+The scratchpad adds about 4 MB to the extension and loads only when you open a board. The extension can be installed next to the original. Its commands and settings are under
 `cockpitDaemon.*` (the original's are `tootega.*`), so rename any settings you carry over.
 
 ## What it does
@@ -63,8 +65,8 @@ The extension can be installed next to the original. Its commands and settings a
   dashboard shows the context window; the rest sits under the (i) icon on the active session.
 - **Sessions.** A list per folder with resume, rename, delete, rewind to an earlier prompt, and
   remote control from your phone.
-- **Input.** `@` file mentions, images, slash commands, voice dictation and an inline spell-checker
-  for Portuguese and English.
+- **Input.** `@` file mentions, images (pasted, or drawn and annotated in the scratchpad), slash
+  commands, voice dictation and an inline spell-checker for Portuguese and English.
 - **Languages.** The interface is in Brazilian Portuguese and English, switchable without a reload.
 
 | A permission prompt with the diff | The details of a session |
@@ -164,3 +166,10 @@ already does, and run `npm run typecheck && npm test && npm run build` before a 
 
 MIT, see [LICENSE](LICENSE). Original work © Tootega Pesquisa e Inovação; this fork © KODIKAS
 (Jeroen Versteege). Third-party notices are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+## Disclaimer
+
+> **Unofficial.** Not affiliated with, endorsed by, or sponsored by Anthropic.
+> "Claude", "Claude Code" and "Anthropic" are trademarks of Anthropic, PBC, used here
+> only to describe interoperability. This project talks to the official Claude Code CLI;
+> it does not bundle or redistribute it.

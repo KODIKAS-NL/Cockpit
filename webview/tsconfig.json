@@ -12,6 +12,6 @@
     "noEmit": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "../shared/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "scratchpad/**/*.ts", "scratchpad/**/*.tsx", "../src/scratchpad/messages.ts", "../shared/**/*.ts"],
   "exclude": ["node_modules"]
 }

@@ -59,6 +59,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
   const [confirmEffort, setConfirmEffort] = useState<{ selected: string; min: string } | null>(null);
   const lastSendRef = useRef<{ text: string; images: ImageAttachment[]; uuid?: string } | null>(null);
   const [draftRestore, setDraftRestore] = useState<{ text: string; images: ImageAttachment[] } | null>(null);
+  const [padImages, setPadImages] = useState<ImageAttachment[] | null>(null);
   const [showUsage, setShowUsage] = useState(false);
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [showPlugins, setShowPlugins] = useState(false);
@@ -146,6 +147,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
       if (data?.kind === 'usageData') setUsage(data.data); // answer to the Usage button (hot data)
       if (data?.kind === 'effortGate') setConfirmEffort({ selected: data.selected, min: data.min });
       if (data?.kind === 'draftRestore' && data.text) setDraftRestore({ text: data.text, images: [] });
+      if (data?.kind === 'attachImages') setPadImages(data.images);
       if (data?.kind === 'voiceDict') setVoiceDict(data.data);
       if (data?.kind === 'pluginsData') setPlugins(data.data);
       if (data?.kind === 'pluginsBusy') {
@@ -249,6 +251,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
   }, []);
   const onRewind = useCallback((idx: number) => setConfirmRewind(idx), []);
   const onDraftInjected = useCallback(() => setDraftRestore(null), []);
+  const onImagesInjected = useCallback(() => setPadImages(null), []);
   const onTextInjected = useCallback(() => setInjectText(null), []);
   const onToggleExpandAll = useCallback(() => setAllExpanded((a) => !(a ?? false)), []);
   const onSettings = () => send({ kind: 'openSettings' });
@@ -753,6 +756,8 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
         slashBusy={state.slashResearching}
         injectDraft={draftRestore}
         onDraftInjected={onDraftInjected}
+        injectImages={padImages}
+        onImagesInjected={onImagesInjected}
         injectText={injectText}
         onTextInjected={onTextInjected}
         onSend={onSend}

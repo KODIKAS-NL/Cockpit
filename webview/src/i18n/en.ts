@@ -227,6 +227,8 @@ export const en = {
   'composer.newSession': 'New session',
   'attach.remove': 'Remove attachment',
   'attach.view': 'View image',
+  'pad.open': 'Scratchpad: draw or annotate, then attach the result',
+  'pad.annotate': 'Annotate',
 
   'activity.compacting': 'Compacting the context…',
 

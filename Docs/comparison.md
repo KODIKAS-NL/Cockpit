@@ -17,6 +17,7 @@ Legend: ✓ yes · partial · – no · n/a not applicable · planned.
 | Find in conversation (Ctrl+F) | ✓ | – | scope **Timeline** vs **Prompts only**, 250 ms debounce, highlight + jump |
 | Export conversation | ✓ | – | self-contained HTML snapshot with expandable tool cards, or AI-polished Markdown |
 | Timeline verbosity filter (verbose→quiet) | ✓ | – | display-only, doesn't change the agent |
+| Scratchpad: annotate screenshots, sketch, attach to the prompt | ✓ | – | Excalidraw board per conversation, saved with it and shared across windows |
 | Scroll-marker rail (one per prompt) | ✓ | partial | Cockpit minimap rail with numbered hover |
 
 ### Editing & human control

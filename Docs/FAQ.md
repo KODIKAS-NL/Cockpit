@@ -1,4 +1,4 @@
-# Tootega Cockpit for Claude Code — Q&A
+# Cockpit for Claude Code — Q&A
 
 Questions and answers for the Visual Studio Marketplace **Q & A** tab and for anyone
 evaluating the extension. Short, factual, no marketing. For the full picture see the
@@ -8,8 +8,8 @@ evaluating the extension. Short, factual, no marketing. For the full picture see
 
 ## What it is
 
-### What is Tootega Cockpit?
-A native VS Code extension that gives Claude Code a rich GUI: chat/timeline, inline diffs,
+### What is Cockpit?
+A VS Code extension that keeps Claude Code conversations running when your window goes away (they run in a small background service, the daemon, so you can continue on another device), and gives Claude Code a rich GUI: chat/timeline, inline diffs,
 plan mode, permission prompts, and — the differentiator — **transparency over context, cache,
 cost and subscription limits**. It is a **presentation and control layer only**; all
 orchestration (the agent loop, tools, subagents, todos, context, compaction, permissions,
@@ -23,7 +23,7 @@ pacing, per-model breakdown, and panels for MCP, skills and hooks. It talks to t
 engine (the CLI), so it inherits the official auth, billing and features automatically.
 
 ### Is it official / affiliated with Anthropic?
-No. It is an independent, open-source (MIT) project by **Tootega Pesquisa e Inovação**. It
+No. It is an independent, open-source (MIT) project, a fork of the Tootega Cockpit by **Tootega Pesquisa e Inovação**, maintained by KODIKAS. It
 pilots the official `claude` CLI; it does not reimplement or replace it.
 
 ### Is it open source? What license?
@@ -134,6 +134,14 @@ supported today. **Rewind** currently restores the *conversation* (transcript tr
 `--resume`), not files on disk. Inline native-editor diffs, editing a plan before approval,
 and Git file-restore checkpoints are **planned** — see
 [Docs/implementation-status.md](implementation-status.md).
+
+### What is the scratchpad?
+A whiteboard (Excalidraw) tied to each conversation. Paste or open a screenshot, annotate it with
+arrows, boxes and text, or sketch an idea, then press **Send to chat**: the board is attached to your
+prompt as an image. Nothing is sent until you press send. Boards are saved with the conversation in
+`~/.cockpit/scratchpads/` and shared by every VS Code server on the machine. Open it from the pencil
+button in the prompt box, from **Annotate** on an image, or with **Cockpit Daemon: Open scratchpad**.
+See [Docs/features.md](features.md#scratchpad).
 
 ### Is it bilingual?
 Yes — **pt-BR** and **international English**, switchable at runtime, following the VS Code

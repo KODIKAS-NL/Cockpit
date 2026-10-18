@@ -42,6 +42,9 @@ interface Props {
   // Draft a restaurar no input (ex.: cancelou o gate de effort). Muda de ref p/ disparar.
   injectDraft?: { text: string; images: ImageAttachment[] } | null;
   onDraftInjected?: () => void;
+  /** Images to append to the attachments (the scratchpad's board). */
+  injectImages?: ImageAttachment[] | null;
+  onImagesInjected?: () => void;
   // Text to insert into the input without erasing what is already there (e.g. a credential value
   // released by the vault). Its ref changes to trigger the insertion.
   injectText?: { text: string } | null;
@@ -90,6 +93,8 @@ export const Composer = memo(function Composer({
   slashBusy,
   injectDraft,
   onDraftInjected,
+  injectImages,
+  onImagesInjected,
   injectText,
   onTextInjected,
   onSend,
@@ -467,6 +472,23 @@ export const Composer = memo(function Composer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [injectDraft]);
 
+  // Appends images sent from the scratchpad.
+  useEffect(() => {
+    if (!injectImages?.length) return;
+    setImages((prev) => [
+      ...prev,
+      ...injectImages.map((i) => ({
+        id: rid(),
+        mediaType: i.mediaType,
+        data: i.data,
+        url: `data:${i.mediaType};base64,${i.data}`,
+      })),
+    ]);
+    requestAnimationFrame(() => ref.current?.focus());
+    onImagesInjected?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [injectImages]);
+
   // Inserts text (a credential value) at the cursor position, without erasing the rest.
   useEffect(() => {
     if (!injectText) return;
@@ -817,6 +839,35 @@ export const Composer = memo(function Composer({
       ),
     });
   }
+  toolItems.push({
+    key: 'scratchpad',
+    node: (
+      <Tooltip text={t('pad.open')}>
+        <button
+          type="button"
+          className="composer-side-btn"
+          onClick={() => send({ kind: 'openScratchpad' })}
+          disabled={disabled}
+          aria-label={t('pad.open')}
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+          </svg>
+        </button>
+      </Tooltip>
+    ),
+  });
   toolItems.push({
     key: 'slash',
     node: <SlashMenu t={t} commands={slashCommands} meta={slashMeta} busy={slashBusy} onPick={pickSlash} />,

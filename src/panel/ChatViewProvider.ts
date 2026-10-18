@@ -69,10 +69,13 @@ import { fetchAccountUsage, usageDiagnostics } from '../cli/UsageApi';
 import { OtelReceiver } from '../cli/OtelReceiver';
 import { CredentialsStore } from '../secrets/CredentialsStore';
 import { buildSystemPrompt } from '../cli/SystemPromptTemplate';
-import type { LimitWindow, HostToWebview, WebviewToHost, TabInfo, UsageBucket, ScopedBucket, VoiceReplacement, ModelMeta, SkillOverride, MentionItem, ModePin } from '../../shared/protocol';
+import type { ImageAttachment, LimitWindow, HostToWebview, WebviewToHost, TabInfo, UsageBucket, ScopedBucket, VoiceReplacement, ModelMeta, SkillOverride, MentionItem, ModePin } from '../../shared/protocol';
 import { Session, type SessionHooks } from '../session/Session';
 import { chooseLocation, type Surface } from './location';
 import { resolveLocale } from '../i18n/host';
+import { ScratchpadManager } from '../scratchpad/ScratchpadPanel';
+import { adoptPad, deletePad, migratePad, padKey } from '../scratchpad/store';
+import { daemonHome } from '../daemon/paths';
 import { researchCommands } from '../cli/SlashCommandResearch';
 import { getLatestCliVersion } from '../cli/CliVersion';
 import { installManaged, managedRoot, managedVersion } from '../cli/ManagedCli';
@@ -229,6 +232,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   // The extension's own globalStorage directory.
   private readonly globalStorageDir?: string;
 
+  // Scratchpad boards (Excalidraw), one per conversation; `padTabs` says which tab a board's
+  // exported image goes back to.
+  // Boards live in ~/.cockpit (not the per-server extension storage) so every VS Code server on
+  // this machine, e.g. code-server and Remote-SSH, sees the same ones.
+  private readonly padDir = daemonHome();
+  private readonly scratchpads: ScratchpadManager;
+  private readonly padTabs = new Map<string, string>();
+
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly memory: vscode.Memento,
@@ -237,6 +248,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     globalStorageUri?: vscode.Uri,
   ) {
     this.globalStorageDir = globalStorageUri?.fsPath;
+    this.scratchpads = new ScratchpadManager(extensionUri, this.padDir, () => resolveLocale(), (key, image) =>
+      this.onPadSend(key, image),
+    );
     this.secrets = secrets;
     if (secrets) this.creds = new CredentialsStore(secrets);
     this.defaults = readClaudeDefaults();
@@ -276,7 +290,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private readonly otel = new OtelReceiver();
 
   /** Shuts down background resources (called in the extension's deactivate). */
+  /** Opens the scratchpad of a conversation (the active one by default). */
+  openScratchpad(tab?: string, image?: ImageAttachment): void {
+    const id = tab ?? this.activeTab;
+    if (!id) return;
+    const s = this.sessions.get(id);
+    const sessionId = s?.sessionId ?? s?.resumeId;
+    if (sessionId) adoptPad(this.padDir, id, sessionId);
+    const key = padKey(sessionId, id);
+    if (this.globalStorageDir) migratePad(this.globalStorageDir, this.padDir, key); // boards of 1.0.308+
+    this.padTabs.set(key, id);
+    const title = this.tabMeta.get(id)?.title || 'Cockpit';
+    this.scratchpads.open(key, vscode.l10n.t('Scratchpad: {0}', title), image);
+  }
+
+  /** The board was sent: attach it to the composer of its conversation and show that chat. */
+  private onPadSend(key: string, image: ImageAttachment): void {
+    const tab = this.padTabs.get(key);
+    if (!tab || !this.sessions.has(tab)) return;
+    this.post({ kind: 'attachImages', images: [image] }, tab);
+    const panel = this.panels.get(tab);
+    if (panel) panel.reveal(undefined, false);
+  }
+
   dispose(): void {
+    this.scratchpads.dispose();
     // Every engine process dies with the extension host.
     //
     // On Windows a child does NOT die with its parent, so each reload of the
@@ -2950,14 +2988,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // (releases the handle / prevents recreation) and then deletes the transcript.
         void this.endLiveSessions(m.sessionId).then(() => {
           deleteSession(this.workspaceCwd(), m.sessionId);
+          deletePad(this.padDir, m.sessionId);
+          if (this.globalStorageDir) deletePad(this.globalStorageDir, m.sessionId);
           this.sendSessions();
         });
         break;
       case 'deleteAllSessions':
         // Confirmation already done in the webview. Detaches ALL live tabs before
         // deleting — otherwise the open session holds/recreates its .jsonl and it reappears.
+        const ids = listSessions(this.workspaceCwd(), 100000).map((x) => x.id);
         void this.endLiveSessions(undefined, true).then(() => {
           deleteAllSessions(this.workspaceCwd());
+          for (const id of ids) {
+            deletePad(this.padDir, id);
+            if (this.globalStorageDir) deletePad(this.globalStorageDir, id);
+          }
           this.sendSessions();
         });
         break;
@@ -3035,6 +3080,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'saveImage':
         void this.saveImage(m.mediaType, m.data);
+        break;
+      case 'openScratchpad':
+        this.openScratchpad(srcTab, m.image);
         break;
       case 'spellCheck':
         void this.handleSpellCheck(srcTab, m.words);

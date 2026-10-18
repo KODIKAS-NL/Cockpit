@@ -549,6 +549,7 @@ type HostMsg =
   | { kind: 'effortGate'; selected: string; min: string } // effort < the folder CLAUDE.md minimum: confirm first
   | { kind: 'voiceCorrected'; text: string } // ditado: texto corrigido (libera o input)
   | { kind: 'voiceCorrectError' } // dictation: correction failed (keeps the original, unblocks)
+  | { kind: 'attachImages'; images: ImageAttachment[] } // the scratchpad sent its board: attach to the composer
   | { kind: 'draftRestore'; text: string } // restores the draft/dictation after a renderer reload/crash
   | { kind: 'voiceDict'; data: VoiceDictData } // the account's dictation dictionary (answer to the modal)
   | { kind: 'voiceReady' } // dictation: WS open + mic actually capturing (you may speak)
@@ -732,6 +733,8 @@ export type WebviewToHost =
   | { kind: 'fetchUsage' } // botão "Usage": busca conta + limites + breakdown (dado quente)
   | { kind: 'enableUsageTracking' } // instala o wrapper de statusline p/ capturar rate_limits real
   | { kind: 'saveImage'; mediaType: string; data: string }
+  // Opens the conversation's scratchpad; `image` is placed on the board (annotate).
+  | { kind: 'openScratchpad'; image?: ImageAttachment }
   // Spell-checker: checks a batch of words; asks for suggestions for one; adds
   // to the user dictionary (persistent in the host).
   | { kind: 'spellCheck'; words: string[] }

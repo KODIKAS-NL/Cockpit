@@ -21,7 +21,7 @@ Legend: ✓ implemented · partial · planned. The full requirements and priorit
 | **Rewind** from a prompt | ✓ | Rewind button on a prompt — truncates the transcript at that point and re-arms `--resume` | Restores the conversation, not the files on disk (Git checkpoints still planned) |
 | **Elapsed time** per turn | ✓ | Shown live on the gauge and again at the end of the turn | — |
 | Subagents (parallel threads) | partial | Rendered when the CLI emits them | A dedicated parallel view is planned |
-| Message queue (follow-ups) | planned | — | — |
+| Message queue (follow-ups) | ✓ | Send while a turn is running: the CLI queues it and the prompt shows as queued until it is picked up | — |
 
 An expanded Edit card in the timeline:
 
@@ -158,6 +158,7 @@ context, and **never** write or log credentials.
 
 | Feature | What it does | Channel |
 |---|---|---|
+| **Scratchpad** (Excalidraw board per conversation) | Annotate screenshots and sketch, then attach the result to the prompt — see [Scratchpad](#scratchpad) | Local (no tokens until you send the image) |
 | **Voice dictation** (speech-to-text) | Dictate straight into the composer — see [Voice dictation](#voice-dictation) | OAuth STT WebSocket (same service as the CLI's `/voice`); **no** token spend |
 | **Dictation correction** | **Opt-in** (default off) spelling/grammar pass after you stop dictating; a clean one-shot (instruction + text only, ~1.7 s) | Anthropic Messages API with the internal model (`cockpitDaemon.internalModel`, default Haiku) |
 | **Internal AI utility helper** ([`AiClient`](../src/cli/AiClient.ts)) | Shared, clean one-shot helper for the Cockpit's own utility calls (dictation correction, slash-command research). Avoids the CLI one-shot's ~5 s cold start + full system prompt/tools | Anthropic Messages API (OAuth), isolated |
@@ -178,6 +179,29 @@ context, and **never** write or log credentials.
 > CLI. The OAuth token is **read-only**; `/usage` and STT spend **no** tokens, and the
 > dictation correction spends only *minimal* subscription tokens (instruction + text). See
 > [`CLAUDE.md`](../CLAUDE.md) §6 for the recorded decision.
+
+## Scratchpad
+
+A whiteboard tied to a conversation, for the things that are easier to show than to type.
+
+- **Open it** from the pencil button in the prompt box, from **Annotate** in the image viewer (the
+  image is placed on the board), or with **Cockpit Daemon: Open scratchpad**. It opens as its own
+  editor tab, one per conversation.
+- **Draw** with the full Excalidraw toolset: pen, shapes, arrows, text, images, eraser, zoom and undo.
+  Mouse, trackpad and touch/Apple Pencil input work, including in code-server on the iPad. The theme
+  follows VS Code, the interface is in English or Portuguese.
+- **Send to chat** exports the board as a PNG and attaches it to the prompt box of the conversation.
+  Nothing reaches Claude until you press send, and Claude only ever sees what you send, never the
+  live board. **Save PNG** writes the image to disk. **New board** (click twice) clears it.
+- **Saved with the conversation** in `~/.cockpit/scratchpads/<session id>.excalidraw.json`, so every
+  VS Code server of that user on the machine (code-server and Remote-SSH alike) sees the same boards.
+  A board open in two windows updates when the other saves; the last save wins. Deleting a
+  conversation deletes its board. A board drawn before the conversation has a session id is kept
+  under the tab and adopted when the id appears.
+- **Not included:** Excalidraw's shape library is hidden (a library implies something permanent
+  outside the conversation), and the CJK handwriting font is left out to keep the download small.
+- The board is a separate bundle (`dist/scratchpad/`, about 4 MB packed) that loads only when a
+  board is opened.
 
 ## Models, effort and sessions
 

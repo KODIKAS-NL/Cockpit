@@ -44,6 +44,16 @@ export function ImageViewer({ t, src, onClose }: Props) {
     onClose();
   };
 
+  const annotate = async () => {
+    try {
+      const image = await toBytes(src);
+      send({ kind: 'openScratchpad', image });
+    } catch {
+      /* noop */
+    }
+    onClose();
+  };
+
   return (
     <Portal>
       <div className="modal-overlay" onClick={onClose}>
@@ -60,6 +70,9 @@ export function ImageViewer({ t, src, onClose }: Props) {
           <div className="modal-actions">
             <button type="button" className="btn" onClick={() => void copy()}>
               {t('common.copy')}
+            </button>
+            <button type="button" className="btn" onClick={() => void annotate()}>
+              {t('pad.annotate')}
             </button>
             <button type="button" className="btn send" onClick={() => void save()}>
               {t('common.save')}
