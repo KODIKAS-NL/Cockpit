@@ -20,6 +20,12 @@ and the project adopts semantic versioning.
   The canvas is always white, whatever the VS Code theme.
 
 ### Fixed
+- Changing `scrollOnSend`, `spellCheck` or `voiceCorrect` now takes effect in the open chat at once; before, it
+  only did after some other setting was pushed or the window reloaded.
+- **The chat no longer stops following the reply on its own.** On an iPad home-screen app the down arrow showed
+  up on the first reply and following stopped. A scroll that no touch, wheel, scrollbar drag or key caused
+  (the viewport or keyboard resizing, content growing) is no longer read as "the reader scrolled up". Scrolling
+  to the bottom, or pressing the down arrow, turns following back on.
 - **No second process on a conversation another Claude Code process has open.** Opening a conversation that the
   official extension (or a terminal) is running used to start a second `claude --resume` on it in the daemon: the
   window saw nothing of the other turn, and a message sent here forked the conversation. The window now checks the

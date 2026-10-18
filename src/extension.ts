@@ -330,6 +330,9 @@ export function activate(context: vscode.ExtensionContext): void {
         e.affectsConfiguration('cockpitDaemon.hideThinking') ||
         e.affectsConfiguration('cockpitDaemon.showBashDescription') ||
         e.affectsConfiguration('cockpitDaemon.expandToolCards') ||
+        e.affectsConfiguration('cockpitDaemon.scrollOnSend') ||
+        e.affectsConfiguration('cockpitDaemon.spellCheck') ||
+        e.affectsConfiguration('cockpitDaemon.voiceCorrect') ||
         e.affectsConfiguration('cockpitDaemon.userName') ||
         e.affectsConfiguration('cockpitDaemon.verbosity')
       ) {

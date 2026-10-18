@@ -49,6 +49,9 @@ import { useDismiss } from './util/useDismiss';
 const NO_TODOS: never[] = [];
 const NO_SLASH: never[] = [];
 
+/** How long after the last touch, wheel, pointer or key a scroll still counts as the reader's. */
+const USER_SCROLL_MS = 1500;
+
 export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; sessionId: string }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [confirmDelete, setConfirmDelete] = useState<SessionInfo | null>(null);
@@ -118,10 +121,13 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
     return () => window.removeEventListener('keydown', h, true);
   }, [view]);
 
-  // Following the output switches off only when the reader scrolls UP. A scroll event caused by
-  // the content growing (a new card, Markdown laying out) leaves the gap to the bottom larger
-  // without the reader having moved, and must not count as "scrolled away".
+  // Following the output switches off only when the reader scrolls UP, by hand. A scroll event
+  // with no input behind it (content growing, the viewport or keyboard resizing, which an iPad
+  // home-screen app does a lot) must not count as "scrolled away". Reaching the bottom again, or
+  // the down arrow, turns following back on.
   const lastTopRef = useRef(0);
+  const inputRef = useRef({ down: false, last: 0 });
+  const userScrolling = (): boolean => inputRef.current.down || Date.now() - inputRef.current.last < USER_SCROLL_MS;
   const onScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
@@ -131,13 +137,16 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
     if (bottom) {
       atBottomRef.current = true;
       setAtBottom(true);
-    } else if (movedUp) {
+    } else if (movedUp && userScrolling()) {
       atBottomRef.current = false;
       setAtBottom(false);
     }
   };
   const scrollToBottom = () => {
     const el = scrollRef.current;
+    // Following resumes at once, not when the smooth scroll arrives.
+    atBottomRef.current = true;
+    setAtBottom(true);
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   };
 
@@ -450,6 +459,47 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
   // before the panel is mounted and be dropped; the loader would then cover a live conversation.
   const cliLoading =
     !state.cli.checked || (!!tab?.sessionId && !tab.historyLoaded && tab.items.length === 0);
+
+  // What counts as the reader moving the view: touch, wheel, a pointer (scrollbar drag) or a
+  // scrolling key. `userScrolling` looks at these.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const input = inputRef.current;
+    const bump = (): void => {
+      input.last = Date.now();
+    };
+    const down = (): void => {
+      input.down = true;
+      bump();
+    };
+    const up = (): void => {
+      input.down = false;
+      bump();
+    };
+    const key = (e: KeyboardEvent): void => {
+      if (['ArrowUp', 'PageUp', 'Home', ' ', 'ArrowDown', 'PageDown', 'End'].includes(e.key)) bump();
+    };
+    el.addEventListener('wheel', bump, { passive: true });
+    el.addEventListener('touchstart', down, { passive: true });
+    el.addEventListener('touchmove', bump, { passive: true });
+    el.addEventListener('touchend', up, { passive: true });
+    el.addEventListener('touchcancel', up, { passive: true });
+    el.addEventListener('pointerdown', down, { passive: true });
+    window.addEventListener('pointerup', up, true);
+    window.addEventListener('keydown', key, true);
+    return () => {
+      el.removeEventListener('wheel', bump);
+      el.removeEventListener('touchstart', down);
+      el.removeEventListener('touchmove', bump);
+      el.removeEventListener('touchend', up);
+      el.removeEventListener('touchcancel', up);
+      el.removeEventListener('pointerdown', down);
+      window.removeEventListener('pointerup', up, true);
+      window.removeEventListener('keydown', key, true);
+      input.down = false;
+    };
+  }, [state.activeTab, cliLoading, view]);
 
   // The timeline can grow without `items` changing (Markdown and highlighting settling, a card
   // collapsing or expanding, an image loading): while following, keep the end in view.
