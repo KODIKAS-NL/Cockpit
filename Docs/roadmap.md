@@ -38,8 +38,3 @@ Not yet scoped.
   read the output, send input, and answer or relay permission prompts. An MCP server is the general
   form and would cover a bot connector too. Open questions: authentication and a local-only default,
   and which actions need a human approval so a connected AI cannot bypass the permission model.
-
-## Project housekeeping
-
-- Link the announcement post from the README.
-- Revoke the one-time publishing tokens (Azure DevOps, Open VSX) when no longer needed.
