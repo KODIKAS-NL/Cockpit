@@ -74,7 +74,7 @@ import { Session, type SessionHooks } from '../session/Session';
 import { chooseLocation, type Surface } from './location';
 import { resolveLocale } from '../i18n/host';
 import { ScratchpadManager } from '../scratchpad/ScratchpadPanel';
-import { adoptPad, deletePad, migratePad, padKey } from '../scratchpad/store';
+import { latestTranscriptImage, adoptPad, deletePad, migratePad, padKey } from '../scratchpad/store';
 import { daemonHome } from '../daemon/paths';
 import { researchCommands } from '../cli/SlashCommandResearch';
 import { getLatestCliVersion } from '../cli/CliVersion';
@@ -250,7 +250,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.globalStorageDir = globalStorageUri?.fsPath;
     this.scratchpads = new ScratchpadManager(extensionUri, this.padDir, () => resolveLocale(), (key, image) =>
       this.onPadSend(key, image),
-    );
+    (key) => this.latestChatImage(key));
     this.secrets = secrets;
     if (secrets) this.creds = new CredentialsStore(secrets);
     this.defaults = readClaudeDefaults();
@@ -302,6 +302,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.padTabs.set(key, id);
     const title = this.tabMeta.get(id)?.title || 'Cockpit';
     this.scratchpads.open(key, vscode.l10n.t('Scratchpad: {0}', title), image);
+  }
+
+  /** The newest image sent in the conversation behind a board. */
+  private latestChatImage(key: string): ImageAttachment | undefined {
+    const tab = this.padTabs.get(key);
+    const s = tab ? this.sessions.get(tab) : undefined;
+    const sessionId = s?.sessionId ?? s?.resumeId;
+    if (!sessionId) return undefined;
+    return latestTranscriptImage(loadTranscript(this.workspaceCwd(), sessionId));
   }
 
   /** The board was sent: attach it to the composer of its conversation and show that chat. */

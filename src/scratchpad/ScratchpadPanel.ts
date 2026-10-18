@@ -24,6 +24,8 @@ export class ScratchpadManager {
     private readonly locale: () => string,
     /** The user sent the board to the conversation `key`. */
     private readonly onSend: (key: string, image: ImageAttachment) => void,
+    /** The newest image sent in the conversation `key`, if any. */
+    private readonly latestImage: (key: string) => ImageAttachment | undefined = () => undefined,
   ) {}
 
   /** Opens (or reveals) the board of `key`; `image` is placed on it. */
@@ -69,6 +71,11 @@ export class ScratchpadManager {
             }
           }
           break;
+        case 'latestImage': {
+          const image = this.latestImage(key);
+          this.post(panel, image ? { kind: 'addImage', image } : { kind: 'noImage' });
+          break;
+        }
         case 'send':
           this.onSend(key, m.image);
           break;

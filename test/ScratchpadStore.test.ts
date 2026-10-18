@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { adoptPad, deletePad, loadPad, padFile, padKey, savePad } from '../src/scratchpad/store';
+import { adoptPad, deletePad, loadPad, padFile, padKey, savePad, latestTranscriptImage } from '../src/scratchpad/store';
 
 let dir: string;
 beforeEach(() => {
@@ -62,5 +62,19 @@ describe('scratchpad migration', () => {
     } finally {
       fs.rmSync(other, { recursive: true, force: true });
     }
+  });
+});
+
+describe('latestTranscriptImage', () => {
+  const user = (images?: string[]) => ({ kind: 'user' as const, id: 'u', text: '', images });
+  it('is undefined without user images', () => {
+    expect(latestTranscriptImage([user(), user([])])).toBeUndefined();
+  });
+  it('takes the newest image', () => {
+    const items = [user(['data:image/png;base64,AAA']), user(['data:image/jpeg;base64,BBB', 'data:image/png;base64,CCC'])];
+    expect(latestTranscriptImage(items)).toEqual({ mediaType: 'image/png', data: 'CCC' });
+  });
+  it('skips a malformed data URL', () => {
+    expect(latestTranscriptImage([user(['data:image/png;base64,AAA', 'nonsense'])])).toEqual({ mediaType: 'image/png', data: 'AAA' });
   });
 });

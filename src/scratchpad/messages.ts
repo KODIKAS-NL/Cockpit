@@ -16,10 +16,14 @@ export type HostToPad =
   | ({ kind: 'init' } & PadInit)
   | { kind: 'addImage'; image: ImageAttachment }
   /** Another window saved the board: show its version. */
-  | { kind: 'reload'; json: string };
+  | { kind: 'reload'; json: string }
+  /** The conversation has no image to start from. */
+  | { kind: 'noImage' };
 
 export type PadToHost =
   | { kind: 'ready' }
+  /** The user asked for the latest image of the conversation. */
+  | { kind: 'latestImage' }
   /** The board changed (debounced by the pad). */
   | { kind: 'save'; json: string }
   /** The board as a PNG, to attach to the conversation's composer. */

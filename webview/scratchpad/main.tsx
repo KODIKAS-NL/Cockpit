@@ -69,6 +69,14 @@ function App() {
     api.scrollToContent(added, { fitToViewport: true, viewportZoomFactor: 0.9 });
   }, []);
 
+  const flash = useCallback(
+    (k: PadKey) => {
+      setNote(padT(lang)(k));
+      window.setTimeout(() => setNote(''), 3000);
+    },
+    [lang],
+  );
+
   useEffect(() => {
     const onMsg = (e: MessageEvent<HostToPad>) => {
       const m = e.data;
@@ -86,6 +94,8 @@ function App() {
         setInitial({ data, image: m.image });
       } else if (m.kind === 'addImage') {
         void addImage(m.image);
+      } else if (m.kind === 'noImage') {
+        flash('noImage');
       } else if (m.kind === 'reload') {
         const api = apiRef.current;
         if (!api) return;
@@ -107,7 +117,7 @@ function App() {
     return () => {
       window.removeEventListener('message', onMsg);
     };
-  }, [addImage]);
+  }, [addImage, flash]);
 
   const onApi = useCallback(
     (api: ExcalidrawImperativeAPI) => {
@@ -153,6 +163,20 @@ function App() {
     saveNow();
   };
 
+  const fromClipboard = async (): Promise<void> => {
+    try {
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((x) => x.startsWith('image/'));
+        if (!type) continue;
+        await addImage({ mediaType: type, data: await blobToBase64(await item.getType(type)) });
+        return;
+      }
+    } catch {
+      /* denied or unavailable: say so below */
+    }
+    flash('noClipboard');
+  };
+
   const render = async (kind: 'send' | 'export'): Promise<void> => {
     const api = apiRef.current;
     if (!api) return;
@@ -185,6 +209,12 @@ function App() {
         renderTopRightUI={() => (
           <div className="pad-actions">
             {note && <span className="pad-note">{note}</span>}
+            <button type="button" className="pad-btn" title={t('fromClipboardTip')} onClick={() => void fromClipboard()}>
+              {t('fromClipboard')}
+            </button>
+            <button type="button" className="pad-btn" title={t('latestImageTip')} onClick={() => post({ kind: 'latestImage' })}>
+              {t('latestImage')}
+            </button>
             <button type="button" className={`pad-btn${confirmNew ? ' warn' : ''}`} onClick={newBoard}>
               {confirmNew ? t('newConfirm') : t('newBoard')}
             </button>

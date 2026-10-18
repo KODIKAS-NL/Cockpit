@@ -13,6 +13,11 @@ and the project adopts semantic versioning.
   to the prompt (nothing is sent until you press send). Boards are saved per conversation in
   `~/.cockpit/scratchpads/`, shared by every VS Code server on the machine (code-server and Remote-SSH
   alike), and an open board updates when another window saves it. **New board** clears it. The `.vsix` grows by about 4 MB.
+  **From clipboard** and **Latest chat image** place a screenshot on the board (only when pressed).
+  The canvas is always white, whatever the VS Code theme.
+
+### Fixed
+- The language label of a code block no longer overlaps its copy button.
 
 ### Changed
 - **New extension identity, new namespace.** This fork is its own extension

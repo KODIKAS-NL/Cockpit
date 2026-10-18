@@ -3,7 +3,7 @@
   "displayName": "Cockpit for Claude Code",
   "description": "%ext.description%",
   "icon": "media/icon.png",
-  "version": "1.0.312",
+  "version": "1.0.314",
   "publisher": "KODIKAS-NL",
   "license": "MIT",
   "author": {

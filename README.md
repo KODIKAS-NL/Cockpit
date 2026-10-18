@@ -167,6 +167,10 @@ already does, and run `npm run typecheck && npm test && npm run build` before a 
 MIT, see [LICENSE](LICENSE). Original work © Tootega Pesquisa e Inovação; this fork © KODIKAS
 (Jeroen Versteege). Third-party notices are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
+## Support
+
+Cockpit is free and open source. If it saves you time, you can [buy me a coffee](https://buymeacoffee.com/kodikas).
+
 ## Disclaimer
 
 > **Unofficial.** Not affiliated with, endorsed by, or sponsored by Anthropic.

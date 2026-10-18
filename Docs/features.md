@@ -191,6 +191,9 @@ A whiteboard tied to a conversation, for the things that are easier to show than
   Mouse, trackpad and touch/Apple Pencil input work, including in code-server on the iPad. The canvas
   is always white, whatever the VS Code theme, because the board is exported as a PNG on white. The
   interface is in English or Portuguese.
+- **Start from an image.** **From clipboard** places the image on the clipboard on the board, and
+  **Latest chat image** places the newest image sent in the conversation. Nothing is inserted unless
+  you press the button.
 - **Send to chat** exports the board as a PNG and attaches it to the prompt box of the conversation.
   Nothing reaches Claude until you press send, and Claude only ever sees what you send, never the
   live board. **Save PNG** writes the image to disk. **New board** (click twice) clears it.

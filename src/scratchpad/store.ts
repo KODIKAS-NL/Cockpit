@@ -3,6 +3,7 @@
 // No VS Code imports, so it can be unit-tested.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { HistoryItem, ImageAttachment } from '../../shared/protocol';
 
 const SUBDIR = 'scratchpads';
 const EXT = '.excalidraw.json';
@@ -71,4 +72,17 @@ export function adoptPad(storageDir: string, tabId: string, sessionId: string): 
   if (!fs.existsSync(from) || fs.existsSync(to)) return;
   fs.mkdirSync(path.dirname(to), { recursive: true });
   fs.renameSync(from, to);
+}
+
+/** The newest image the user sent in a transcript, or undefined when there is none. */
+export function latestTranscriptImage(items: HistoryItem[]): ImageAttachment | undefined {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (it.kind !== 'user' || !it.images) continue;
+    for (let j = it.images.length - 1; j >= 0; j--) {
+      const m = /^data:([^;,]+);base64,(.+)$/s.exec(it.images[j]);
+      if (m) return { mediaType: m[1], data: m[2] };
+    }
+  }
+  return undefined;
 }
