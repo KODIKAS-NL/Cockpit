@@ -654,6 +654,8 @@ export const ptBR: Partial<Strings> = {
   'timeline.commandOutput': 'saída do comando',
   'timeline.stoppedElsewhere': 'O turno foi interrompido em outra janela.',
   'timeline.daemonRestarted': 'O daemon reiniciou; o turno em andamento foi perdido. Envie de novo para continuar.',
+  'timeline.runningElsewhere':
+    'Esta conversa também está aberta em outro processo do Claude Code ({0}, {1}). O Cockpit não se conectou a ela, porque dois processos na mesma conversa se desencontram. Envie uma mensagem para continuar aqui mesmo assim, ou espere o outro terminar.',
   'timeline.sessionGone': 'Esta conversa foi apagada em outra janela. Sua próxima mensagem inicia uma nova.',
   'timeline.engineNotice': 'aviso do engine',
   'timeline.compactAuto': 'contexto compactado (auto)',

@@ -151,6 +151,8 @@ export const en = {
   'timeline.commandOutput': 'command output',
   'timeline.stoppedElsewhere': 'The turn was stopped from another window.',
   'timeline.daemonRestarted': 'The daemon restarted; the turn in progress was lost. Send again to continue.',
+  'timeline.runningElsewhere':
+    'This conversation is also open in another Claude Code process ({0}, {1}). Cockpit did not attach to it, because two processes on one conversation drift apart. Send a message to continue here anyway, or wait until the other one is done.',
   'timeline.sessionGone': 'This conversation was deleted in another window. Your next message starts a new one.',
   'timeline.engineNotice': 'engine warning',
   'timeline.compactAuto': 'context compacted (auto)',

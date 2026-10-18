@@ -7,6 +7,7 @@ import type { DiscoveredModel } from '../cli/ModelDiscovery';
 import { CliProcessManager, type CliOptions } from '../cli/CliProcessManager';
 import type { CliProcess } from '../cli/CliProcess';
 import { RemoteCliProcess } from '../cli/RemoteCliProcess';
+import { foreignLive, liveSessionsSync } from '../cli/SessionRegistry';
 import type { DaemonClient } from '../daemon/DaemonClient';
 import { parseLocalCommand } from '../../shared/localCommand';
 import type { SessionSnapshot } from '../../shared/daemon';
@@ -418,10 +419,40 @@ export class Session {
     };
   }
 
-  ensureCli(): void {
+  /** The other CLI process we warned about (pid), so a deliberate send after the warning goes through. */
+  private foreignWarned?: number;
+
+  /**
+   * Another live Claude Code process (the official extension, a terminal) has this conversation
+   * open: starting a second one would fork it. The first time, say so and start nothing; an
+   * attach in the background stays out of the way, a message the user sends afterwards
+   * continues here anyway.
+   */
+  private blockedByForeign(user: boolean): boolean {
+    const id = this.resumeId ?? this.sessionId;
+    if (!id) return false;
+    const other = foreignLive(liveSessionsSync(), id);
+    if (!other) return false;
+    if (this.foreignWarned !== other.pid) {
+      this.foreignWarned = other.pid;
+      this.emit({
+        kind: 'engineNotice',
+        id: `elsewhere:${other.pid}`,
+        text: `${other.entrypoint ?? '?'}|${other.status ?? '?'}`,
+        topic: 'running_elsewhere',
+      });
+      log(`[session] ${id} is open in pid ${other.pid} (${other.entrypoint}, ${other.status}): not attaching`);
+      return true;
+    }
+    return !user;
+  }
+
+  /** Starts (attaches) the CLI process. `user`: a message the user just sent asks for it. */
+  ensureCli(user = false): void {
     if (this.cli) return;
     const opts = this.cliOptions();
     const engine = opts.engine ?? 'claude';
+    if (engine === 'claude' && this.blockedByForeign(user)) return;
     // Claude runs in the daemon; the Tootega agent keeps its own lifecycle, as a child process.
     this.replayEcho = engine === 'claude'; // buildClaudeArgs passes --replay-user-messages
     if (engine === 'claude') {
@@ -496,7 +527,8 @@ export class Session {
    * or runs as the next turn. `uuid` identifies it when the CLI echoes it back.
    */
   send(text: string, images?: { mediaType: string; data: string }[], uuid: string = randomUUID()): void {
-    this.ensureCli();
+    this.ensureCli(true);
+    if (!this.cli) return; // another process has this conversation: warned, nothing started
     if (!this.busy) {
       this.setBusy(true);
       this.stats.beginTurn(); // stopwatch of the active execution time (excludes idleness)
@@ -716,6 +748,7 @@ export class Session {
   /** Turns Remote Control on or off; the state itself comes back through `onRemoteState`. */
   async setRemote(on: boolean): Promise<{ ok: boolean; url?: string; error?: string }> {
     this.ensureCli();
+    if (!this.cli) return { ok: false, error: 'this conversation is running in another Claude Code process' };
     if (!(this.cli instanceof RemoteCliProcess)) return { ok: false, error: 'not available for this engine' };
     return this.cli.setRemote(on);
   }
@@ -755,6 +788,7 @@ export class Session {
     if (end) this.stop();
     else this.detach();
     this.sessionId = undefined;
+    this.foreignWarned = undefined;
     this.seenModel = undefined;
     // Also clears the resumeId: a REALLY new conversation. Without this, after "clear
     // context" on a resumed session the next send() would respawn with --resume of the
@@ -798,6 +832,7 @@ export class Session {
   keepAlivePing(): boolean {
     if (this.busy) return false;
     this.ensureCli();
+    if (!this.cli) return false;
     this.setBusy(true);
     this.stats.beginTurn();
     dlog('session', `keep-alive ping (${this.sessionId ?? this.resumeId ?? '?'})`);

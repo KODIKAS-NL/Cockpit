@@ -1249,6 +1249,15 @@ body {
 .tool-name {
   font-weight: 600;
 }
+.tool-head-desc {
+  min-width: 0;
+  flex: 1 1 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+}
 .tool-file {
   font-size: 11px;
   font-family: var(--vscode-editor-font-family, monospace);
@@ -1549,9 +1558,12 @@ body {
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 4px;
+  max-width: 100%;
 }
 .bubble-image-btn {
   display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
   padding: 0;
   border: none;
   background: none;
@@ -1561,7 +1573,8 @@ body {
 .bubble-image {
   height: 90px;
   width: auto;
-  max-width: none;
+  /* A wide screenshot shrinks to the bubble instead of overflowing it. */
+  max-width: 100%;
   object-fit: contain;
   border-radius: 6px;
   border: 1px solid var(--vscode-panel-border, transparent);

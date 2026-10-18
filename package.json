@@ -3,7 +3,7 @@
   "displayName": "Cockpit for Claude Code",
   "description": "%ext.description%",
   "icon": "media/icon.png",
-  "version": "1.0.317",
+  "version": "1.0.321",
   "publisher": "KODIKAS-NL",
   "license": "MIT",
   "author": {
@@ -447,10 +447,15 @@
           "default": true,
           "description": "%cfg.notifyOnComplete%"
         },
-        "cockpitDaemon.showThinking": {
+        "cockpitDaemon.hideThinking": {
           "type": "boolean",
           "default": false,
-          "description": "%cfg.showThinking%"
+          "description": "%cfg.hideThinking%"
+        },
+        "cockpitDaemon.showBashDescription": {
+          "type": "boolean",
+          "default": true,
+          "description": "%cfg.showBashDescription%"
         },
         "cockpitDaemon.spellCheck": {
           "type": "boolean",

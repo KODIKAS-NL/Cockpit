@@ -7,6 +7,9 @@ and the project adopts semantic versioning.
 ## [Unreleased]
 
 ### Added
+- **Two chat display settings.** `cockpitDaemon.showBashDescription` (default on) shows what Claude says a
+  Bash command is for next to its name. `cockpitDaemon.hideThinking` (default off) replaces
+  `showThinking`: thinking blocks are now shown by default, each one collapsible; turn it on to hide them.
 - **Scratchpad.** A board (Excalidraw) tied to each conversation, in its own editor tab, for annotating
   screenshots and sketching. Open it from the pencil button in the prompt box, the **Annotate** button in
   the image viewer, or **Cockpit Daemon: Open scratchpad**. **Send to chat** attaches the board as an image
@@ -17,6 +20,11 @@ and the project adopts semantic versioning.
   The canvas is always white, whatever the VS Code theme.
 
 ### Fixed
+- **No second process on a conversation another Claude Code process has open.** Opening a conversation that the
+  official extension (or a terminal) is running used to start a second `claude --resume` on it in the daemon: the
+  window saw nothing of the other turn, and a message sent here forked the conversation. The window now checks the
+  CLI's session registry, shows a notice with the other process and its state, and starts nothing; a message you
+  send afterwards continues here anyway.
 - The language label of a code block no longer overlaps its copy button.
 
 ### Changed

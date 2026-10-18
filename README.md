@@ -151,6 +151,9 @@ Host logs are in **Output**, **Cockpit for Claude Code**, and the daemon's in `~
 - Everything derived from transcripts covers one machine. Voice capture needs `ffmpeg` on the host.
 - The statusline wrapper for real usage works on Windows only. The usage meters themselves work
   everywhere.
+- A conversation that another Claude Code process has open (the official extension, a terminal) is not
+  attached: the window warns and starts nothing, because two processes on one conversation drift apart.
+  Following that process's turn live is not built.
 - The daemon serves the Claude engine only, and the daemon and the windows must be on the same
   machine.
 - The event format of the CLI is not frozen. A new CLI version can change how parts render.

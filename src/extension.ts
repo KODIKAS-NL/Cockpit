@@ -327,7 +327,8 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       // UI-only prefs: re-push the config without restarting the session.
       if (
-        e.affectsConfiguration('cockpitDaemon.showThinking') ||
+        e.affectsConfiguration('cockpitDaemon.hideThinking') ||
+        e.affectsConfiguration('cockpitDaemon.showBashDescription') ||
         e.affectsConfiguration('cockpitDaemon.expandToolCards') ||
         e.affectsConfiguration('cockpitDaemon.userName') ||
         e.affectsConfiguration('cockpitDaemon.verbosity')

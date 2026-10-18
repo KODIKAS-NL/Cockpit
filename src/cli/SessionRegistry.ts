@@ -21,6 +21,7 @@ export interface LiveSession {
   entrypoint?: string;
   name?: string;
   version?: string;
+  status?: string; // busy | idle (not pinned)
 }
 
 /** Every session the CLI currently reports as running. Never throws. */
@@ -44,4 +45,48 @@ export async function liveSessions(): Promise<LiveSession[]> {
     }
   }
   return out;
+}
+
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EPERM'; // alive, but not ours to signal
+  }
+}
+
+/** The registry, read synchronously (a small folder). Never throws. */
+export function liveSessionsSync(): LiveSession[] {
+  let names: string[];
+  try {
+    names = fs.readdirSync(DIR);
+  } catch {
+    return [];
+  }
+  const out: LiveSession[] = [];
+  for (const n of names) {
+    if (!n.endsWith('.json')) continue;
+    try {
+      const o = JSON.parse(fs.readFileSync(path.join(DIR, n), 'utf8')) as Partial<LiveSession>;
+      if (typeof o?.sessionId === 'string' && typeof o?.pid === 'number') out.push(o as LiveSession);
+    } catch {
+      continue;
+    }
+  }
+  return out;
+}
+
+/**
+ * A live CLI process that has `sessionId` open and is not one the daemon started (those have
+ * the `sdk-cli` entrypoint, and the daemon keeps one per conversation itself). Two processes on
+ * one conversation write the same transcript and neither sees the other's turns, so the window
+ * does not start a second one without being told. Stale files (the process is gone) are ignored.
+ */
+export function foreignLive(
+  all: LiveSession[],
+  sessionId: string,
+  alive: (pid: number) => boolean = pidAlive,
+): LiveSession | undefined {
+  return all.find((s) => s.sessionId === sessionId && s.entrypoint !== 'sdk-cli' && alive(s.pid));
 }

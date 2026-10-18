@@ -15,7 +15,8 @@ All under **Settings → Extensions → Cockpit for Claude Code** (prefix `cockp
 | `permissionMode` | enum | `default` | Permission mode forwarded to the CLI (always sent, `default` included); reflected in the dropdown |
 | `notifyOnComplete` | boolean | `true` | Notify when the agent finishes and the panel is not visible |
 | `notifyOnPermission` | boolean | `true` | When Claude asks for permission and the chat is not visible, also show a notification with Allow and Deny. Answering in either place closes the other |
-| `showThinking` | boolean | `false` | Expand *thinking* blocks by default |
+| `hideThinking` | boolean | `false` | Hide *thinking* blocks. Off: they are shown, and each one can be collapsed |
+| `showBashDescription` | boolean | `true` | Show the description Claude gives a Bash command next to its name |
 | `verbosity` | enum | `verbose` | Timeline display level — `verbose` / `necessary` / `dialogo` / `quiet` (display only; see [Timeline verbosity](features.md#timeline-verbosity)) |
 | `expandToolCards` | boolean | `false` | Expand tool cards by default in the timeline |
 | `scrollOnSend` | boolean | `true` | Scroll the conversation to the end when you send a message |

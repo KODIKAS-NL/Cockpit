@@ -61,6 +61,8 @@ interface Props {
   t: Translator;
   emptyHint: boolean;
   showThinking?: boolean;
+  hideThinking?: boolean;
+  showBashDescription?: boolean;
   expandTools?: boolean;
   userName?: string;
   todos: TodoItem[];
@@ -133,6 +135,8 @@ export const Timeline = memo(function Timeline({
   t,
   emptyHint,
   showThinking,
+  hideThinking,
+  showBashDescription,
   expandTools,
   userName,
   todos,
@@ -231,6 +235,8 @@ export const Timeline = memo(function Timeline({
             items={g.items}
             t={t}
             defaultShowThinking={!!showThinking}
+            hideThinking={!!hideThinking}
+            showBashDescription={showBashDescription !== false}
             defaultOpenTools={expandTools !== false}
             todos={todos}
             showTodos={gi === lastTodoGroup}
@@ -333,6 +339,8 @@ function ClaudeTurnView({
   items,
   t,
   defaultShowThinking,
+  hideThinking,
+  showBashDescription,
   defaultOpenTools,
   todos,
   showTodos,
@@ -342,6 +350,8 @@ function ClaudeTurnView({
   items: (AssistantItem | ToolItem)[];
   t: Translator;
   defaultShowThinking: boolean;
+  hideThinking: boolean;
+  showBashDescription: boolean;
   defaultOpenTools: boolean;
   todos: TodoItem[];
   showTodos: boolean;
@@ -370,7 +380,7 @@ function ClaudeTurnView({
     group = [];
     nodes.push(
       <div key={grp[0].id} className={`tl-step tool ${toolStatus(grp)}`}>
-        <ToolCard items={grp} t={t} defaultOpen={defaultOpenTools} />
+        <ToolCard items={grp} t={t} defaultOpen={defaultOpenTools} showDescription={showBashDescription} />
       </div>,
     );
   };
@@ -414,10 +424,10 @@ function ClaudeTurnView({
     // Assistente (texto/thinking): quebra o grupo.
     flushGroup();
     // Nothing to show yet (AssistantContent renders nothing): no step, so no dot of its own.
-    if (!it.text && !it.thinking) continue;
+    if (!it.text && (hideThinking || !it.thinking)) continue;
     nodes.push(
       <div key={it.id} className="tl-step text">
-        <AssistantContent item={it} t={t} defaultShowThinking={defaultShowThinking} />
+        <AssistantContent item={it} t={t} defaultShowThinking={defaultShowThinking} hideThinking={hideThinking} />
       </div>,
     );
   }
@@ -450,6 +460,8 @@ const ClaudeTurn = memo(ClaudeTurnView, (a, b) => {
   if (
     a.t !== b.t ||
     a.defaultShowThinking !== b.defaultShowThinking ||
+    a.hideThinking !== b.hideThinking ||
+    a.showBashDescription !== b.showBashDescription ||
     a.defaultOpenTools !== b.defaultOpenTools ||
     a.showTodos !== b.showTodos ||
     a.verbosity !== b.verbosity ||
@@ -526,6 +538,17 @@ const NoticeBanner = memo(function NoticeBanner({ item, t }: { item: NoticeItem;
         <span className="notice-banner-mark">⚠</span>
         <span className="notice-banner-text">
           {t(item.topic === 'stopped_elsewhere' ? 'timeline.stoppedElsewhere' : 'timeline.daemonRestarted')}
+        </span>
+      </div>
+    );
+  }
+  if (item.topic === 'running_elsewhere') {
+    const [entry, status] = item.text.split('|');
+    return (
+      <div className="notice-banner" id={`msg-${item.id}`}>
+        <span className="notice-banner-mark">⚠</span>
+        <span className="notice-banner-text">
+          {t('timeline.runningElsewhere', entry, status === 'busy' ? t('status.busy') : t('status.idle'))}
         </span>
       </div>
     );
@@ -666,23 +689,26 @@ function AssistantContent({
   item,
   t,
   defaultShowThinking,
+  hideThinking,
 }: {
   item: AssistantItem;
   t: Translator;
   defaultShowThinking: boolean;
+  hideThinking: boolean;
 }) {
   const [showThinking, setShowThinking] = useState(defaultShowThinking);
   // The global default (setting) changed: re-syncs the already mounted blocks.
   useEffect(() => setShowThinking(defaultShowThinking), [defaultShowThinking]);
-  if (!item.text && !item.thinking) return null;
+  const thinking = hideThinking ? '' : item.thinking;
+  if (!item.text && !thinking) return null;
   return (
     <div className="assistant-msg">
-      {item.thinking && (
+      {thinking && (
         <div className="thinking">
           <button type="button" className="link-btn" onClick={() => setShowThinking((s) => !s)}>
             {showThinking ? t('thinking.hide') : t('thinking.show')}
           </button>
-          {showThinking && <pre className="thinking-body">{item.thinking}</pre>}
+          {showThinking && <pre className="thinking-body">{thinking}</pre>}
         </div>
       )}
       {item.text && (
@@ -724,7 +750,17 @@ function toolStatus(items: ToolItem[]): 'ok' | 'busy' | 'err' {
   return items.some((i) => !i.done) ? 'busy' : 'ok';
 }
 
-function ToolCard({ items, t, defaultOpen }: { items: ToolItem[]; t: Translator; defaultOpen: boolean }) {
+function ToolCard({
+  items,
+  t,
+  defaultOpen,
+  showDescription,
+}: {
+  items: ToolItem[];
+  t: Translator;
+  defaultOpen: boolean;
+  showDescription: boolean;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   // The global default (setting) changed: re-syncs the already mounted cards.
   useEffect(() => setOpen(defaultOpen), [defaultOpen]);
@@ -737,6 +773,9 @@ function ToolCard({ items, t, defaultOpen }: { items: ToolItem[]; t: Translator;
   const input = (item.input ?? {}) as Record<string, unknown>;
   const filePath = typeof input.file_path === 'string' ? input.file_path : undefined;
   const name = item.name;
+  // What Claude says a Bash command is for (the `description` it passes), like the official panel.
+  const description =
+    showDescription && name === 'Bash' && typeof input.description === 'string' ? input.description.trim() : '';
   // EndConversation: the agent closed the session itself. Surface the reason it gave.
   const endReason =
     name === 'EndConversation'
@@ -750,6 +789,7 @@ function ToolCard({ items, t, defaultOpen }: { items: ToolItem[]; t: Translator;
       <button type="button" className="tool-head" onClick={() => setOpen((o) => !o)}>
         <span className="tool-icon">{toolIcon(name)}</span>
         <span className="tool-name">{name}{merged && <span className="tool-count">×{items.length}</span>}</span>
+        {description && <span className="tool-head-desc" title={description}>{description}</span>}
         {filePath && (
           <span
             className="tool-file"

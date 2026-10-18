@@ -356,7 +356,8 @@ export interface SessionConfig {
   permissionModes: string[];
   allowAgents: boolean; // liberar agentes (Task) e workflows (Workflow); off economiza tokens
   autoCompact: string; // this conversation's auto-compact: 'auto' | 'off' | window in tokens
-  showThinking: boolean; // expand thinking by default
+  hideThinking: boolean; // do not show thinking blocks (otherwise shown, each collapsible)
+  showBashDescription: boolean; // the description Claude gives a Bash command, next to its name
   spellCheck: boolean; // spell-check while typing (composer overlay)
   expandToolCards: boolean; // expand tool cards by default in the timeline
   scrollOnSend: boolean; // sending a message scrolls the conversation to the end

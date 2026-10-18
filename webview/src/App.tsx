@@ -304,7 +304,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
       send({
         kind: 'exportMd',
         markdown: buildConversationMd(items, t, title, state.config?.userName, {
-          showThinking: allExpanded ?? state.config?.showThinking,
+          showThinking: allExpanded ?? state.config?.hideThinking !== true,
           expandTools: allExpanded ?? state.config?.expandToolCards === true,
         }),
         fileName: suggestedFileName(title),
@@ -676,7 +676,9 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
             items={items}
             t={t}
             emptyHint={items.length === 0}
-            showThinking={allExpanded ?? state.config?.showThinking}
+            showThinking={allExpanded ?? state.config?.hideThinking !== true}
+            hideThinking={state.config?.hideThinking === true}
+            showBashDescription={state.config?.showBashDescription !== false}
             expandTools={allExpanded ?? state.config?.expandToolCards === true}
             userName={state.config?.userName}
             todos={tab?.todos ?? NO_TODOS}
