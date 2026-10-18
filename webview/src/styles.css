@@ -1112,7 +1112,8 @@ body {
 .md-code .code-lang {
   position: absolute;
   top: 4px;
-  right: 8px;
+  /* Left of the copy button (right: 8px, about 20px wide): a long name grows to the left. */
+  right: 34px;
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -2081,7 +2082,7 @@ body {
 .code-copy {
   position: absolute;
   top: 4px;
-  right: 36px;
+  right: 8px;
   background: transparent;
   border: none;
   color: var(--vscode-foreground);

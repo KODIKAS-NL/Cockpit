@@ -188,8 +188,9 @@ A whiteboard tied to a conversation, for the things that are easier to show than
   image is placed on the board), or with **Cockpit Daemon: Open scratchpad**. It opens as its own
   editor tab, one per conversation.
 - **Draw** with the full Excalidraw toolset: pen, shapes, arrows, text, images, eraser, zoom and undo.
-  Mouse, trackpad and touch/Apple Pencil input work, including in code-server on the iPad. The theme
-  follows VS Code, the interface is in English or Portuguese.
+  Mouse, trackpad and touch/Apple Pencil input work, including in code-server on the iPad. The canvas
+  is always white, whatever the VS Code theme, because the board is exported as a PNG on white. The
+  interface is in English or Portuguese.
 - **Send to chat** exports the board as a PNG and attaches it to the prompt box of the conversation.
   Nothing reaches Claude until you press send, and Claude only ever sees what you send, never the
   live board. **Save PNG** writes the image to disk. **New board** (click twice) clears it.

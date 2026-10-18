@@ -17,3 +17,6 @@ HANDOFF.md
 
 # Parked plans, local only
 Docs/future-plans/
+
+# Browser tool output
+.playwright-mcp/

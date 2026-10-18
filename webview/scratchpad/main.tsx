@@ -22,11 +22,6 @@ const post = (m: PadToHost): void => vscode.postMessage(m);
 
 const SAVE_DEBOUNCE_MS = 600;
 
-function isDark(): boolean {
-  const c = document.body.classList;
-  return c.contains('vscode-dark') || c.contains('vscode-high-contrast');
-}
-
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -52,7 +47,6 @@ function App() {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const [initial, setInitial] = useState<{ data: unknown; image?: ImageAttachment } | null>(null);
   const [lang, setLang] = useState('en');
-  const [dark, setDark] = useState(isDark());
   const [note, setNote] = useState('');
   const saveTimer = useRef<number>();
   // A scene we set ourselves (another window's version) must not be saved back as a change.
@@ -110,11 +104,8 @@ function App() {
     };
     window.addEventListener('message', onMsg);
     post({ kind: 'ready' });
-    const obs = new MutationObserver(() => setDark(isDark()));
-    obs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
     return () => {
       window.removeEventListener('message', onMsg);
-      obs.disconnect();
     };
   }, [addImage]);
 
@@ -188,7 +179,8 @@ function App() {
         initialData={initial.data as never}
         excalidrawAPI={onApi}
         onChange={onChange}
-        theme={dark ? 'dark' : 'light'}
+        // Always light: the board is exported as a PNG on white, so what you draw on must be white too.
+        theme="light"
         langCode={lang.toLowerCase().startsWith('pt') ? 'pt-BR' : 'en'}
         renderTopRightUI={() => (
           <div className="pad-actions">
