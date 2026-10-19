@@ -134,14 +134,12 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
     const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
     const movedUp = el.scrollTop < lastTopRef.current - 1;
     lastTopRef.current = el.scrollTop;
-    if (movedUp && userScrolling()) {
-      // The reader moved up: stop following, even within the last 40px. A small wheel step stays
-      // inside them, and the content growing afterwards would pull the view back to the end.
-      atBottomRef.current = false;
-      setAtBottom(false);
-    } else if (bottom) {
+    if (bottom) {
       atBottomRef.current = true;
       setAtBottom(true);
+    } else if (movedUp && userScrolling()) {
+      atBottomRef.current = false;
+      setAtBottom(false);
     }
   };
   const scrollToBottom = () => {
@@ -538,9 +536,6 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
       }
     });
     ro.observe(content);
-    // The viewport shrinks when the prompt box grows (a pasted image, a long draft): no scroll
-    // event, no content change, yet the end slips out of view. Following keeps it in view.
-    ro.observe(el);
     return () => ro.disconnect();
   }, [state.activeTab, cliLoading, view]);
 

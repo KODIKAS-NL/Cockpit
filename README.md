@@ -24,12 +24,11 @@ it in the open under the MIT license, which is what makes this fork possible.
   <img alt="Cockpit in VS Code: the chat on the left and the dashboard on the right" src="https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/dashboard.png">
 </picture>
 
-## What the official extension does not have
+## Features
 
 | | |
 |---|---|
 | **Conversations that outlive the window** | Claude runs in a background daemon, so closing the lid, dropping the connection or reloading VS Code does not stop it. Any window attaches to a running conversation, and the phone joins it through Remote Control. |
-| **Questions and plans that stay beside the answer** | A question or a plan for review docks above the prompt box instead of covering the explanation it refers to. Collapse it to read, expand it to answer. |
 | **Plan feedback with references and images** | Copy lines from the plan or any file and paste them into the notes: they become an inline reference pill (as in the prompt box) and go to Claude as quoted lines. Paste a screenshot too. The same notes box exists on every question. |
 | **Code references in the prompt** | Copy code in the editor and paste it in the prompt: it becomes an inline `@file#L12-30` pill that Backspace removes in one go, and shows as a chip in the timeline. |
 | **A scratchpad per conversation** | Annotate a screenshot or sketch, then send the board to Claude as an image. |
