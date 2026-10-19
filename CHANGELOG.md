@@ -20,6 +20,24 @@ and the project adopts semantic versioning.
   The canvas is always white, whatever the VS Code theme.
 
 ### Fixed
+- **The selection reference goes away when its file is closed.** The `⧉ @file#a-b` chip above the prompt box
+  stayed after the file's tab was closed, and after switching to another file. It now follows the active
+  editor and drops when the file has no tab left (a focused chat tab does not clear it).
+- **Prose is no longer colored as code in the prompt box.** Ordinary words such as "a", "to" and "I" were painted
+  as keywords when a sentence looked code-like to the highlighter. Only fenced code and `inline code` are colored
+  now. The prompt's text layer and the textarea also use the same kerning and ligature settings.
+- **The caret stays on its text in a long prompt, in VS Code too.** Once the prompt box scrolls it gets a
+  scrollbar that narrows its text column (VS Code styles webview scrollbars as 10 px bars, and macOS shows them
+  with a mouse attached), but the colored text layer behind it did not narrow, so lines wrapped differently and
+  the caret ended up beside the wrong character. The layer and the box now always have the same text width.
+  Also fixed: the box stayed non-scrollable once it had reached its maximum height.
+- **The caret no longer drifts from the text in a long prompt.** The mic button's tooltip wrapper added a 15 px line
+  under the prompt box, so the highlight layer behind the transparent textarea could not scroll as far as the
+  textarea and lagged behind the caret once the box scrolled (over 10 lines). The wrapper is out of the flow, both
+  layers reserve the same scrollbar gutter, and comments in the prompt's code highlighting are no longer italic.
+- The send and stop buttons are vertically centered on the prompt box's toolbar row (they sat 2 px high).
+- The cog next to the permission mode no longer slides under the send button at some widths: the prompt box's
+  toolbar miscounted its icons (the slash button was left out), so one icon too many stayed inline.
 - Changing `scrollOnSend`, `spellCheck` or `voiceCorrect` now takes effect in the open chat at once; before, it
   only did after some other setting was pushed or the window reloaded.
 - **The chat no longer stops following the reply on its own.** On an iPad home-screen app the down arrow showed

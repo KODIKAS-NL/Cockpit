@@ -139,8 +139,6 @@ export function escapeHtml(s: string): string {
  * stays plain text. The HTML's TEXT CONTENT is identical to the original text
  * (the ``` and ` markers remain as text), guaranteeing alignment in the overlay.
  */
-// Minimum hljs relevance to treat an UNFENCED snippet as code (and not prose).
-const CODE_RELEVANCE = 6;
 
 // `spell`: marks misspelled words in the PROSE (never in code). Each snippet's
 // global offset is passed on to the spans' data-ss (the composer
@@ -170,18 +168,12 @@ export function richHighlight(text: string, spell = false): string {
   return out;
 }
 
-// Auto-detects: when the snippet "looks like code" (high relevance), it is highlighted; otherwise
-// it is treated as prose (plain + inline `code`). It keeps the text identical.
+// Unfenced text is prose: plain, with inline `code` and spell marks. It used to be auto-detected as
+// code when hljs found it relevant enough, which painted ordinary words ("a", "to", "I") as keywords
+// in a normal sentence, and every extra span is one more place where the mirror can drift from the
+// textarea. Code is colored when it is fenced. It keeps the text identical.
 function autoOrPlain(s: string, spell: boolean, base: number): string {
   if (!s) return '';
-  if (s.length <= MAX && /\S/.test(s)) {
-    try {
-      const a = hljs.highlightAuto(s);
-      if ((a.relevance ?? 0) >= CODE_RELEVANCE && a.value) return a.value;
-    } catch {
-      /* cai p/ prosa */
-    }
-  }
   return inlineRich(s, spell, base);
 }
 

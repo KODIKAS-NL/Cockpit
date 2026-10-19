@@ -178,14 +178,27 @@ export const Composer = memo(function Composer({
     const cs = getComputedStyle(el);
     const lineH = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.4;
     const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-    const rows = Math.round((meter.offsetHeight - pad) / lineH);
-    const shown = Math.min(Math.max(rows, MIN_ROWS), MAX_ROWS);
-    const next = Math.ceil(shown * lineH + pad);
-    if (next !== lastH.current) {
-      // Same height: don't touch style, don't invalidate layout.
-      lastH.current = next;
-      el.style.height = `${next}px`;
-      el.style.overflowY = rows > MAX_ROWS ? 'auto' : 'hidden';
+    const wrap = el.parentElement;
+    // The textarea's scrollbar (when it has one) narrows its text column; the mirror and the twin
+    // have none, so they get the same room as padding or they wrap differently and the caret ends
+    // up beside the wrong character. The width is read back, not assumed: it depends on the
+    // platform, on VS Code's webview scrollbar styling and on the "always show scroll bars" setting.
+    let rows = 0;
+    for (let pass = 0; pass < 2; pass++) {
+      rows = Math.round((meter.offsetHeight - pad) / lineH);
+      const shown = Math.min(Math.max(rows, MIN_ROWS), MAX_ROWS);
+      const next = Math.ceil(shown * lineH + pad);
+      if (next !== lastH.current) {
+        // Same height: don't touch style, don't invalidate layout.
+        lastH.current = next;
+        el.style.height = `${next}px`;
+      }
+      // Its own memo: the height stops changing at the maximum, the overflow must still follow.
+      const ovf = rows > MAX_ROWS ? 'auto' : 'hidden';
+      if (el.style.overflowY !== ovf) el.style.overflowY = ovf;
+      const sb = el.offsetWidth - el.clientWidth;
+      if (wrap && wrap.style.getPropertyValue('--sb') === `${sb}px`) break;
+      wrap?.style.setProperty('--sb', `${sb}px`);
     }
     // While the text fits, nothing may stay scrolled (the box shows all of it).
     if (rows <= MAX_ROWS && el.scrollTop !== 0) {
@@ -702,7 +715,6 @@ export const Composer = memo(function Composer({
   const [toolsShown, setToolsShown] = useState(99);
   const [toolsTight, setToolsTight] = useState(false);
   const toolCountRef = useRef(0);
-  toolCountRef.current = (onVoiceDict ? 1 : 0) + (onCredentials ? 1 : 0) + (onRemoteControl ? 1 : 0) + 1;
   // Runs after every render (cheap; React drops a state update that changes nothing), so it also
   // catches the chips appearing once the config arrives; the observer covers resizes in between.
   const toolsObserver = useRef<{ ro: ResizeObserver; picks: Element | null } | null>(null);
@@ -872,6 +884,7 @@ export const Composer = memo(function Composer({
     key: 'slash',
     node: <SlashMenu t={t} commands={slashCommands} meta={slashMeta} busy={slashBusy} onPick={pickSlash} />,
   });
+  toolCountRef.current = toolItems.length; // what the layout effect measures against
   const shownTools = Math.min(toolsShown, toolItems.length);
 
   return (

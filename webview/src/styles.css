@@ -970,6 +970,11 @@ body {
 .rt-code .hljs-comment {
   font-style: italic;
 }
+/* Upright in the prompt: italic glyphs have other widths and would shift the caret in a line. */
+.composer-highlight .hljs-comment,
+.composer-highlight .hljs-quote {
+  font-style: normal;
+}
 .caret {
   animation: blink 1s steps(2) infinite;
 }
@@ -1686,6 +1691,13 @@ body {
   word-break: break-word;
   tab-size: 2;
   border: 0;
+  /* One shaping for the textarea and the mirror: the mirror is cut into spans (code, spell marks),
+     the textarea is one run, and kerning/ligatures across those cuts differ between engines, which
+     moves the caret off the text a little more with every character of a line. */
+  font-kerning: none;
+  font-variant-ligatures: none;
+  text-rendering: optimizeSpeed;
+  letter-spacing: 0;
 }
 .composer-highlight {
   position: absolute;
@@ -6376,7 +6388,7 @@ body {
 .composer-side .btn.send-icon {
   position: absolute;
   right: 8px;
-  bottom: 6px;
+  bottom: 4px;
   min-width: 0;
   width: 32px;
   height: 28px;
@@ -6427,7 +6439,7 @@ body {
 .composer-side .btn.send-now {
   position: absolute;
   right: 46px;
-  bottom: 6px;
+  bottom: 4px;
   height: 28px;
   margin: 0;
   padding: 0 10px;
@@ -6460,6 +6472,11 @@ body {
 .composer-input-wrap .composer-input {
   padding-right: var(--mic-room);
 }
+/* The textarea's scrollbar (--sb, set in Composer.tsx) takes room from its text; the twins give the same. */
+.composer-input-wrap .composer-highlight,
+.composer-input-wrap .composer-measure {
+  padding-right: calc(var(--mic-room) + var(--sb, 0px));
+}
 /* Hidden twin of the text: same font, padding and width, but sized by its content, so the
    textarea can be sized by rows (see Composer.tsx). */
 .composer-measure {
@@ -6470,10 +6487,17 @@ body {
   visibility: hidden;
   pointer-events: none;
 }
-.composer-input-wrap .composer-side-btn.voice {
+/* The tooltip wrapper of the mic is out of the flow: left static it adds a line box under the
+   textarea, the wrap grows by ~15 px and the highlight mirror (inset:0) can no longer scroll as far
+   as the textarea, so the text drifts away from the caret in a long prompt. */
+.composer-input-wrap > .tt-wrap {
   position: absolute;
   top: 6px;
   right: 8px;
+  z-index: 2;
+}
+.composer-input-wrap .composer-side-btn.voice {
+  position: static;
   width: 26px;
   height: 26px;
   border: none;

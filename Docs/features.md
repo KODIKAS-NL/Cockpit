@@ -38,7 +38,7 @@ An expanded Edit card in the timeline:
 | Composed questions (AskUserQuestion) | ✓ | Modal with tabs per question, option cards, `multiSelect`, an **Other** option, and a **text box per question** that is added to that question's choices (**Enter** sends, **Shift+Enter** new line) | — |
 | Side-by-side diff in the native editor | ✓ | **Open diff in editor** button on the edit-permission modal → VS Code `vscode.diff` | Editing inside the native diff to change the proposal is still in the webview path |
 | **@-mention file autocomplete** | ✓ | Type `@` to pick a workspace file (fuzzy) | No `Alt+K` line-range shortcut |
-| **Share editor selection** | ✓ | Composer chip (`@file#a-b`) with an eye toggle to include/exclude | — |
+| **Share editor selection** | ✓ | Composer chip (`@file#a-b`) with an eye toggle to include/exclude; follows the active editor and goes away when the file is closed | — |
 | **Auto-save before read/write** | ✓ | Flushes a dirty buffer before the agent reads/writes (`cockpitDaemon.autosave`) | — |
 | Accept/reject per file and per hunk | planned | — | — |
 | Agent Todos panel | partial | The **Tasks** tab shows the live task list | Depends on the CLI emitting todos |

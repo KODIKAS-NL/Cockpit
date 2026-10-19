@@ -174,7 +174,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private lastClosed?: { tabId: string; sessionId?: string };
   // Ref of the editor's active selection (@file#a-b) to share via the composer.
   private lastSelRef?: string;
-  private selListener?: vscode.Disposable;
+  private lastSelUri?: string; // the document the ref points at
+  private selListeners: vscode.Disposable[] = [];
   private tabSeq = 0;
 
   // Session overrides (in memory — they don't change the user's global settings).
@@ -270,7 +271,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // against the local agent would spawn it just to fail.
     if (engineCaps().account) void resolveAccountKey(this.claudePath());
     // Editor's active selection → shareable @file#a-b ref in the composer.
-    this.selListener = vscode.window.onDidChangeTextEditorSelection((e) => this.onSelectionChanged(e));
+    // It follows the selection, the active editor, and the file's tab: closing the file drops the ref.
+    // An undefined active editor is NOT a reason to clear: it is also what a focused chat tab reports.
+    this.selListeners.push(
+      vscode.window.onDidChangeTextEditorSelection((e) => this.setSelection(e.textEditor)),
+      vscode.window.onDidChangeActiveTextEditor((ed) => {
+        if (ed) this.setSelection(ed);
+      }),
+      vscode.window.tabGroups.onDidChangeTabs(() => this.dropSelectionIfClosed()),
+    );
     // Automatic keep-alive ping is OFF: any refresh via --resume writes
     // a real turn into the .jsonl (pollutes the conversation, spends tokens and reaches the agent).
     // O medidor de vida do cache no painel continua (independe do keeper).
@@ -338,19 +347,39 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (this.watchdog) clearInterval(this.watchdog);
     this.windowStateSub?.dispose();
     this.reloadBar?.dispose();
-    this.selListener?.dispose();
+    for (const d of this.selListeners) d.dispose();
     this.diffProviderReg?.dispose();
   }
 
   /** Updates the selection ref (@rel#a-b) and notifies the composer. Empty = no selection. */
-  private onSelectionChanged(e: vscode.TextEditorSelectionChangeEvent): void {
-    const ed = e.textEditor;
+  private setSelection(ed: vscode.TextEditor): void {
     const sel = ed.selection;
     let ref: string | undefined;
     if (ed.document.uri.scheme === 'file' && !sel.isEmpty) {
       const rel = vscode.workspace.asRelativePath(ed.document.uri, false);
       ref = `@${rel}#${sel.start.line + 1}-${sel.end.line + 1}`;
     }
+    this.publishSelection(ref, ref ? ed.document.uri.toString() : undefined);
+  }
+
+  /** The file the ref points at lost its tab (closed): the reference goes with it. */
+  private dropSelectionIfClosed(): void {
+    if (!this.lastSelUri) return;
+    const open = vscode.window.tabGroups.all.some((g) =>
+      g.tabs.some((t) => {
+        const input = t.input;
+        return (
+          (input instanceof vscode.TabInputText && input.uri.toString() === this.lastSelUri) ||
+          (input instanceof vscode.TabInputTextDiff &&
+            (input.modified.toString() === this.lastSelUri || input.original.toString() === this.lastSelUri))
+        );
+      }),
+    );
+    if (!open) this.publishSelection(undefined, undefined);
+  }
+
+  private publishSelection(ref: string | undefined, uri: string | undefined): void {
+    this.lastSelUri = uri;
     if (ref === this.lastSelRef) return;
     this.lastSelRef = ref;
     this.post({ kind: 'selection', ref });
