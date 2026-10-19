@@ -266,7 +266,7 @@ npm run build        # extension, daemon and webview (esbuild)
 npm run watch        # the same, rebuilding on change
 npm run typecheck    # host and webview
 npm test             # Vitest
-npm run vsix         # typecheck, bump the patch version, package the .vsix
+npm run vsix         # typecheck, bump the patch version, package the .vsix (keeps the newest 3)
 npm run publish:marketplace / publish:openvsx    # see Docs/releasing.md
 mac/CockpitDaemon/scripts/build-app.sh [--install]   # the macOS app
 ```

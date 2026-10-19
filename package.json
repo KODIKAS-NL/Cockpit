@@ -634,8 +634,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p webview/tsconfig.json --noEmit",
     "vscode:prepublish": "node esbuild.mjs --production",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
-    "package": "npm run clean && npm version patch --no-git-tag-version && vsce package",
-    "vsix": "npm run typecheck && npm run clean && npm version patch --no-git-tag-version && vsce package",
+    "package": "npm run clean && npm version patch --no-git-tag-version && vsce package && node scripts/prune-vsix.mjs",
+    "vsix": "npm run typecheck && npm run clean && npm version patch --no-git-tag-version && vsce package && node scripts/prune-vsix.mjs",
     "publish:marketplace": "vsce publish --packagePath cockpit-claude-code-daemon-$npm_package_version.vsix",
     "publish:openvsx": "npx ovsx publish cockpit-claude-code-daemon-$npm_package_version.vsix"
   },

@@ -19,12 +19,13 @@ Publisher / namespace: `KODIKAS-NL`. Extension ID: `KODIKAS-NL.cockpit-claude-co
    ```
 4. Publish. The tokens go in the environment of your own terminal, never in a file or in chat:
    ```
-   read -s VSCE_PAT && export VSCE_PAT       # Azure DevOps token, scope Marketplace > Manage
+   read -s "VSCE_PAT?Marketplace token: " && export VSCE_PAT && echo   # Azure DevOps token, scope Marketplace > Manage
    npm run publish:marketplace
 
-   read -s OVSX_PAT && export OVSX_PAT       # Open VSX token
+   read -s "OVSX_PAT?Open VSX token: " && export OVSX_PAT && echo      # Open VSX token
    npm run publish:openvsx
    ```
+   The `"NAME?Prompt: "` form is zsh (the macOS default); in bash use `read -sp "Prompt: " NAME`.
    Both scripts publish the file for the version in `package.json`.
 5. The listings can take a few minutes to appear (the Marketplace verifies the package first).
 
