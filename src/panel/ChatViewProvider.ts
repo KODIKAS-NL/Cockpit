@@ -3371,6 +3371,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   // Resolved path per engine: with tabs on different engines, both binaries
   // have to be findable at the same time.
   private resolvedPaths = new Map<EngineId, string>();
+  private cliUpdatePoll: ReturnType<typeof setInterval> | undefined;
   private cliAvailable = false;
   private pathFixed = false; // already tried adding ~/.local/bin to the user's PATH
 
@@ -3454,9 +3455,37 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       void this.downloadManagedCli(true);
       return;
     }
+    const before = CliProcessManager.resolve(enginePath(), currentEngine()).version;
     const term = vscode.window.createTerminal('Claude Update');
     term.show();
     term.sendText(`${this.claudeCmd()} update`);
+    this.pollForCliUpdate(before);
+  }
+
+  /**
+   * After `claude update` in a terminal: the terminal gives no reliable "finished" signal (shell
+   * integration is missing in some setups, and not every shell reports it), so the version is
+   * re-read every few seconds until it differs from the old one, then the dashboard is refreshed.
+   */
+  private pollForCliUpdate(before: string | undefined): void {
+    if (this.cliUpdatePoll) clearInterval(this.cliUpdatePoll);
+    let tries = 0;
+    const iv = setInterval(() => {
+      tries++;
+      const r = CliProcessManager.resolve(enginePath(), currentEngine());
+      const changed = r.ok && r.version !== before;
+      if (changed || tries > 60) {
+        clearInterval(iv);
+        this.cliUpdatePoll = undefined;
+        if (changed) {
+          this.reportCliStatus();
+          void vscode.window.showInformationMessage(
+            vscode.l10n.t('Claude Code CLI detected: {0}', r.version ?? ''),
+          );
+        }
+      }
+    }, 3000);
+    this.cliUpdatePoll = iv;
   }
 
   /** This extension's version (read from the bundle's package.json). */

@@ -2,6 +2,8 @@
 
 *by KODIKAS*
 
+**Install:** [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=KODIKAS-NL.cockpit-claude-code-daemon) · [Open VSX](https://open-vsx.org/extension/KODIKAS-NL/cockpit-claude-code-daemon) (code-server, VSCodium, Cursor)
+
 Cockpit keeps your Claude Code conversations running when your window goes away. A small background
 service, the daemon, owns the `claude` process, so you can start a task on one device, continue it on
 another, and follow it from your phone. On top of that it is a VS Code extension with a graphical
@@ -117,9 +119,13 @@ The full list is in [Docs/features.md](Docs/features.md), and
 | Claude Code CLI | recent (2.1.162 or newer) | `claude` on the `PATH` and signed in, or let the extension download it |
 | Node.js | 20 or newer | only to build from source |
 
-1. Get a `.vsix` (build one, see [Docs/development.md](Docs/development.md), or take a release) and
-   install it: `code --install-extension cockpit-claude-code-daemon-<version>.vsix`, or in VS Code
-   Extensions, the ⋯ menu, Install from VSIX.
+1. Install the extension:
+   - **VS Code:** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=KODIKAS-NL.cockpit-claude-code-daemon),
+     or search for "Cockpit for Claude Code" in the Extensions view.
+   - **code-server, VSCodium, Cursor:** from [Open VSX](https://open-vsx.org/extension/KODIKAS-NL/cockpit-claude-code-daemon).
+   - **From source:** build a `.vsix` (see [Docs/development.md](Docs/development.md)) and install it
+     with `code --install-extension cockpit-claude-code-daemon-<version>.vsix`, or in the
+     Extensions view, the ⋯ menu, Install from VSIX.
 2. Install and sign in to Claude Code if you have not: follow Anthropic's instructions, then run
    `claude` once and log in. If `claude` is not on the `PATH`, set `cockpitDaemon.claudePath`.
 3. Start the daemon. Run **Cockpit Daemon: Install daemon** from the command palette (a launchd agent
