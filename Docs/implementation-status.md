@@ -33,7 +33,7 @@ Updated per the first build cycle. Tracks the [execution plan](execution-plan.md
 
 ### Model and effort selection (Phase 6 / M2) — implemented
 - **Model** and **effort** selectors in the UI (`--model` / `--effort` of the CLI), applied as an
-  in-memory session override (they do not alter global settings); the switch restarts the CLI session.
+  in-memory session override (they do not alter global settings); the switch is live, with no restart.
 - **Models: discovery is the only source** (the CLI has no `models` subcommand):
   1. **`/v1/models`** builds the whole picker — `id`, `display_name` (label), `max_input_tokens`
      (context column + the `[1m]` suffix rule) and `created_at` (ordering). Credential: API key

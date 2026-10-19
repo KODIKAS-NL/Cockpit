@@ -79,7 +79,9 @@ export interface UiState {
   showSessions: boolean;
   showContext: boolean;
   loggedIn: boolean; // login state (Sign in vs Sign out). Optimistic until confirmed.
-  selectionRef?: string; // @file#a-b of the editor's active selection (shareable)
+  selectionRef?: string; // @file#La-b of the editor's active selection (shareable)
+  lastCopy?: { text: string; ref: string }; // the last multi-line copy made in an editor
+  refsByTab: Record<string, string[]>; // pinned and pasted code references, per conversation
   tabs: TabState[];
   activeTab: string;
 }
@@ -93,6 +95,7 @@ export const initialState: UiState = {
   showSessions: false,
   showContext: false,
   loggedIn: true,
+  refsByTab: {},
   tabs: [],
   activeTab: '',
 };
@@ -128,9 +131,25 @@ export type Action =
   | { type: 'setSessionsOpen'; open: boolean }
   | { type: 'setContextOpen'; open: boolean }
   | { type: 'clearError' }
+  | { type: 'addRef'; ref: string }
+  | { type: 'removeRef'; ref: string }
+  | { type: 'clearRefs' }
   | { type: 'interruptUi' };
 
 export function reducer(state: UiState, action: Action): UiState {
+  if (action.type === 'addRef' || action.type === 'removeRef' || action.type === 'clearRefs') {
+    const cur = state.refsByTab[state.activeTab] ?? [];
+    const next =
+      action.type === 'addRef'
+        ? cur.includes(action.ref)
+          ? cur
+          : [...cur, action.ref]
+        : action.type === 'removeRef'
+          ? cur.filter((r) => r !== action.ref)
+          : [];
+    if (next === cur) return state;
+    return { ...state, refsByTab: { ...state.refsByTab, [state.activeTab]: next } };
+  }
   if (action.type === 'localUser') {
     return patchTab(state, state.activeTab, (tab) => ({
       ...tab,
@@ -206,6 +225,8 @@ export function reducer(state: UiState, action: Action): UiState {
       };
     case 'selection':
       return { ...state, selectionRef: msg.ref };
+    case 'copySource':
+      return { ...state, lastCopy: { text: msg.text, ref: msg.ref } };
     case 'sessions':
       return { ...state, sessions: msg.sessions, sessionsCwd: msg.cwd };
     case 'slashMeta':
@@ -449,6 +470,7 @@ function tabReducer(tab: TabState, msg: HostToWebview): TabState {
           input: msg.input,
           suggestions: msg.suggestions,
           oldText: msg.oldText,
+          planFile: msg.planFile,
         },
       };
     case 'askRequest':

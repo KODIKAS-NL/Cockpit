@@ -1,9 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Translator } from '../i18n';
 import type { PermissionRequest } from '../types';
+import type { ImageAttachment } from '../../../shared/protocol';
 import { Markdown } from './Markdown';
 import { DiffView } from './DiffView';
 import { Portal } from './Portal';
+import { CardShell } from './CardShell';
+import { RefTextarea, type RefTextareaHandle } from './RefTextarea';
+import { Attachments, readImage, type PastedImage } from './Attachments';
+import { expandRefsForFeedback } from '../../../shared/codeRef';
 import { Icon, type IconName } from './Icon';
 import { send } from '../vscodeApi';
 import { splitInvisible, hasInvisible, codeLabel, codeMark } from '../invisible';
@@ -11,8 +16,11 @@ import { splitInvisible, hasInvisible, codeLabel, codeMark } from '../invisible'
 interface Props {
   t: Translator;
   req: PermissionRequest;
-  onDecision: (d: 'allow' | 'deny' | 'allow_always', message?: string, mode?: string) => void;
+  onDecision: (d: 'allow' | 'deny' | 'allow_always', message?: string, mode?: string, images?: ImageAttachment[]) => void;
   planApproval?: string; // last plan-approval choice: 'default' | 'acceptEdits' | 'auto'
+  docked?: boolean; // the plan card sits above the prompt box instead of over the chat
+  lastCopy?: { text: string; ref: string }; // the last editor copy, for references in the plan notes
+  selectionRef?: string; // the editor selection as a reference
 }
 
 // Line icon per tool.
@@ -26,7 +34,7 @@ const TOOL_ICON: Record<string, IconName> = {
   WebSearch: 'search',
 };
 
-export function PermissionModal({ t, req, onDecision, planApproval }: Props) {
+export function PermissionModal({ t, req, onDecision, planApproval, docked, lastCopy, selectionRef }: Props) {
   useEffect(() => {
     // Only Ctrl/Cmd+Enter decides anything here: a stray Escape (or a click outside the
     // dialog, see the overlay below) must not silently deny a tool the user meant to allow.
@@ -42,7 +50,7 @@ export function PermissionModal({ t, req, onDecision, planApproval }: Props) {
 
   // Plan mode: ExitPlanMode arrives as a permission; the plan comes in input.plan.
   if (req.tool === 'ExitPlanMode') {
-    return <PlanModal t={t} req={req} onDecision={onDecision} planApproval={planApproval} />;
+    return <PlanModal t={t} req={req} onDecision={onDecision} planApproval={planApproval} docked={docked} lastCopy={lastCopy} selectionRef={selectionRef} />;
   }
 
   const inp = (req.input ?? {}) as Record<string, unknown>;
@@ -221,7 +229,7 @@ function clip(s: string, n: number): string {
 // in the editor); this card keeps only the approval gate and a link to that file, plus an
 // optional notes box for "Keep planning". When the host could not write the file — an older CLI,
 // or no workspace — it falls back to showing the plan inline, editable, as before.
-function PlanModal({ t, req, onDecision, planApproval }: Props) {
+function PlanModal({ t, req, onDecision, planApproval, docked, lastCopy, selectionRef }: Props) {
   const plan = String((req.input as Record<string, unknown>)?.plan ?? '');
   const planFile = req.planFile;
   const [editing, setEditing] = useState(false);
@@ -232,22 +240,22 @@ function PlanModal({ t, req, onDecision, planApproval }: Props) {
 
   // With a file, "Keep planning" carries the notes box; inline, it carries the edited plan.
   const edited = draft.trim() !== plan.trim();
+  const notesRef = useRef<RefTextareaHandle>(null);
+  const [images, setImages] = useState<PastedImage[]>([]);
   const keepPlanning = () =>
     planFile
-      ? onDecision('deny', notes.trim() || undefined)
+      ? onDecision(
+          'deny',
+          expandRefsForFeedback(notes, plan, planFile, notesRef.current?.pasted() ?? new Map()).trim() || undefined,
+          undefined,
+          images.length ? images.map(({ mediaType, data }) => ({ mediaType, data })) : undefined,
+        )
       : onDecision('deny', edited ? draft : undefined);
 
   const openPlan = () => planFile && send({ kind: 'openLink', href: planFile, preview: true });
 
   return (
-    <Portal>
-      {/* No onClick here on purpose: a stray click outside the dialog must not deny the plan
-          (or discard notes/edits). The decision is only made by the explicit buttons below. */}
-      <div className="modal-overlay">
-        <div
-          className={`modal perm plan ${maximized ? 'maximized' : ''}`}
-          onClick={(e) => e.stopPropagation()}
-        >
+    <CardShell t={t} className={`modal perm plan ${maximized ? 'maximized' : ''}`} docked={docked}>
           <div className="perm-head">
             <span className="perm-icon">
               <Icon name="plan" size={16} />
@@ -290,12 +298,24 @@ function PlanModal({ t, req, onDecision, planApproval }: Props) {
                   {planFile}
                 </button>
                 <div className="perm-plan-filenote">{t('permission.planSavedNote')}</div>
-                <textarea
-                  className="perm-plan-notes"
+                <RefTextarea
+                  ref={notesRef}
+                  t={t}
                   value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  onChange={setNotes}
                   placeholder={t('permission.planNotesPlaceholder')}
+                  lastCopy={lastCopy}
+                  onImages={(files) => void Promise.all(files.map(readImage)).then((im) => setImages((p) => [...p, ...im]))}
                 />
+                <Attachments t={t} small images={images} onRemove={(id) => setImages((p) => p.filter((x) => x.id !== id))} />
+                <div className="perm-plan-notes-hint">
+                  <span>{t('permission.planNotesRefsHint')}</span>
+                  {selectionRef && (
+                    <button type="button" className="btn" onClick={() => notesRef.current?.insert(selectionRef)}>
+                      {t('refs.insertSelection')}
+                    </button>
+                  )}
+                </div>
               </div>
             ) : editing ? (
               <textarea
@@ -310,7 +330,7 @@ function PlanModal({ t, req, onDecision, planApproval }: Props) {
           </div>
           <div className="modal-actions perm-actions">
             <button type="button" className="btn deny" onClick={keepPlanning}>
-              {(planFile ? notes.trim() : edited)
+              {(planFile ? notes.trim() || images.length > 0 : edited)
                 ? t('permission.planSendNotes')
                 : t('permission.keepPlanning')}
             </button>
@@ -331,8 +351,6 @@ function PlanModal({ t, req, onDecision, planApproval }: Props) {
               </button>
             ))}
           </div>
-        </div>
-      </div>
-    </Portal>
+    </CardShell>
   );
 }

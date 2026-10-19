@@ -134,12 +134,14 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
     const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
     const movedUp = el.scrollTop < lastTopRef.current - 1;
     lastTopRef.current = el.scrollTop;
-    if (bottom) {
-      atBottomRef.current = true;
-      setAtBottom(true);
-    } else if (movedUp && userScrolling()) {
+    if (movedUp && userScrolling()) {
+      // The reader moved up: stop following, even within the last 40px. A small wheel step stays
+      // inside them, and the content growing afterwards would pull the view back to the end.
       atBottomRef.current = false;
       setAtBottom(false);
+    } else if (bottom) {
+      atBottomRef.current = true;
+      setAtBottom(true);
     }
   };
   const scrollToBottom = () => {
@@ -252,8 +254,11 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
     }
     dispatch({ type: 'localUser', id: uuid, text, images: previews.length ? previews : undefined, queued });
     dispatch({ type: 'clearError' }); // new send: clears the previous error/abort warning
+    dispatch({ type: 'clearRefs' }); // the references went with this message
     send({ kind: 'sendMessage', text, images: images.length ? images : undefined, selection, uuid, now });
   }, []);
+  const onAddRef = useCallback((ref: string) => dispatch({ type: 'addRef', ref }), []);
+  const onRemoveRef = useCallback((ref: string) => dispatch({ type: 'removeRef', ref }), []);
   const onStop = useCallback(() => {
     send({ kind: 'interrupt' });
     dispatch({ type: 'interruptUi' });
@@ -389,15 +394,15 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
     send({ kind: 'deleteAllSessions' });
     setConfirmDeleteAll(false);
   };
-  const onPermission = (d: 'allow' | 'deny' | 'allow_always', message?: string, mode?: string) => {
+  const onPermission = (d: 'allow' | 'deny' | 'allow_always', message?: string, mode?: string, images?: ImageAttachment[]) => {
     if (tab?.permission) {
-      send({ kind: 'permissionDecision', requestId: tab.permission.requestId, decision: d, message, mode });
+      send({ kind: 'permissionDecision', requestId: tab.permission.requestId, decision: d, message, mode, images });
       dispatch({ type: 'clearPermission' });
     }
   };
-  const onAsk = (answers: Record<string, string>) => {
+  const onAsk = (answers: Record<string, string>, images?: Record<string, ImageAttachment[]>) => {
     if (tab?.ask) {
-      send({ kind: 'askResponse', requestId: tab.ask.requestId, answers });
+      send({ kind: 'askResponse', requestId: tab.ask.requestId, answers, images });
       dispatch({ type: 'clearAsk', answers });
     }
   };
@@ -450,6 +455,25 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
       </div>
     ) : null;
 
+  // Expand / collapse all: a button in the top bar, next to export.
+  const topControls = (
+    <>
+      <button
+        type="button"
+        className="tabstrip-btn"
+        title={allExpanded ? t('composer.collapseAll') : t('composer.expandAll')}
+        aria-label={allExpanded ? t('composer.collapseAll') : t('composer.expandAll')}
+        aria-pressed={allExpanded ?? false}
+        onClick={onToggleExpandAll}
+      >
+        <Icon name={allExpanded ? 'collapse' : 'expand'} />
+      </button>
+      {exportControl}
+    </>
+  );
+
+  // The cards that wait for an answer to something Claude just wrote: docked, not modal.
+  const dockedCard = !!tab?.ask || tab?.permission?.tool === 'ExitPlanMode';
   const cliMissing = !state.cli.available;
   // Loading: the host hasn't reported the CLI status yet, OR the tab hasn't
   // received the history yet (reopening a context). Avoids the flash of the banner and the empty
@@ -514,6 +538,9 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
       }
     });
     ro.observe(content);
+    // The viewport shrinks when the prompt box grows (a pasted image, a long draft): no scroll
+    // event, no content change, yet the end slips out of view. Following keeps it in view.
+    ro.observe(el);
     return () => ro.disconnect();
   }, [state.activeTab, cliLoading, view]);
 
@@ -707,11 +734,11 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
           onClose={(id) => send({ kind: 'closeTab', tabId: id })}
           onOpenEditor={() => send({ kind: 'openEditor' })}
           onRename={(sessionId, name) => send({ kind: 'renameSession', sessionId, name })}
-          trailing={exportControl}
+          trailing={topControls}
         />
       )}
       <div className="scroll-wrap">
-        {view !== 'sidebar' && exportControl && <div className="export-float">{exportControl}</div>}
+        {view !== 'sidebar' && <div className="export-float">{topControls}</div>}
         {cliLoading ? (
           <div className="cockpit-loader" role="status" aria-label="Cockpit">
             <div className="cockpit-loader-ring">
@@ -733,6 +760,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
             userName={state.config?.userName}
             todos={tab?.todos ?? NO_TODOS}
             answers={tab?.answers}
+            askPending={!!tab?.ask}
             onRewind={tab?.status === 'busy' ? undefined : onRewind}
             verbosity={state.config?.verbosity}
           />
@@ -748,16 +776,6 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
             ↓
           </button>
         )}
-        <button
-          type="button"
-          className="expand-all"
-          title={allExpanded ? t('composer.collapseAll') : t('composer.expandAll')}
-          aria-label={allExpanded ? t('composer.collapseAll') : t('composer.expandAll')}
-          aria-pressed={allExpanded ?? false}
-          onClick={onToggleExpandAll}
-        >
-          <Icon name={allExpanded ? 'collapse' : 'expand'} />
-        </button>
         </>
         )}
       </div>
@@ -795,6 +813,26 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
         </div>
       )}
 
+      {/* A question or a plan waiting for you is docked here, in place of the prompt box, so the
+          chat above it stays readable. The composer is hidden, not unmounted: its draft stays. */}
+      {dockedCard && (
+        <div className="dock">
+          {tab?.ask ? (
+            <AskQuestionModal t={t} req={tab.ask} onSubmit={onAsk} docked lastCopy={state.lastCopy} />
+          ) : tab?.permission ? (
+            <PermissionModal
+              t={t}
+              req={tab.permission}
+              onDecision={onPermission}
+              planApproval={state.config?.planApproval}
+              lastCopy={state.lastCopy}
+              selectionRef={state.selectionRef}
+              docked
+            />
+          ) : null}
+        </div>
+      )}
+      <div style={{ display: dockedCard ? 'none' : 'contents' }}>
       <Composer
         t={t}
         locale={state.locale}
@@ -814,6 +852,10 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
         onTextInjected={onTextInjected}
         onSend={onSend}
         selectionRef={state.selectionRef}
+        refs={state.refsByTab[state.activeTab] ?? NO_SLASH}
+        lastCopy={state.lastCopy}
+        onAddRef={onAddRef}
+        onRemoveRef={onRemoveRef}
         onStop={onStop}
         onVoiceDict={onVoiceDict}
         onCredentials={onCredentials}
@@ -838,12 +880,11 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
           />
         }
       />
+      </div>
 
       {credsModalEl}
 
-      {tab?.permission && <PermissionModal t={t} req={tab.permission} onDecision={onPermission} planApproval={state.config?.planApproval} />}
-
-      {tab?.ask && <AskQuestionModal t={t} req={tab.ask} onSubmit={onAsk} />}
+      {tab?.permission && !dockedCard && <PermissionModal t={t} req={tab.permission} onDecision={onPermission} planApproval={state.config?.planApproval} />}
 
       {confirmDelete && (
         <ConfirmDialog

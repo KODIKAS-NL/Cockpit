@@ -17,6 +17,14 @@ export const en = {
   'search.next': 'Next (Enter)',
   'search.close': 'Close (Esc)',
   'selection.included': 'Editor selection shared with Claude — click to exclude',
+  'refs.open': 'Open the file at these lines',
+  'refs.pin': 'Keep this selection as a reference',
+  'refs.pasteAsText': 'Insert the code as text instead',
+  'dock.collapse': 'Fold the card',
+  'dock.expand': 'Unfold the card',
+  'refs.insertSelection': 'Insert editor selection',
+  'permission.planNotesRefsHint': 'Copy lines in the plan or any file and paste them here: they go to the agent as references.',
+  'refs.remove': 'Remove reference',
   'selection.excluded': 'Editor selection hidden — click to include',
   'about.cliOutdated': 'New version {0} available. Update with: claude update',
   'about.cliBelowMin':
@@ -660,6 +668,7 @@ export const en = {
   'permission.planNotesPlaceholder': 'Notes for the agent (optional) — sent when you keep planning',
 
   'ask.title': 'Claude has a question',
+  'ask.answerBelow': 'Answer it below',
   'ask.answered': 'Question answered',
   'ask.submit': 'Submit',
   'ask.other': 'Other…',

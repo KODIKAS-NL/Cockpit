@@ -35,17 +35,18 @@ An expanded Edit card in the timeline:
 | **Invisible characters exposed in the command** | ✓ | Zero-width, bidi overrides, non-ASCII spaces, tab padding and C0 controls show as a marked glyph (hover gives `U+XXXX NAME`), with a warning above the command | Applies to the command preview; other previews show the raw text |
 | Permission modes (HITL ↔ auto) | ✓ | **Permission** dropdown (`default`, `plan`, `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`) | `bypassPermissions` disables approvals — use with care |
 | **Plan mode** (view, **edit** and approve a plan) | ✓ | `ExitPlanMode` permission with **Edit/Preview** toggle and a **maximize** toggle for long plans; **Approve & run** or **Keep planning (send my notes)** feeds your edits back | — |
-| Composed questions (AskUserQuestion) | ✓ | Modal with tabs per question, option cards, `multiSelect`, an **Other** option, and a **text box per question** that is added to that question's choices (**Enter** sends, **Shift+Enter** new line) | — |
+| Composed questions (AskUserQuestion) | ✓ | Card docked above the prompt box (not over the timeline) with tabs per question, option cards, `multiSelect`, an **Other** option, and a **text box per question** that is added to that question's choices (**Enter** sends, **Shift+Enter** new line) | — |
 | Side-by-side diff in the native editor | ✓ | **Open diff in editor** button on the edit-permission modal → VS Code `vscode.diff` | Editing inside the native diff to change the proposal is still in the webview path |
 | **@-mention file autocomplete** | ✓ | Type `@` to pick a workspace file (fuzzy) | No `Alt+K` line-range shortcut |
 | **Share editor selection** | ✓ | Composer chip (`@file#a-b`) with an eye toggle to include/exclude; follows the active editor and goes away when the file is closed | — |
+| **Code references** | ✓ | Paste lines copied in an editor as an inline `@file#L10-12` reference drawn as a pill, several at once; Backspace, Delete or ✕ removes it, the edit button swaps it for the code; pin the selection chip; sent messages show them as chips that open the file; the plan notes take them too (Remote Control excepted); images can be pasted into the plan notes and question notes | — |
 | **Auto-save before read/write** | ✓ | Flushes a dirty buffer before the agent reads/writes (`cockpitDaemon.autosave`) | — |
 | Accept/reject per file and per hunk | planned | — | — |
 | Agent Todos panel | partial | The **Tasks** tab shows the live task list | Depends on the CLI emitting todos |
 
 A multiple-choice question from the agent:
 
-![The question dialog](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/question.png)
+![The question card, docked above the prompt box](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/question-docked.png)
 
 ### Checkpoints and recovery
 
@@ -210,7 +211,7 @@ A whiteboard tied to a conversation, for the things that are easier to show than
 ## Models, effort and sessions
 
 - **Model** and **Effort** are *session overrides* (they do not change global settings);
-  switching restarts the CLI session.
+  switching is live, with no restart (control requests to the running CLI).
 - **Model per mode.** The pin in the model popup ties the current model and effort to the current
   permission mode (`cockpitDaemon.modePins`, for every conversation). Entering the mode, also when
   Claude leaves plan mode after an approved plan, switches live. Claude Code's `opusplan` alias covers
@@ -244,36 +245,17 @@ A whiteboard tied to a conversation, for the things that are easier to show than
 Continue a Cockpit conversation from your phone or from `claude.ai/code`. The phone-icon button — on the
 session card in the Hub and in the composer — starts it.
 
-**Why it is a terminal, not a slash command.** `/remote-control` only exists in an *interactive*
-session. The Cockpit's session is headless (`-p --input-format stream-json`, which is what gives
-us the event stream), and there the CLI answers *"/remote-control isn't available in this
-environment"* — the command isn't even in that session's `slash_commands` (measured on 2.1.223).
-So the Cockpit hands the conversation over the way the CLI does support it.
+Remote Control runs **inside the daemon's process** for the conversation (the `remote` message in
+[daemon mode](daemon-mode.md)): the phone joins the same live conversation as one more client, and
+every window keeps seeing the turns. Nothing is handed over to a terminal, and the composer keeps
+working. The daemon keeps the process alive while Remote Control is on, and restarts it if it dies.
+Clicking the button again turns it off.
 
-What the button does:
-
-1. **Stops the tab's headless process.** Two processes owning one session would duplicate the
-   context on disk.
-2. **Opens a visible terminal** with `claude --remote-control --resume <session-id>` — an
-   interactive session that continues *this* conversation and prints the pairing URL/QR.
-3. **Keeps the timeline following.** The interactive session writes to the same transcript, so
-   the tab repaints from it while the remote session runs: local history and remote turns side
-   by side.
-4. **Steps the composer aside.** The button turns green; typing in the Cockpit is refused with an
-   explanation and reveals the terminal instead of respawning a process over the conversation.
-5. **Clicking again turns it off** (same toggle as the official extension): the terminal closes
-   and the Cockpit drives the conversation again. Nothing is lost — the next message resumes it.
-   Closing the terminal by hand does the same.
-
-**The button says what is known, not what was hoped for.** Spawning the terminal is not proof
-that the session came up, so the state is *confirmed*: the CLI registers every running process in
-`~/.claude/sessions/<pid>.json`, and [`SessionRegistry`](../src/cli/SessionRegistry.ts) looks for
-this conversation there (checking the pid is really alive — a hard kill leaves the file behind).
-The button is **amber and pulsing** while connecting, **green** once the process is registered,
-and **red** if it never appeared (45s) or disappeared after being up. A failure leaves the
-terminal open — it holds the reason (login, network, a CLI error) — and the next click
-reconnects instead of toggling off. Assuming success was the bug the official extension fixed in
-2.1.224; the fix here is the same one, at the same place.
+**The button says what is known, not what was hoped for.** The state is *confirmed*: the CLI
+registers every running process in `~/.claude/sessions/<pid>.json`, and
+[`SessionRegistry`](../src/cli/SessionRegistry.ts) looks for this conversation there (checking the
+pid is really alive). The button is **amber and pulsing** while connecting, **green** once the
+process is registered, and **red** if it never appeared (45s) or disappeared after being up.
 
 Requirements are the CLI's, not ours: Remote Control needs a **claude.ai login** (an
 `ANTHROPIC_API_KEY` in the environment, or an `ANTHROPIC_BASE_URL` outside `api.anthropic.com`,

@@ -19,6 +19,13 @@ Legend: ✓ yes · partial · – no · n/a not applicable · planned.
 | Timeline verbosity filter (verbose→quiet) | ✓ | – | display-only, doesn't change the agent |
 | Scratchpad: annotate screenshots, sketch, attach to the prompt | ✓ | – | Excalidraw board per conversation, saved with it and shared across windows |
 | Scroll-marker rail (one per prompt) | ✓ | partial | Cockpit minimap rail with numbered hover |
+| Inline code references (paste copied code as an `@file#L10-12` pill) | ✓ | – | Backspace or ✕ removes it whole; chips in the timeline open the file |
+| Question and plan cards docked above the prompt box | ✓ | – | the explanation stays readable; collapsible |
+| Plan feedback and question notes with references and pasted images | ✓ | – | images are saved to `Planing/.attachment-temp/` and deleted when the turn ends |
+| Conversations outlive the window (daemon), attach from any window | ✓ | – | see [daemon mode](daemon-mode.md) |
+| Chat in the side bar, model/effort/mode live in the prompt box | ✓ | – |  |
+| Model and effort pinned per permission mode | ✓ | – | switched live on mode change |
+| Auto-compact limit per conversation | ✓ | – | kept by the daemon |
 
 ### Editing & human control
 
@@ -75,7 +82,7 @@ Legend: ✓ yes · partial · – no · n/a not applicable · planned.
 | Close the webview without stopping the run | ✓ | partial | Cockpit keeps the CLI/session alive in the host; reopening replays the full timeline. Official tab-close behavior is not documented |
 | Manual reload (fix gray/dead webview) | ✓ | n/a | status-bar ↻ + per-session-card ↻ + auto render-watchdog |
 | Reopen closed session | ✓ | ✓ | `Ctrl+Shift+T` + command palette |
-| Remote control (follow from phone) | ✓ | ✓ | phone icon on the session card (and in the composer) hands the conversation to `claude --remote-control --resume` in a visible terminal — see [Remote Control](features.md#remote-control) |
+| Remote control (follow from phone) | ✓ | ✓ | phone icon on the session card (and in the composer) runs inside the daemon's process, the phone joins the live conversation — see [Remote Control](features.md#remote-control) |
 | Resume cloud / remote sessions (claude.ai) | – | ✓ | official Remote tab |
 | Reposition panel (sidebar / editor / window) | ✓ | ✓ | chat in the secondary side bar or an editor tab; dashboard in the Activity Bar |
 

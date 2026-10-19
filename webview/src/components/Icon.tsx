@@ -26,7 +26,9 @@ export type IconName =
   | 'search'
   | 'diamond'
   | 'plan'
-  | 'pin';
+  | 'pin'
+  | 'eye'
+  | 'eyeOff';
 
 const PATHS: Record<IconName, ReactElement> = {
   // A push pin: a model/effort pinned to a permission mode.
@@ -80,6 +82,18 @@ const PATHS: Record<IconName, ReactElement> = {
   // Pencil: rename.
   edit: <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />,
   terminal: <path d="M4 17l6-6-6-6M12 19h8" />,
+  eye: (
+    <>
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  eyeOff: (
+    <>
+      <path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-2.6 3.5M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.8 9.8 0 0 0 5.4-1.6" />
+      <path d="M3 3l18 18M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </>
+  ),
   file: <path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8l-4-5zM14 3v5h4" />,
   globe: (
     <>

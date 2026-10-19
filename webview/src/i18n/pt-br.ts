@@ -19,6 +19,14 @@ export const ptBR: Partial<Strings> = {
   'search.next': 'Próximo (Enter)',
   'search.close': 'Fechar (Esc)',
   'selection.included': 'Seleção do editor compartilhada com o Claude — clique p/ excluir',
+  'refs.open': 'Abrir o arquivo nestas linhas',
+  'refs.pin': 'Manter esta seleção como referência',
+  'refs.pasteAsText': 'Inserir o código como texto',
+  'dock.collapse': 'Recolher o cartão',
+  'dock.expand': 'Expandir o cartão',
+  'refs.insertSelection': 'Inserir seleção do editor',
+  'permission.planNotesRefsHint': 'Copie trechos do plano ou de qualquer arquivo e cole aqui: vão para o agente como referências.',
+  'refs.remove': 'Remover referência',
   'selection.excluded': 'Seleção do editor oculta — clique p/ incluir',
   'about.cliOutdated': 'Nova versão {0} disponível. Atualize com: claude update',
   'about.cliBelowMin':
@@ -590,6 +598,7 @@ export const ptBR: Partial<Strings> = {
   'permission.planNotesPlaceholder': 'Notas para o agente (opcional) — enviadas ao continuar planejando',
 
   'ask.title': 'O Claude tem uma pergunta',
+  'ask.answerBelow': 'Responda abaixo',
   'ask.answered': 'Pergunta respondida',
   'ask.submit': 'Enviar',
   'ask.other': 'Outro…',

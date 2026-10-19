@@ -1,6 +1,7 @@
-import { memo, useMemo, useState, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { createContext, memo, useContext, useMemo, useState, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import type { Translator } from '../i18n';
 import { send } from '../vscodeApi';
+import { parseRef, refLines, splitLeadingRefs } from '../../../shared/codeRef';
 import type {
   TimelineItem,
   AssistantItem,
@@ -67,6 +68,8 @@ interface Props {
   userName?: string;
   todos: TodoItem[];
   answers?: Record<string, string>;
+  /** A question is waiting in the dock below: its card here only points at it. */
+  askPending?: boolean;
   onRewind?: (userIndex: number) => void; // rewind to this prompt (removing it)
   verbosity?: string; // verbose|necessary|dialogo|quiet — filters the display
 }
@@ -141,6 +144,7 @@ export const Timeline = memo(function Timeline({
   userName,
   todos,
   answers,
+  askPending,
   onRewind,
   verbosity = 'verbose',
 }: Props) {
@@ -203,6 +207,7 @@ export const Timeline = memo(function Timeline({
   // p/ o rewind referenciar o prompt certo independentemente do id local/uuid.
   let userOrdinal = allGroups.slice(0, hidden).filter((g) => g.kind === 'user').length - 1;
   return (
+    <AskPendingContext.Provider value={!!askPending}>
     <div className="timeline">
       {hidden > 0 && (
         <div className="timeline-earlier" ref={topRef}>
@@ -246,6 +251,7 @@ export const Timeline = memo(function Timeline({
         ),
       )}
     </div>
+    </AskPendingContext.Provider>
   );
 });
 
@@ -604,6 +610,7 @@ function InfoTip({ t, title, rows, focusable = true }: { t: Translator; title: s
   );
 }
 
+const USER_CLAMP_LINES = 4; // keep in step with .user-hl--clamp
 const UserBubble = memo(function UserBubble({
   item,
   t,
@@ -622,7 +629,9 @@ const UserBubble = memo(function UserBubble({
   const openImage = useImageViewer();
   const [collapsed, setCollapsed] = useState(true);
   // It only makes sense to offer expanding when the text has more than one line.
-  const collapsible = !!item.text && item.text.includes('\n');
+  // The `@file#La-b` lines at the start of a message are code references: chips, then the text.
+  const { refs, rest } = splitLeadingRefs(item.text ?? '');
+  const collapsible = !!rest && rest.split('\n').length > USER_CLAMP_LINES;
   return (
     <div className={pinned ? 'pinned-wrap' : undefined}>
       <div className={`bubble user ${pinned ? 'pinned' : ''}`} id={`msg-${item.id}`}>
@@ -671,10 +680,39 @@ const UserBubble = memo(function UserBubble({
             ))}
           </div>
         )}
-        {item.text && (
+        {refs.length > 0 && (
+          <div className="bubble-refs">
+            {refs.map((r, i) => {
+              const p = parseRef(r);
+              const lines = refLines(p);
+              return (
+                <span key={`${r}-${i}`} className="composer-selchip" title={`${p.path}${lines ? `:${lines}` : ''}`}>
+                  <button
+                    type="button"
+                    className="composer-selchip-main"
+                    onClick={() => send({ kind: 'openLink', href: p.start ? `${p.path}#L${p.start}` : p.path })}
+                  >
+                    <span className="composer-selchip-name">{p.name}</span>
+                    {lines && <span className="composer-selchip-lines">:{lines}</span>}
+                    {p.dir && (
+                      <span className="composer-selchip-dir">
+                        <bdi>{p.dir}</bdi>
+                      </span>
+                    )}
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+        {rest && (
           <pre
             className={`content hljs user-hl ${collapsible && collapsed ? 'user-hl--clamp' : ''}`}
-            dangerouslySetInnerHTML={{ __html: richHighlight(item.text) }}
+            onClick={(e) => {
+              const href = (e.target as HTMLElement).closest<HTMLElement>('.ref-chip')?.dataset.href;
+              if (href) send({ kind: 'openLink', href });
+            }}
+            dangerouslySetInnerHTML={{ __html: richHighlight(rest, false, true) }}
           />
         )}
       </div>
@@ -963,6 +1001,8 @@ function ToolCard({
   }
 }
 
+const AskPendingContext = createContext(false);
+
 // AskUserQuestion: inline modal-like view — questions + options with the choice
 // marked. Always open. Answers come from the tab's live state; in a resumed
 // retomada, caem no parse do tool_result.
@@ -990,6 +1030,19 @@ function AskCard({
   const parsed = parseAnswersFromResult(toText(item.result), questions);
   const answerOf = (q: string): string => (answers?.[q] ?? parsed[q] ?? '').trim();
   const anyAnswered = questions.some((q) => answerOf(q.question).length > 0);
+  const askPending = useContext(AskPendingContext);
+  // Still waiting for the answer, which is asked in the dock below: no second copy of the options.
+  if (askPending && !anyAnswered && !toText(item.result)) {
+    return (
+      <div className="ask-card">
+        <div className="ask-card-head">
+          <span className="ask-icon">?</span>
+          <span className="ask-card-title">{t('ask.title')}</span>
+          <span className="ask-card-wait">{t('ask.answerBelow')}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="ask-card">

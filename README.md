@@ -19,7 +19,33 @@ Pesquisa e Inovação (HermesSilva). Almost everything good in it starts with th
 GUI for Claude Code that keeps its figures honest and gives you fine control. Thank you for building
 it in the open under the MIT license, which is what makes this fork possible.
 
-![Cockpit in VS Code: the chat on the left and the dashboard on the right](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/dashboard.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/dashboard-dark.png">
+  <img alt="Cockpit in VS Code: the chat on the left and the dashboard on the right" src="https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/dashboard.png">
+</picture>
+
+## What the official extension does not have
+
+| | |
+|---|---|
+| **Conversations that outlive the window** | Claude runs in a background daemon, so closing the lid, dropping the connection or reloading VS Code does not stop it. Any window attaches to a running conversation, and the phone joins it through Remote Control. |
+| **Questions and plans that stay beside the answer** | A question or a plan for review docks above the prompt box instead of covering the explanation it refers to. Collapse it to read, expand it to answer. |
+| **Plan feedback with references and images** | Copy lines from the plan or any file and paste them into the notes: they become an inline reference pill (as in the prompt box) and go to Claude as quoted lines. Paste a screenshot too. The same notes box exists on every question. |
+| **Code references in the prompt** | Copy code in the editor and paste it in the prompt: it becomes an inline `@file#L12-30` pill that Backspace removes in one go, and shows as a chip in the timeline. |
+| **A scratchpad per conversation** | Annotate a screenshot or sketch, then send the board to Claude as an image. |
+| **A model and effort per mode** | Opus on high effort to plan, Sonnet to build, switched live when you approve the plan. |
+| **The numbers** | Context, prompt cache with a keep-alive, cost per turn and session, and subscription limits with pacing. |
+| **Chat in the side bar** | Next to the code, with conversation tabs, and live controls in the prompt box. |
+
+| A question docked above the prompt box | A plan for review, with notes and references |
+|---|---|
+| ![A question card docked above the prompt box, the explanation still visible](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/question-docked.png) | ![A plan card with a notes box and the Keep planning and Approve buttons](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/plan-feedback.png) |
+
+Code references work the same in the prompt box, in plan feedback and in question notes:
+
+![The prompt box with a pasted code reference drawn inline as a pill](https://raw.githubusercontent.com/KODIKAS-NL/Cockpit/master/images/inline-refs.png)
+
+[Docs/comparison.md](Docs/comparison.md) has the full row-by-row comparison.
 
 ## What it is for
 
@@ -56,6 +82,8 @@ That is what the fork adds to the original:
   mode. Pin from the model popup, or see `modePins` in [Docs/settings.md](Docs/settings.md).
 - **Its own copy of the Claude Code CLI**, if you do not have one. The extension offers to download
   it from Anthropic's release server, verifies the checksum, and keeps it up to date.
+- **Code references and docked cards.** Paste copied code into the prompt, a plan note or an
+  answer and it becomes a reference pill; questions and plans dock above the prompt box.
 - **A quieter interface**, closer to the official extension.
 
 The scratchpad adds about 4 MB to the extension and loads only when you open a board. The extension can be installed next to the original. Its commands and settings are under

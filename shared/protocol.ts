@@ -611,6 +611,8 @@ type HostMsg =
   | { kind: 'credsError'; message: string } // failure (storage unavailable, etc.)
   // Editor selection/active file to share as @file#a-b (composer toggle).
   | { kind: 'selection'; ref?: string }
+  // The last multi-line copy made in an editor: pasting that text into the composer becomes a reference.
+  | { kind: 'copySource'; text: string; ref: string }
   // Autocomplete de @-mention: resultados p/ a query digitada. Cada item é um arquivo do
   // workspace ou uma sessão viva (CLI 2.1.232: @nome resolve outra sessão e dispara SendMessage
   // no envio). `label` é o que se insere após o '@'; `kind` só decide o ícone/estilo na lista.
@@ -671,8 +673,10 @@ export type WebviewToHost =
       // Plan approval ("Approve, run in Auto"): switches the session to this mode as part of
       // the same allow answer, so the pinned model for it applies before the plan's work starts.
       mode?: string;
+      // Images pasted into the feedback: the host saves them and names the files in the message.
+      images?: ImageAttachment[];
     }
-  | { kind: 'askResponse'; requestId: string; answers: Record<string, string> }
+  | { kind: 'askResponse'; requestId: string; answers: Record<string, string>; images?: Record<string, ImageAttachment[]> }
   | { kind: 'setModel'; model: string }
   | { kind: 'removeModel'; model: string }
   | { kind: 'setEffort'; effort: string }

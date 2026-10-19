@@ -1,5 +1,7 @@
 // Webview provider: the bridge between the CLI (engine) and the React UI.
 import * as vscode from 'vscode';
+import { buildRef, isRefWorthy } from '../../shared/codeRef';
+import { removeFeedbackImages, saveFeedbackImages, sweepFeedbackImages, withImagePaths } from '../session/FeedbackImages';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -256,6 +258,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (secrets) this.creds = new CredentialsStore(secrets);
     this.defaults = readClaudeDefaults();
     setOneMContextDisabled(oneMContextDisabled(this.workspaceCwd()));
+    sweepFeedbackImages(this.workspaceCwd()); // images left behind by a window that closed mid-turn
     this.observedDefaultModel = this.memory.get<string>('defaultModel');
     this.restoreDiscovery();
     this.statusBar = statusBar;
@@ -280,6 +283,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }),
       vscode.window.tabGroups.onDidChangeTabs(() => this.dropSelectionIfClosed()),
     );
+    // Copying lines in an editor tells the composer where they came from, so pasting them there
+    // becomes a reference chip. No paste edits are provided: pasting in editors is untouched. Older
+    // hosts without the API simply skip it.
+    if (typeof vscode.languages.registerDocumentPasteEditProvider === 'function') {
+      this.selListeners.push(
+        vscode.languages.registerDocumentPasteEditProvider(
+          { scheme: 'file' },
+          {
+            prepareDocumentPaste: (doc, ranges) => {
+              const r = ranges[0];
+              if (ranges.length !== 1 || !r) return;
+              // The data transfer VS Code hands over on copy is empty: the text comes from the document.
+              const text = doc.getText(r);
+              if (!isRefWorthy(text, r.start.line + 1, r.end.line + 1)) return;
+              const rel = vscode.workspace.asRelativePath(doc.uri, false);
+              this.post({ kind: 'copySource', text, ref: buildRef(rel, r.start.line + 1, r.end.line + 1, r.end.character) });
+            },
+          },
+          { providedPasteEditKinds: [], copyMimeTypes: ['application/vnd.cockpit.copy-source'] },
+        ),
+      );
+    }
     // Automatic keep-alive ping is OFF: any refresh via --resume writes
     // a real turn into the .jsonl (pollutes the conversation, spends tokens and reaches the agent).
     // O medidor de vida do cache no painel continua (independe do keeper).
@@ -357,7 +382,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     let ref: string | undefined;
     if (ed.document.uri.scheme === 'file' && !sel.isEmpty) {
       const rel = vscode.workspace.asRelativePath(ed.document.uri, false);
-      ref = `@${rel}#${sel.start.line + 1}-${sel.end.line + 1}`;
+      ref = buildRef(rel, sel.start.line + 1, sel.end.line + 1, sel.end.character);
     }
     this.publishSelection(ref, ref ? ed.document.uri.toString() : undefined);
   }
@@ -437,6 +462,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
       },
       onResult: () => {
+        // Images pasted into feedback were read during this turn: they are not needed any more.
+        removeFeedbackImages(this.feedbackImages.splice(0));
         this.notifyComplete();
         void this.refreshUsage(); // fetches fresh usage at the end of each interaction (no persisted cache)
         this.sendSessions(); // the new/updated session is already on disk — reflected in the context list
@@ -2912,11 +2939,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             this.sendConfig();
           }
         }
-        srcSession().decide(m.requestId, m.decision, m.message, m.mode);
+        srcSession().decide(
+          m.requestId,
+          m.decision,
+          m.decision === 'deny' && m.images?.length ? this.attachFeedback(m.message ?? '', m.images) : m.message,
+          m.mode,
+        );
         break;
       }
       case 'askResponse':
-        srcSession().answer(m.requestId, m.answers);
+        srcSession().answer(
+          m.requestId,
+          m.images
+            ? Object.fromEntries(Object.entries(m.answers).map(([q, a]) => [q, this.attachFeedback(a, m.images?.[q])]))
+            : m.answers,
+        );
         break;
       case 'setModel':
         this.snapComboBaseline(srcTab);
@@ -3284,6 +3321,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /** Saves a pasted image (base64) to disk via VSCode's native dialog. */
+  /** Files of images pasted into plan feedback / answers, removed when the turn ends. */
+  private feedbackImages: string[] = [];
+
+  /** Saves pasted feedback images and returns the text with their paths named. */
+  private attachFeedback(text: string, images?: import('../../shared/protocol').ImageAttachment[]): string {
+    if (!images?.length) return text;
+    const saved = saveFeedbackImages(this.workspaceCwd(), images);
+    this.feedbackImages.push(...saved.abs);
+    return withImagePaths(text, saved.rel);
+  }
+
   private async saveImage(mediaType: string, data: string): Promise<void> {
     const ext = (mediaType.split('/')[1] || 'png').replace('+xml', '').replace('jpeg', 'jpg');
     const def = `image-${Date.now()}.${ext}`;

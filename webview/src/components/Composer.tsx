@@ -14,6 +14,7 @@ import type { Translator } from '../i18n';
 import type { ImageAttachment, SlashCmdMeta, MentionItem } from '../../../shared/protocol';
 import { send, saveState, readState } from '../vscodeApi';
 import { richHighlight } from '../util/highlight';
+import { useInlineRefs } from '../util/useInlineRefs';
 import {
   ensureSpell,
   spellReady,
@@ -25,6 +26,9 @@ import {
 } from '../spell/spell';
 import { useImageViewer } from './ImageViewer';
 import { SpellDropdown } from './SpellDropdown';
+import { Attachments } from './Attachments';
+import { Icon } from './Icon';
+import { parseRef, refLines } from '../../../shared/codeRef';
 import { Tooltip } from './Tooltip';
 import { SlashMenu } from './SlashMenu';
 
@@ -51,7 +55,13 @@ interface Props {
   onTextInjected?: () => void;
   /** `now`: "Send now": interrupt the running turn so this message runs right away. */
   onSend: (text: string, images: ImageAttachment[], selection?: string, now?: boolean) => void;
-  selectionRef?: string; // @file#a-b of the editor's active selection
+  selectionRef?: string; // @file#La-b of the editor's active selection
+  /** Pinned and pasted code references of this conversation (@file#La-b). */
+  refs?: string[];
+  /** The last multi-line copy made in an editor: pasting that text here becomes a reference. */
+  lastCopy?: { text: string; ref: string };
+  onAddRef?: (ref: string) => void;
+  onRemoveRef?: (ref: string) => void;
   onStop: () => void;
   onVoiceDict?: () => void; // opens the dictation dictionary modal
   onCredentials?: () => void; // abre o cofre de credenciais (TOTP 2FA)
@@ -79,6 +89,7 @@ const rid = () => `c_${Date.now()}_${seq++}`;
 // The prompt box shows 2 rows at rest and grows with the text up to 10 rows, then scrolls.
 const MIN_ROWS = 2;
 const MAX_ROWS = 10;
+const NO_REFS: string[] = [];
 
 export const Composer = memo(function Composer({
   t,
@@ -107,8 +118,18 @@ export const Composer = memo(function Composer({
   remotePhase,
   picks,
   selectionRef,
+  refs = NO_REFS,
+  lastCopy,
+  onAddRef,
+  onRemoveRef,
 }: Props) {
   const [includeSel, setIncludeSel] = useState(true);
+  // A selection that was pinned and sent stays out of the row until the selection changes.
+  const [sentSel, setSentSel] = useState<string | undefined>();
+  useEffect(() => {
+    if (selectionRef !== sentSel) setSentSel(undefined);
+  }, [selectionRef, sentSel]);
+  const liveSel = selectionRef && selectionRef !== sentSel && !refs.includes(selectionRef) ? selectionRef : undefined;
   const [text, setText] = useState('');
   const [images, setImages] = useState<PendingImage[]>([]);
   const openImage = useImageViewer();
@@ -407,9 +428,14 @@ export const Composer = memo(function Composer({
     bitmaps.forEach(attachImage);
   };
 
+  const inl = useInlineRefs({ t, ref, hlRef, text, setText, lastCopy });
+  const pastedCode = inl.pastedCode;
+
   const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const cd = e.clipboardData;
     if (!cd) return;
+    // Lines copied in an editor: a reference chip instead of the raw code (the CLI reads the lines).
+    if (inl.onPaste(e)) return;
     const fileItems = Array.from(cd.items || []).filter((it) => it.kind === 'file');
     if (fileItems.length === 0) return; // texto normal: cola direto
 
@@ -518,7 +544,10 @@ export const Composer = memo(function Composer({
   }, [injectText]);
 
   // While a turn runs, Enter queues the message (the CLI takes it in at its next step).
+  // What goes to Claude: the live selection (when included), then the pinned and pasted references.
+  const allRefs = Array.from(new Set([...(includeSel && liveSel ? [liveSel] : []), ...refs]));
   const submit = (now?: boolean) => {
+    if (selectionRef && refs.includes(selectionRef)) setSentSel(selectionRef);
     // Sending during dictation: ends the capture NOW (without correction) and cancels a
     // pending correction — otherwise the button keeps recording and late transcriptions
     // repopulate the area after the clear. recordingRef=false BEFORE so the
@@ -536,7 +565,7 @@ export const Composer = memo(function Composer({
     onSend(
       v,
       images.map((i) => ({ mediaType: i.mediaType, data: i.data })),
-      includeSel && selectionRef ? selectionRef : undefined,
+      allRefs.length ? allRefs.join('\n') : undefined,
       now,
     );
     setText('');
@@ -549,6 +578,7 @@ export const Composer = memo(function Composer({
   };
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (inl.onKeyDown(e)) return;
     if (mentionOpen) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -889,30 +919,7 @@ export const Composer = memo(function Composer({
 
   return (
     <div className="composer">
-      {images.length > 0 && (
-        <div className="attachments">
-          {images.map((img) => (
-            <div className="attachment" key={img.id}>
-              <button
-                type="button"
-                className="attachment-thumb"
-                title={t('attach.view')}
-                onClick={() => openImage(img.url)}
-              >
-                <img src={img.url} alt="" />
-              </button>
-              <button
-                type="button"
-                className="attachment-remove"
-                title={t('attach.remove')}
-                onClick={() => setImages((prev) => prev.filter((x) => x.id !== img.id))}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      <Attachments t={t} images={images} onRemove={(id) => setImages((prev) => prev.filter((x) => x.id !== id))} />
       {mentionOpen && (
         <div className="slash-menu mention-menu">
           {mentionItems.map((it, i) => (
@@ -950,17 +957,40 @@ export const Composer = memo(function Composer({
           ))}
         </div>
       )}
-      {selectionRef && (
-        <button
-          type="button"
-          className={`composer-selchip ${includeSel ? 'on' : 'off'}`}
-          title={includeSel ? t('selection.included') : t('selection.excluded')}
-          onClick={() => setIncludeSel((v) => !v)}
-        >
-          <span className="composer-selchip-eye">{includeSel ? '◉' : '◌'}</span>
-          ⧉ {selectionRef}
-        </button>
-      )}
+      <div className={`composer-refs${liveSel || refs.length ? ' open' : ''}`}>
+        <div className="composer-refs-in">
+          {liveSel && (
+            <RefChip
+              t={t}
+              refStr={liveSel}
+              live
+              off={!includeSel}
+              onToggle={() => setIncludeSel((v) => !v)}
+              onPin={onAddRef ? () => onAddRef(liveSel) : undefined}
+            />
+          )}
+          {refs.map((r) => (
+            <RefChip
+              key={r}
+              t={t}
+              refStr={r}
+              onRemove={() => {
+                pastedCode.current.delete(r);
+                onRemoveRef?.(r);
+              }}
+              onAsText={
+                pastedCode.current.has(r)
+                  ? () => {
+                      insertAtCaret(pastedCode.current.get(r) ?? '');
+                      pastedCode.current.delete(r);
+                      onRemoveRef?.(r);
+                    }
+                  : undefined
+              }
+            />
+          ))}
+        </div>
+      </div>
       <div className="composer-row">
         <div
           className="composer-input-wrap"
@@ -979,6 +1009,7 @@ export const Composer = memo(function Composer({
         >
           <pre className="composer-highlight hljs" ref={hlRef} aria-hidden="true" />
           <pre className="composer-measure" ref={measureRef} aria-hidden="true" />
+          {inl.badgeEl}
           {connecting && (
             <div className="voice-connecting" role="status">
               <span className="voice-spinner" aria-hidden="true" />
@@ -1006,6 +1037,10 @@ export const Composer = memo(function Composer({
               detectMention(val, caret);
             }}
             onClick={(e) => openSpellAt(e.currentTarget.selectionStart ?? 0)}
+            onMouseMove={inl.onMouseMove}
+            onMouseLeave={inl.onMouseLeave}
+            onMouseUp={inl.onMouseUp}
+            onSelect={inl.onSelect}
             onKeyDown={onKey}
             onPaste={onPaste}
             onDragOver={(e) => e.preventDefault()}
@@ -1130,6 +1165,74 @@ export const Composer = memo(function Composer({
     </div>
   );
 });
+
+/**
+ * One code reference as a quiet chip, like VS Code's chat attachments: the file name and lines keep
+ * their width, the folder is dimmed and cut at its START (the end of a path tells files apart).
+ * The live selection toggles with the eye and can be pinned; a pinned or pasted one can be removed.
+ */
+function RefChip({
+  t,
+  refStr,
+  live,
+  off,
+  onToggle,
+  onPin,
+  onRemove,
+  onAsText,
+}: {
+  t: Translator;
+  refStr: string;
+  live?: boolean;
+  off?: boolean;
+  onToggle?: () => void;
+  onPin?: () => void;
+  onRemove?: () => void;
+  onAsText?: () => void;
+}) {
+  const p = parseRef(refStr);
+  const lines = refLines(p);
+  const open = () => send({ kind: 'openLink', href: p.start ? `${p.path}#L${p.start}` : p.path });
+  return (
+    <span className={`composer-selchip${off ? ' off' : ''}`} title={`${p.path}${lines ? `:${lines}` : ''}`}>
+      {live && (
+        <button
+          type="button"
+          className="composer-selchip-btn"
+          aria-pressed={!off}
+          title={off ? t('selection.excluded') : t('selection.included')}
+          onClick={onToggle}
+        >
+          <Icon name={off ? 'eyeOff' : 'eye'} />
+        </button>
+      )}
+      <button type="button" className="composer-selchip-main" title={t('refs.open')} onClick={open}>
+        <span className="composer-selchip-name">{p.name}</span>
+        {lines && <span className="composer-selchip-lines">:{lines}</span>}
+        {p.dir && (
+          <span className="composer-selchip-dir">
+            <bdi>{p.dir}</bdi>
+          </span>
+        )}
+      </button>
+      {onPin && (
+        <button type="button" className="composer-selchip-btn" title={t('refs.pin')} aria-label={t('refs.pin')} onClick={onPin}>
+          <Icon name="pin" />
+        </button>
+      )}
+      {onAsText && (
+        <button type="button" className="composer-selchip-btn" title={t('refs.pasteAsText')} aria-label={t('refs.pasteAsText')} onClick={onAsText}>
+          <Icon name="edit" />
+        </button>
+      )}
+      {onRemove && (
+        <button type="button" className="composer-selchip-btn" title={t('refs.remove')} aria-label={t('refs.remove')} onClick={onRemove}>
+          ✕
+        </button>
+      )}
+    </span>
+  );
+}
 
 /** O que o botão diz é o que se sabe da conexão — nunca "ligado" por otimismo. */
 function remoteLabel(

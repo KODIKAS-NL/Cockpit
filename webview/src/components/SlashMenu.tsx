@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Translator } from '../i18n';
 import type { SlashCmdMeta } from '../../../shared/protocol';
 import { Tooltip } from './Tooltip';
@@ -37,6 +37,7 @@ const AI_CATS = new Set(['session', 'context', 'config', 'tools', 'account', 'in
 export function SlashMenu({ t, commands, meta, busy, onPick }: Props) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLSpanElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   // t only accepts known keys; catalog keys are dynamic → cast.
   const tk = (k: string) => t(k as Parameters<Translator>[0]);
 
@@ -92,6 +93,24 @@ export function SlashMenu({ t, commands, meta, busy, onPick }: Props) {
     };
   }, [open]);
 
+  // The menu is fixed, placed above the button and kept inside the panel (the button sits at the
+  // left of the toolbar, so anchoring the menu's right edge to it ran off the panel).
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = (): void => {
+      const btn = wrapRef.current;
+      const menu = menuRef.current;
+      if (!btn || !menu) return;
+      const r = btn.getBoundingClientRect();
+      const w = menu.offsetWidth;
+      menu.style.bottom = `${window.innerHeight - r.top + 6}px`;
+      menu.style.left = `${Math.max(6, Math.min(r.left, window.innerWidth - w - 6))}px`;
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [open, groups]);
+
   return (
     <span className="slash-cmd-wrap" ref={wrapRef}>
       <Tooltip className="tt-block" text={busy ? t('slash.menu.loading') : t('slash.menu.tip')}>
@@ -106,7 +125,7 @@ export function SlashMenu({ t, commands, meta, busy, onPick }: Props) {
         </button>
       </Tooltip>
       {open && (
-        <div className="slash-cmd-menu" role="listbox">
+        <div className="slash-cmd-menu" role="listbox" ref={menuRef}>
           {groups.length === 0 ? (
             <div className="slash-cmd-empty">{t('slash.menu.empty')}</div>
           ) : (

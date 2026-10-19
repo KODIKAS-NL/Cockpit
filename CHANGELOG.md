@@ -7,6 +7,13 @@ and the project adopts semantic versioning.
 ## [Unreleased]
 
 ### Added
+- **Code references.** Copy two or more lines in an editor and paste them into the prompt box: they become a
+  chip (`Composer.tsx:10-12  webview/src/components`) instead of raw code, and Claude gets an `@file#L10-12`
+  mention and reads those lines itself. Collect several, from different files. The chip's buttons open the
+  file at those lines, insert the code as text instead, or remove the reference. The editor-selection chip has a
+  pin to keep a selection while you move on. References show as chips in the sent message too, and the chip row
+  opens and closes with a short animation. A single line or word still pastes as text. Mentions now use the
+  CLI's own `#L12-30` form.
 - **Two chat display settings.** `cockpitDaemon.showBashDescription` (default on) shows what Claude says a
   Bash command is for next to its name. `cockpitDaemon.hideThinking` (default off) replaces
   `showThinking`: thinking blocks are now shown by default, each one collapsible; turn it on to hide them.
@@ -52,6 +59,22 @@ and the project adopts semantic versioning.
 - The language label of a code block no longer overlaps its copy button.
 
 ### Changed
+- Documentation: README now opens with what the official extension lacks, with new screenshots (docked question, plan feedback, inline code reference); features and comparison updated for live Remote Control, docked cards and inline references.
+- The chat and the prompt box use the full width of the panel: VS Code's 20px default padding on each side is gone, and the inner margins are slimmer.
+- The `/` command menu opens above its button and stays inside the panel, in the same neutral style as the other menus (no orange).
+- A question waiting in the dock shows in the chat as a one-line card pointing at it, not a second copy of the options.
+- Scrolling up in the chat by a small step stays up, even within the last few pixels; before, the view could snap back to the end.
+- You can paste images into the plan feedback and the question notes. They show as small thumbnails, are saved under `Planing/.attachment-temp/` so Claude can read them, and are removed when the turn ends (leftovers older than a day are swept at startup). The question notes take inline code references too.
+- Claude's questions and the plan card are docked above the prompt box instead of covering the chat, so the explanation stays readable; a chevron folds the card, and the answer buttons stack. The prompt box is hidden meanwhile and keeps its draft. Tool permission prompts stay modal.
+- The plan card now shows the saved plan file with a notes box (the host always sent the file; the card ignored it). The notes take inline code references (paste lines copied from the plan or any file, or insert the editor selection), and Keep planning sends them as the quoted lines.
+- Pasting copied editor lines puts the `@file#La-b` reference inline, at the caret, drawn as a pill. Backspace or Delete next to it, or its ✕, removes all of it (the edit button swaps it for the code). Inline references show as chips in the sent message too.
+- The expand / collapse all button moved from the bottom right to the top bar, next to export, in the same style.
+- A collapsed message in the chat shows four lines instead of one, and "Show more" appears only for longer ones.
+- A pinned selection chip is removed after you send, and the live selection chip stays hidden until the selection changes.
+- **The selection chip looks like the rest of the prompt box.** Instead of an orange pill with the full
+  `@path#a-b`, it is a small bordered chip, as in VS Code's chat attachments: an eye toggle, the file name with
+  its lines, and the folder dimmed after it. The name and lines always show; a long folder is cut at its start
+  ("…nested/folder"), since the end of a path is what tells files apart. The full path is in the tooltip.
 - **Tool card headers.** The status (Error, Running) comes before the (i), the empty gap after the (i) is gone,
   and the collapse chevron is a larger icon that points down when collapsed and up when expanded, with a short
   rotation animation (off under reduced motion).
