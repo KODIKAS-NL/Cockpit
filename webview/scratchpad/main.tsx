@@ -17,7 +17,11 @@ import { padT, type PadKey } from './i18n';
 import './scratchpad.css';
 
 declare function acquireVsCodeApi(): { postMessage(m: PadToHost): void };
-const vscode = acquireVsCodeApi();
+// VS Code injects acquireVsCodeApi; another editor injects window.cockpitHost (same postMessage).
+const vscode =
+  typeof acquireVsCodeApi === 'function'
+    ? acquireVsCodeApi()
+    : (window as unknown as { cockpitHost: { postMessage(m: PadToHost): void } }).cockpitHost;
 const post = (m: PadToHost): void => vscode.postMessage(m);
 
 const SAVE_DEBOUNCE_MS = 600;

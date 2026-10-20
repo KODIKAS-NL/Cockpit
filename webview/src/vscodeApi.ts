@@ -11,8 +11,14 @@ declare function acquireVsCodeApi(): VsCodeApi;
 
 let api: VsCodeApi | undefined;
 
+// VS Code injects `acquireVsCodeApi`. Another editor (a JetBrains webview) injects
+// `window.cockpitHost` with the same three methods.
 export function getVsCodeApi(): VsCodeApi {
-  if (!api) api = acquireVsCodeApi();
+  if (!api) {
+    const host = (window as unknown as { cockpitHost?: VsCodeApi }).cockpitHost;
+    api = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : host;
+    if (!api) throw new Error('No host bridge: neither acquireVsCodeApi nor window.cockpitHost');
+  }
   return api;
 }
 
