@@ -26,3 +26,4 @@ jetbrains/build/
 jetbrains/.gradle/
 jetbrains/.intellijPlatform/
 jetbrains/.kotlin/
+.idea/

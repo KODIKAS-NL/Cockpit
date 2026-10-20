@@ -17,7 +17,11 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        rider("2026.2") { useInstaller = false }
+        // A downloaded Rider has no JCEF bundle; an installed one does. Use it when present.
+        val installed = providers.gradleProperty("riderPath").orNull
+            ?: listOf("${System.getProperty("user.home")}/Applications/Rider.app", "/Applications/Rider.app")
+                .firstOrNull { file(it).exists() }
+        if (installed != null) local(installed) else rider("2026.2") { useInstaller = false }
         bundledPlugin("com.intellij.modules.jcef")
         pluginVerifier()
         zipSigner()

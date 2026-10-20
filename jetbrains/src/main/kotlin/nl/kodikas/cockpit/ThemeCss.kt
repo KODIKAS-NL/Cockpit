@@ -8,8 +8,11 @@ import java.awt.Color
 
 /** The IDE colours as the `--vscode-*` variables the chat UI is written against. */
 object ThemeCss {
-    private fun hex(c: Color?): String? =
-        c?.let { String.format("#%02x%02x%02x", it.red, it.green, it.blue) }
+    // Some theme colours are translucent (hover backgrounds); dropping the alpha turns them black.
+    private fun hex(c: Color?): String? = c?.let {
+        if (it.alpha == 255) String.format("#%02x%02x%02x", it.red, it.green, it.blue)
+        else String.format("rgba(%d, %d, %d, %.3f)", it.red, it.green, it.blue, it.alpha / 255.0)
+    }
 
     fun build(): String {
         val scheme = EditorColorsManager.getInstance().globalScheme
@@ -39,7 +42,27 @@ object ThemeCss {
             "input-foreground" to hex(fg),
             "input-border" to hex(border),
             "button-background" to hex(JBUI.CurrentTheme.Button.defaultButtonColorStart()),
-            "button-foreground" to hex(fg),
+            "button-hoverBackground" to hex(JBUI.CurrentTheme.Button.defaultButtonColorEnd()),
+            "button-foreground" to "#ffffff",
+            "button-secondaryBackground" to hex(JBUI.CurrentTheme.Button.buttonColorStart()),
+            "button-secondaryHoverBackground" to hex(JBUI.CurrentTheme.ActionButton.pressedBackground()),
+            "button-secondaryForeground" to hex(fg),
+            "badge-background" to hex(JBUI.CurrentTheme.Button.defaultButtonColorStart()),
+            "badge-foreground" to "#ffffff",
+            "toolbar-hoverBackground" to hex(JBUI.CurrentTheme.ActionButton.hoverBackground()),
+            "dropdown-background" to hex(UIUtil.getTextFieldBackground()),
+            "dropdown-foreground" to hex(fg),
+            "dropdown-border" to hex(border),
+            "editorWidget-border" to hex(border),
+            "editorHoverWidget-background" to hex(UIUtil.getPanelBackground()),
+            "editorHoverWidget-border" to hex(border),
+            "menu-background" to hex(UIUtil.getPanelBackground()),
+            "menu-border" to hex(border),
+            "input-placeholderForeground" to hex(UIUtil.getContextHelpForeground()),
+            "list-activeSelectionForeground" to hex(UIUtil.getListSelectionForeground(true)),
+            "textCodeBlock-background" to hex(editorBg),
+            "inputValidation-errorBorder" to hex(JBUI.CurrentTheme.Validator.errorBorderColor()),
+            "inputValidation-warningBorder" to hex(JBUI.CurrentTheme.Validator.warningBorderColor()),
             "textLink-foreground" to hex(link),
             "list-hoverBackground" to hex(JBUI.CurrentTheme.List.Hover.background(true)),
             "list-activeSelectionBackground" to hex(JBUI.CurrentTheme.List.Selection.background(true)),
@@ -51,6 +74,6 @@ object ThemeCss {
             "charts-purple" to if (dark) "#b180d7" else "#652d90",
         )
         val body = vars.entries.filter { it.value != null }.joinToString("\n") { "  --vscode-${it.key}: ${it.value};" }
-        return ":root {\n$body\n}\nbody { background: ${hex(bg)}; color: ${hex(fg)}; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }"
+        return ":root {\n  color-scheme: ${if (dark) "dark" else "light"};\n$body\n}\nbody { background: ${hex(bg)}; color: ${hex(fg)}; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }"
     }
 }

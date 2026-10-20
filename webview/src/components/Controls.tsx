@@ -3,6 +3,7 @@ import type { Translator } from '../i18n';
 import type { SessionConfig, ModelMeta } from '../../../shared/protocol';
 import { Tooltip } from './Tooltip';
 import { useDismiss } from '../util/useDismiss';
+import { PopSelect } from './PopSelect';
 
 const CUSTOM = '__custom__';
 
@@ -112,17 +113,12 @@ export function Controls({
       <Tooltip className="tt-block" title={t('controls.permission')} text={t('tip.ctrl.permission')}>
         <label className="ctrl">
           <span className="ctrl-label">{t('controls.permission')}</span>
-          <select
+          <PopSelect
             className="ctrl-select"
             value={config.permissionMode}
-            onChange={(e) => onPermission(e.target.value)}
-          >
-            {config.permissionModes.map((pm) => (
-              <option key={pm} value={pm}>
-                {permLabel(pm, t)}
-              </option>
-            ))}
-          </select>
+            options={config.permissionModes.map((pm) => ({ value: pm, label: permLabel(pm, t) }))}
+            onChange={onPermission}
+          />
         </label>
       </Tooltip>
 

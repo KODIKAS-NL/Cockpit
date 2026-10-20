@@ -7246,3 +7246,24 @@ body {
   font-size: 11px;
   opacity: 0.7;
 }
+
+/* PopSelect: a one-column list, opening upward from the prompt toolbar. */
+.pop-select .pop-select-list {
+  min-width: 140px;
+}
+.pop-select .ctrl-modelsel-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+.pop-select.up .pop-select-list {
+  top: auto;
+  bottom: calc(100% + 4px);
+  left: 0;
+  right: auto;
+}
+.composer-picks .pop-select {
+  position: relative;
+}
+.composer-picks .pop-select .pop-select-list {
+  left: 0;
+  right: auto;
+}

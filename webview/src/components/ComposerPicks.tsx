@@ -7,6 +7,7 @@ import type { Translator } from '../i18n';
 import type { SessionConfig } from '../../../shared/protocol';
 import { Icon } from './Icon';
 import { useDismiss } from '../util/useDismiss';
+import { PopSelect } from './PopSelect';
 import { effortLabel, modelLabel, permLabel } from './Controls';
 
 interface Props {
@@ -128,19 +129,14 @@ export function ComposerPicks({
         onPin={onPin}
         onUnpin={onUnpin}
       />
-      <select
+      <PopSelect
+        up
         className="composer-pick-mode"
         title={t('controls.permission')}
-        aria-label={t('controls.permission')}
         value={config.permissionMode}
-        onChange={(e) => onPermission(e.target.value)}
-      >
-        {config.permissionModes.map((pm) => (
-          <option key={pm} value={pm}>
-            {permLabel(pm, t)}
-          </option>
-        ))}
-      </select>
+        options={config.permissionModes.map((pm) => ({ value: pm, label: permLabel(pm, t) }))}
+        onChange={onPermission}
+      />
       <button
         type="button"
         className={`composer-pick-cog${open ? ' on' : ''}`}

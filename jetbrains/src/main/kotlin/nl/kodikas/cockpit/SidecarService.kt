@@ -6,7 +6,10 @@ import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.notification.NotificationAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
+import com.intellij.ide.ui.LafManagerListener
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.editor.colors.EditorColorsListener
+import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.invokeLater
 import com.intellij.openapi.components.Service
@@ -48,6 +51,10 @@ class SidecarService(private val project: Project) : Disposable {
         val p = ProcessBuilder(node, script.path, "--extension-path", sidecarDir.path)
             .start()
         process = p
+        // The page follows the IDE: a new look-and-feel or editor colour scheme re-sends the theme.
+        val bus = ApplicationManager.getApplication().messageBus.connect(this)
+        bus.subscribe(LafManagerListener.TOPIC, LafManagerListener { invokeLater { pushTheme() } })
+        bus.subscribe(EditorColorsManager.TOPIC, EditorColorsListener { invokeLater { pushTheme() } })
         ApplicationManager.getApplication().executeOnPooledThread {
             p.errorStream.bufferedReader().forEachLine { log.info("[sidecar] $it") }
         }
