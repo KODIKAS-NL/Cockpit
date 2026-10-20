@@ -27,7 +27,7 @@ class NewSessionAction : CockpitAction("cockpitDaemon.newSession", showWindow = 
 class ScratchpadAction : CockpitAction("cockpitDaemon.scratchpad")
 class InterruptAction : CockpitAction("cockpitDaemon.interrupt")
 class SessionsAction : CockpitAction("cockpitDaemon.openSessions", showWindow = true)
-class SettingsFileAction : CockpitAction("cockpitDaemon.settings")
+class SettingsFileAction : CockpitAction("cockpit.settingsFile")
 class LoginAction : CockpitAction("cockpitDaemon.login")
 class LogoutAction : CockpitAction("cockpitDaemon.logout")
 class RestartDaemonAction : CockpitAction("cockpitDaemon.daemon.restart")

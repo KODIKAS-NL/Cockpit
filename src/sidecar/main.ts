@@ -84,6 +84,10 @@ export function start(argv: string[], input = process.stdin, output = process.st
         host.openSettings();
         return { ok: true };
       }
+      if (c.id === 'cockpit.settingsFile') {
+        host.openSettingsFile();
+        return { ok: true };
+      }
       return { ok: runCommand(c.id, core, commands) };
     });
     rpc.on('theme', (t: { css: string }) => {

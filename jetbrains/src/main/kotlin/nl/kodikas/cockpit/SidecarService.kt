@@ -174,6 +174,10 @@ private class Handlers(private val project: Project, private val rpc: Rpc) {
             null
         }
         rpc.on("status") { null }
+        rpc.on("openSettingsPage") {
+            invokeLater { com.intellij.openapi.options.ShowSettingsUtil.getInstance().showSettingsDialog(project, CockpitSettings::class.java) }
+            null
+        }
         rpc.on("openPad") { p -> PadTabs.open(project, p.asJsonObject["key"].asString, p.asJsonObject["title"].asString); null }
         rpc.on("showDiff") { p -> showDiff(p.asJsonObject); null }
         rpc.on("runInTerminal") { p -> runInTerminal(p.asJsonObject); null }

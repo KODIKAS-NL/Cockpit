@@ -137,7 +137,12 @@ export class RpcHost implements EditorHost {
   }
 
   // --- Asked for by name ---
+  /** The settings page of the IDE; the plugin shows it. */
   openSettings(): void {
+    this.rpc.notify('openSettingsPage');
+  }
+  /** The settings file itself, for what the page does not list. */
+  openSettingsFile(): void {
     const file = this.settingsFile();
     if (file) void this.openFile(file).catch(() => undefined);
   }
