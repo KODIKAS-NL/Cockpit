@@ -723,6 +723,8 @@ export const en = {
   'rewind.title': 'Rewind to here (removes this prompt and everything after)',
   'bubble.showMore': 'Show more',
   'bubble.queued': 'Queued',
+  'timeline.taskDone': 'Background task finished',
+  'timeline.taskFailed': 'Background task failed',
   'bubble.queuedHint': 'Claude takes this message in at its next step',
   'bubble.showLess': 'Show less',
   'confirm.cancel': 'Cancel',

@@ -59,6 +59,10 @@ and the project adopts semantic versioning.
 - The language label of a code block no longer overlaps its copy button.
 
 ### Changed
+- Background-task notifications (the CLI's `<task-notification>` messages) show as one muted line, "Background task finished" with the summary, instead of a raw user bubble.
+- The chevron on the docked question and plan cards points down while open and up once folded, and a folded card keeps its title line.
+- After **Update** on the CLI (non-managed install) the dashboard re-reads the version every 3 seconds until it changes, instead of staying on the old version.
+- Sending a message no longer shows the down arrow: the scroll-follow check order is back to what it was before 1.0.342.
 - Documentation: README now opens with what the official extension lacks, with new screenshots (docked question, plan feedback, inline code reference); features and comparison updated for live Remote Control, docked cards and inline references.
 - The chat and the prompt box use the full width of the panel: VS Code's 20px default padding on each side is gone, and the inner margins are slimmer.
 - The `/` command menu opens above its button and stays inside the panel, in the same neutral style as the other menus (no orange).

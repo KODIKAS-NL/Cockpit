@@ -3698,6 +3698,12 @@ body {
   }
 }
 /* Output of a local slash command (/model, ...): a quiet line, not a warning. */
+.notice-banner.task-notice {
+  opacity: 0.8;
+}
+.notice-banner.task-notice.error .notice-banner-mark {
+  color: var(--vscode-errorForeground);
+}
 .notice-banner.local-command {
   border-style: solid;
   border-color: var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
@@ -7153,7 +7159,8 @@ body {
     animation: none;
   }
 }
-.modal.docked.collapsed > :not(:first-child):not(.dock-toggle) {
+/* Folded: the toggle and the head line stay (the toggle is the first child, the head the next). */
+.modal.docked.collapsed > .dock-toggle + * ~ * {
   display: none;
 }
 .modal.docked.collapsed {

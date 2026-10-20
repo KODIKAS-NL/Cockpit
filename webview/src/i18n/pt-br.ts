@@ -653,6 +653,8 @@ export const ptBR: Partial<Strings> = {
   'rewind.title': 'Rebobinar até aqui (remove este prompt e tudo depois)',
   'bubble.showMore': 'Mostrar mais',
   'bubble.queued': 'Na fila',
+  'timeline.taskDone': 'Tarefa em segundo plano concluída',
+  'timeline.taskFailed': 'Tarefa em segundo plano falhou',
   'bubble.queuedHint': 'O Claude recebe esta mensagem no próximo passo',
   'bubble.showLess': 'Mostrar menos',
   'confirm.cancel': 'Cancelar',

@@ -201,11 +201,11 @@ export const Timeline = memo(function Timeline({
     if (g.kind === 'claude' && g.items.some((it) => it.kind === 'tool' && isTodoToolName(it.name))) {
       lastTodoGroup = i;
     }
-    if (g.kind === 'user') lastUserGroup = i;
+    if (g.kind === 'user' && !parseTaskNotice(g.item.text)) lastUserGroup = i;
   });
   // Ordinal of each user prompt (matching the order in the host's transcript),
   // p/ o rewind referenciar o prompt certo independentemente do id local/uuid.
-  let userOrdinal = allGroups.slice(0, hidden).filter((g) => g.kind === 'user').length - 1;
+  let userOrdinal = allGroups.slice(0, hidden).filter((g) => g.kind === 'user' && !parseTaskNotice(g.item.text)).length - 1;
   return (
     <AskPendingContext.Provider value={!!askPending}>
     <div className="timeline">
@@ -221,6 +221,8 @@ export const Timeline = memo(function Timeline({
           <NoticeBanner key={g.item.id} item={g.item} t={t} />
         ) : g.kind === 'hook' ? (
           <HookBanner key={g.item.id} item={g.item} t={t} />
+        ) : g.kind === 'user' && parseTaskNotice(g.item.text) ? (
+          <TaskNoticeBanner key={g.item.id} item={g.item} t={t} />
         ) : g.kind === 'user' ? (
           ((userOrdinal += 1),
           (
@@ -505,6 +507,35 @@ const HookBanner = memo(function HookBanner({ item, t }: { item: HookItem; t: Tr
  * Aviso do engine no meio da sessão: créditos do modo rápido esgotados, modelo de subagente
  * restrito rodando no modelo do pai. Sem esta faixa, o usuário só veria o efeito.
  */
+/**
+ * The CLI queues a `<task-notification>` as a user message when a background task (a command, a
+ * monitor, a subagent) finishes. It is not something the user typed: show it as one muted line.
+ */
+function parseTaskNotice(text?: string): { status: string; summary: string } | undefined {
+  const t = (text ?? '').trimStart();
+  if (!t.startsWith('<task-notification')) return undefined;
+  const pick = (tag: string) => new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`).exec(t)?.[1]?.trim() ?? '';
+  return { status: pick('status'), summary: pick('summary') };
+}
+
+const TaskNoticeBanner = memo(function TaskNoticeBanner({ item, t }: { item: UserItem; t: Translator }) {
+  const n = parseTaskNotice(item.text);
+  const failed = n?.status === 'failed';
+  return (
+    <div className={`notice-banner task-notice ${failed ? 'error' : ''}`} id={`msg-${item.id}`}>
+      <span className="notice-banner-mark">{failed ? '✕' : '✓'}</span>
+      <span className="notice-banner-label">{t(failed ? 'timeline.taskFailed' : 'timeline.taskDone')}</span>
+      {n?.summary && <span className="notice-banner-text">{n.summary}</span>}
+      {item.queued && (
+        <span className="bubble-queued" title={t('bubble.queuedHint')}>
+          {t('bubble.queued')}
+        </span>
+      )}
+      {item.ts && <InfoTip t={t} title={t('timeline.taskDone')} rows={[{ label: t('tip.time'), value: fmtStamp(item.ts) }]} />}
+    </div>
+  );
+});
+
 const NoticeBanner = memo(function NoticeBanner({ item, t }: { item: NoticeItem; t: Translator }) {
   // Fronteira de compactação: não é aviso, é a MEDIDA do que saiu do contexto.
   const c = item.compaction;
