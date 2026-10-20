@@ -1,0 +1,13 @@
+<idea-plugin>
+  <id>nl.kodikas.cockpit</id>
+  <name>Cockpit for Claude Code</name>
+  <vendor url="https://github.com/KODIKAS-NL/Cockpit">KODIKAS</vendor>
+  <description>Chat with Claude Code in the IDE, with conversations that outlive the window.</description>
+  <depends>com.intellij.modules.platform</depends>
+  <depends>com.intellij.modules.jcef</depends>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <toolWindow id="Cockpit" anchor="right" factoryClass="nl.kodikas.cockpit.CockpitToolWindowFactory"/>
+    <notificationGroup id="Cockpit" displayType="BALLOON"/>
+  </extensions>
+</idea-plugin>

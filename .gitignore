@@ -20,3 +20,9 @@ Docs/future-plans/
 
 # Browser tool output
 .playwright-mcp/
+
+# JetBrains plugin build output
+jetbrains/build/
+jetbrains/.gradle/
+jetbrains/.intellijPlatform/
+jetbrains/.kotlin/
