@@ -44,4 +44,8 @@ val sidecarFiles = tasks.register<Sync>("sidecarFiles") {
     into("sidecar") { from(root.file("package.json")) }
 }
 
-tasks.prepareSandbox { from(sidecarFiles.map { it.destinationDir.resolve("sidecar") }) { into("${rootProject.name}/sidecar") } }
+// Every sandbox (runIde, tests, buildPlugin) gets the sidecar next to the plugin's classes.
+tasks.withType<org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask>().configureEach {
+    dependsOn(sidecarFiles)
+    from(sidecarFiles.map { it.destinationDir.resolve("sidecar") }) { into(pluginName.map { "$it/sidecar" }) }
+}
