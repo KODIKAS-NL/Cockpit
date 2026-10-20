@@ -6,8 +6,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { ImageAttachment } from '../../shared/protocol';
-import type { HostToPad, PadToHost } from './messages';
-import { loadPad, padFile, savePad } from './store';
+import type { HostToPad, PadToHost } from '../scratchpad/messages';
+import { loadPad, padFile, savePad } from '../scratchpad/store';
 
 const VIEW_TYPE = 'cockpitDaemon.scratchpad';
 

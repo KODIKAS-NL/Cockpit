@@ -247,7 +247,8 @@ claude -p --output-format stream-json --input-format stream-json --include-parti
 
 | Path | What is there |
 |------|---------------|
-| `src/extension.ts`, `src/panel/` | Extension entry, the chat view provider (the host side of the UI) |
+| `src/core/` | The editor-neutral core (`CockpitCore`, `EditorHost` and the other host interfaces, `Surfaces`); never imports `vscode` (guarded by `test/coreBoundary.test.ts`) |
+| `src/vscode/`, `src/extension.ts` | The VS Code adapter: `ChatViewProvider` (views, panels, status bar, watchdog), `VsCodeHost`, `ScratchpadPanel`, and the extension entry |
 | `src/session/` | `Session` (one conversation's runtime in a window), `SessionStore` (transcripts) |
 | `src/cli/` | Engine contract (`CliProcess`), the daemon client (`RemoteCliProcess`), the Tootega runner (`CliProcessManager`), usage, models, plugins, auth |
 | `src/scratchpad/`, `webview/scratchpad/` | The scratchpad: host-side panels and storage (`~/.cockpit/scratchpads`), and the Excalidraw page (own bundle `dist/scratchpad/`) |

@@ -6,11 +6,7 @@ import * as path from 'node:path';
 
 const SRC = path.resolve(__dirname, '../src');
 
-const ALLOWED = new Set<string>([
-  'extension.ts',
-  'panel/ChatViewProvider.ts',
-  'scratchpad/ScratchpadPanel.ts',
-]);
+const ALLOWED = new Set<string>(['extension.ts']);
 
 function walk(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -21,6 +17,8 @@ function walk(dir: string): string[] {
 
 const importsVscode = (file: string): boolean =>
   /from\s+['"]vscode['"]|require\(\s*['"]vscode['"]\s*\)/.test(fs.readFileSync(file, 'utf8'));
+
+const importsAdapter = (file: string): boolean => /from\s+['"](?:\.\.?\/)+(?:src\/)?vscode\//.test(fs.readFileSync(file, 'utf8'));
 
 describe('core boundary', () => {
   const files = walk(SRC).map((f) => ({ rel: path.relative(SRC, f).split(path.sep).join('/'), abs: f }));
@@ -38,5 +36,12 @@ describe('core boundary', () => {
       return !f || !importsVscode(f.abs);
     });
     expect(stale).toEqual([]);
+  });
+
+  it('the core does not import the adapter', () => {
+    const offenders = files
+      .filter((f) => !f.rel.startsWith('vscode/') && f.rel !== 'extension.ts' && importsAdapter(f.abs))
+      .map((f) => f.rel);
+    expect(offenders).toEqual([]);
   });
 });

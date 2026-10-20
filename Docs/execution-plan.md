@@ -50,7 +50,7 @@ Define **what**, **in which order**, and **with which definition of done** to bu
 - **Session** (`src/session/Session.ts`) — one conversation's runtime in a window: streaming state, permission and question prompts, live setting switches, follows what other windows do. **SessionStore** reads transcripts and lists sessions.
 - **StatsAggregator** (`src/stats/`) — accumulates usage per turn/session; computes cache hit-rate, cost and timing.
 - **Account** — `UsageApi` (the real OAuth `/usage`), `AuthStatus`, and the statusline cache for the 5h/weekly limits and plan.
-- **ChatViewProvider** (`src/panel/`) — the host side of the UI: tabs, permission and plan handling (including the native diff API), settings, the Hub.
+- **CockpitCore** (`src/core/`) and **ChatViewProvider** (`src/vscode/`) — the host side of the UI: tabs, permission and plan handling (including the native diff API), settings, the Hub.
 - **Webview** (`webview/src/`) — React; talks to the host through typed `postMessage` (`shared/protocol.ts`).
 
 ### 2.3. Event contract

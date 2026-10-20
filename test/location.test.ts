@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { chooseLocation } from '../src/panel/location';
+import { chooseLocation } from '../src/core/location';
 
 describe('chooseLocation', () => {
   it('sends a conversation with no place to the preferred surface', () => {

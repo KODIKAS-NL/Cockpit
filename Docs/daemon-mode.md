@@ -253,7 +253,7 @@ host state; the daemon is what keeps the Claude processes alive regardless of wh
 them. A conversation lives in **one** place, the side bar chat or an editor tab: opening one that
 already has an editor tab reveals that tab, and only the explicit commands (**Open in editor**,
 **Move to the side bar chat**) move it. `cockpitDaemon.preferredLocation` decides where a conversation
-with no place yet opens. The rule is `src/panel/location.ts`.
+with no place yet opens. The rule is `src/core/location.ts`.
 
 ## Roadmap
 
@@ -334,6 +334,6 @@ knows the session id, so a restart always continues the same transcript.
 | `src/cli/RemoteCliProcess.ts` | `CliProcess` relayed through the daemon. |
 | `src/cli/CliProcessManager.ts` | The Tootega engine's child process; exports the argument builder both share. |
 | `src/session/Session.ts` | Snapshot replay, prompts settled elsewhere, other windows' messages, refusals. |
-| `src/panel/ChatViewProvider.ts` | Auto-attach on open, live badges, detach on close, one plan file per plan. |
+| `src/core/CockpitCore.ts` | Auto-attach on open, live badges, detach on close, one plan file per plan. |
 | `shared/daemon.ts` | Protocol types. |
 | `test/Daemon.test.ts`, `test/DaemonSessions.test.ts` | Daemon behaviour and two-window flows, against `test/fixtures/fake-claude.mjs`. |

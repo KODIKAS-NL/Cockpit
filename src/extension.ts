@@ -1,6 +1,6 @@
 // Extension entry point.
 import * as vscode from 'vscode';
-import { ChatViewProvider } from './panel/ChatViewProvider';
+import { ChatViewProvider } from './vscode/ChatViewProvider';
 import { enableUsageTracking, disableUsageTracking, isEnabled } from './cli/StatuslineInstaller';
 import {
   enableUtf8Fix,
