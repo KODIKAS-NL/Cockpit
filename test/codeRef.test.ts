@@ -27,7 +27,7 @@ describe('codeRef', () => {
   });
   it('only multi-line copies are references', () => {
     expect(isRefWorthy('a\nb', 1, 2)).toBe(true);
-    expect(isRefWorthy('word', 3, 3)).toBe(false);
+    expect(isRefWorthy('word', 3, 3)).toBe(true);
     expect(isRefWorthy('  \n  ', 1, 2)).toBe(false);
   });
   it('finds inline refs', () => {

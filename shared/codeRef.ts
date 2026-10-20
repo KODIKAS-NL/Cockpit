@@ -46,9 +46,9 @@ export function sameCopy(a: string, b: string): boolean {
   return a.length > 0 && norm(a) === norm(b);
 }
 
-/** Only multi-line copies become references; a word or one line is just text. */
-export function isRefWorthy(text: string, startLine: number, endLine: number): boolean {
-  return endLine > startLine && text.trim().length > 0;
+/** Any non-blank copy becomes a reference: a method name is as good a pointer as a block. */
+export function isRefWorthy(text: string, _startLine: number, _endLine: number): boolean {
+  return text.trim().length > 0;
 }
 
 export interface InlineRef {

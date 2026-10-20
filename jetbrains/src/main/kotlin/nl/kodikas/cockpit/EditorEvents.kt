@@ -41,8 +41,7 @@ class EditorEvents : ProjectActivity {
                 val doc = e.editor.document
                 val range = e.newRange
                 if (range.isEmpty) return sidecar.send("selection", null)
-                val base = project.basePath
-                val rel = if (base != null && file.path.startsWith("$base/")) file.path.removePrefix("$base/") else file.path
+                val rel = ProjectPaths.relative(project, file.path)
                 val end = doc.getLineNumber(range.endOffset)
                 sidecar.send(
                     "selection",

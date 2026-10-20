@@ -81,7 +81,7 @@ class SidecarService(private val project: Project) : Disposable {
         ApplicationManager.getApplication().executeOnPooledThread { peer.run() }
 
         val init = JsonObject().apply {
-            project.basePath?.let { addProperty("workspaceRoot", it) }
+            ProjectPaths.root(project)?.let { addProperty("workspaceRoot", it) }
             addProperty("language", Locale.getDefault().toLanguageTag())
             addProperty("localUi", true)
             addProperty("theme", ThemeCss.build())

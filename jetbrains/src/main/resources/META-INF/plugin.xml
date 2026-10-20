@@ -9,6 +9,7 @@
 
   <extensions defaultExtensionNs="com.intellij">
     <toolWindow id="Cockpit" anchor="right" factoryClass="nl.kodikas.cockpit.CockpitToolWindowFactory"/>
+    <copyPastePreProcessor implementation="nl.kodikas.cockpit.CopyAsReference"/>
     <postStartupActivity implementation="nl.kodikas.cockpit.EditorEvents"/>
     <notificationGroup id="Cockpit" displayType="BALLOON"/>
   </extensions>
