@@ -35,6 +35,7 @@ class CockpitFrontend(private val project: Project, private val scope: Coroutine
     private val log = logger<CockpitFrontend>()
     private var tunnel: Process? = null
     private var started = false
+    @Volatile private var disposed = false
 
     /** `http://127.0.0.1:<port>/?t=<token>` as this window can reach it. */
     val baseUrl = CompletableFuture<String>()
@@ -86,15 +87,40 @@ class CockpitFrontend(private val project: Project, private val scope: Coroutine
         val host = sshHost() ?: return@withContext null
         val local = ServerSocket(0).use { it.localPort }
         log.info("Opening an SSH tunnel to $host (sidecar port $port) on local port $local")
-        val p = ProcessBuilder("ssh", "-N", "-o", "ExitOnForwardFailure=yes", "-o", "BatchMode=yes", "-L", "$local:127.0.0.1:$port", host)
-            .redirectErrorStream(true).start()
-        tunnel = p
-        ApplicationManager.getApplication().executeOnPooledThread { p.inputStream.bufferedReader().forEachLine { log.info("[ssh] $it") } }
-        repeat(50) {
-            if (open(local)) return@withContext local
-            if (!p.isAlive) return@withContext null
-            Thread.sleep(200)
+        // The tunnel dies when the laptop sleeps or the network drops. Keep it alive on the same local
+        // port, so the page's WebSocket (which retries by itself) finds its way back.
+        val first = CompletableFuture<Boolean>()
+        ApplicationManager.getApplication().executeOnPooledThread {
+            var delay = 1000L
+            while (!disposed) {
+                val p = try {
+                    ProcessBuilder(
+                        "ssh", "-N", "-o", "ExitOnForwardFailure=yes", "-o", "BatchMode=yes",
+                        "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "ConnectTimeout=10",
+                        "-L", "$local:127.0.0.1:$port", host,
+                    ).redirectErrorStream(true).start()
+                } catch (e: Exception) {
+                    log.warn("Could not start ssh: ${e.message}")
+                    first.complete(false)
+                    return@executeOnPooledThread
+                }
+                tunnel = p
+                val out = Thread { p.inputStream.bufferedReader().forEachLine { log.info("[ssh] $it") } }.apply { isDaemon = true; start() }
+                val started = System.currentTimeMillis()
+                if (!first.isDone) {
+                    repeat(50) { if (!first.isDone && open(local)) first.complete(true) else if (!first.isDone && p.isAlive) Thread.sleep(200) }
+                    first.complete(false)
+                }
+                p.waitFor()
+                out.join(500)
+                if (disposed) break
+                // A tunnel that lived for a while was healthy: retry quickly. Quick deaths back off.
+                delay = if (System.currentTimeMillis() - started > 30_000) 1000L else minOf(delay * 2, 15_000L)
+                log.info("SSH tunnel ended; reconnecting in ${delay}ms")
+                Thread.sleep(delay)
+            }
         }
+        if (first.get()) return@withContext local
         null
     }
 
@@ -126,6 +152,7 @@ class CockpitFrontend(private val project: Project, private val scope: Coroutine
     }
 
     override fun dispose() {
+        disposed = true
         tunnel?.destroy()
     }
 

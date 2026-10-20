@@ -151,7 +151,8 @@ JetBrains Gateway only supports Linux hosts, so for a macOS backend use the **To
    `COCKPIT_SSH_HOST` for the client.
 
 When the page loads, the tunnel is up. You will see an `ssh -N -L …` process on the laptop; it ends
-with the client.
+with the client. If the laptop sleeps or the network drops, the tunnel ends and is restarted by
+the plugin on the same local port; the page reconnects by itself, so nothing needs a reload.
 
 ## Settings
 
