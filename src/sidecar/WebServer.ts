@@ -9,6 +9,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import type { WebviewToHost } from '../../shared/protocol';
 import { HUB_ID, SIDEBAR_ID, panelId, type Surfaces } from '../core/surfaces';
 import { resolveLocale } from '../i18n/host';
+import { log } from '../util/logger';
 import { makeNonce, viewRegionLocale } from '../core/CockpitCore';
 
 const FILES: Record<string, { file: string; type: string }> = {
@@ -94,6 +95,7 @@ export class WebServer {
 
   private attach(ws: WebSocket, url: URL): void {
     const id = this.surfaceId(url);
+    log(`web socket open: ${id}`);
     const kind = id === HUB_ID ? 'hub' : id === SIDEBAR_ID ? 'sidebar' : 'panel';
     this.sockets.add(ws);
     this.o.surfaces.set(id, { kind, tab: url.searchParams.get('tab') ?? undefined, post: (m) => ws.send(JSON.stringify(m)) });
@@ -122,6 +124,7 @@ export class WebServer {
 
   private handle(req: http.IncomingMessage, res: http.ServerResponse): void {
     const url = new URL(req.url ?? '/', 'http://x');
+    log(`web ${req.method} ${url.pathname}`);
     if (url.pathname === '/') {
       if (url.searchParams.get('t') !== this.token) return void this.reply(res, 403, 'text/plain', 'forbidden');
       return void this.reply(res, 200, 'text/html; charset=utf-8', this.page(url));

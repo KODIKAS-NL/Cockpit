@@ -46,9 +46,11 @@ class SidecarService(private val project: Project) : Disposable {
         val node = findNode() ?: return fail("Node.js was not found. Install Node 20+ or set COCKPIT_NODE.")
 
         val p = ProcessBuilder(node, script.path, "--extension-path", sidecarDir.path)
-            .redirectError(ProcessBuilder.Redirect.INHERIT)
             .start()
         process = p
+        ApplicationManager.getApplication().executeOnPooledThread {
+            p.errorStream.bufferedReader().forEachLine { log.info("[sidecar] $it") }
+        }
         val pool = { r: Runnable -> ApplicationManager.getApplication().executeOnPooledThread(r); Unit }
         val peer = Rpc(p.inputStream.bufferedReader(), p.outputStream, pool)
         rpc = peer
@@ -64,6 +66,7 @@ class SidecarService(private val project: Project) : Disposable {
         peer.request("init", init).whenComplete { result, error ->
             if (error != null) return@whenComplete fail(error.message ?: error.toString())
             val o = result.asJsonObject
+            log.info("sidecar up on port ${o.get("port").asInt}")
             baseUrl.complete("http://127.0.0.1:${o.get("port").asInt}/?t=${o.get("token").asString}")
         }
     }
