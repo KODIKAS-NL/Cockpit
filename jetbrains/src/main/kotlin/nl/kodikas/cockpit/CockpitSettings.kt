@@ -9,7 +9,7 @@ import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.dsl.builder.AlignX
+import com.intellij.ui.dsl.builder.columns
 import com.intellij.ui.dsl.builder.panel
 import java.io.File
 import java.util.Locale
@@ -66,19 +66,19 @@ class CockpitSettings : Configurable {
                 val title = humanize(key)
                 when {
                     type == "boolean" -> row {
-                        val box = checkBox(title).comment(text, 90).component
+                        val box = checkBox(title).comment(text, 70).component
                         box.isSelected = current?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false
                         fields += Field(key, default, { com.google.gson.JsonPrimitive(box.isSelected) }, { v -> box.isSelected = v?.asBoolean ?: false })
                     }
                     type == "string" && d.has("enum") -> row(title) {
                         val values = d.getAsJsonArray("enum").map { it.asString }
-                        val combo = comboBox(values).comment(text, 90).component
+                        val combo = comboBox(values).comment(text, 70).component
                         combo.selectedItem = current?.asString
                         fields += Field(key, default, { com.google.gson.JsonPrimitive(combo.selectedItem as String) }, { v -> combo.selectedItem = v?.asString })
                     }
                     type == "string" || type == "number" || type == "integer" -> row(title) {
                         val number = type != "string"
-                        val tf = textField().align(AlignX.FILL).comment(text, 90).component
+                        val tf = textField().columns(40).comment(text, 70).component
                         tf.text = current?.takeIf { it.isJsonPrimitive }?.asString ?: ""
                         fields += Field(key, default, {
                             val s = tf.text
@@ -89,7 +89,7 @@ class CockpitSettings : Configurable {
             }
         }
         panel = p
-        return JBScrollPane(p).also { it.border = null }
+        return JBScrollPane(p, JBScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JBScrollPane.HORIZONTAL_SCROLLBAR_NEVER).also { it.border = null }
     }
 
     /** What the file would hold after Apply: the values that differ from the defaults. */
