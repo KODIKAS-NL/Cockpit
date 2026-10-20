@@ -200,7 +200,7 @@ export class WebServer {
 </head>
 <body>
   <div id="root"></div>
-  <script nonce="${nonce}">${SHIM}</script>
+  <script nonce="${nonce}">${SHIM.replace("'/ws'+location.search", "'/ws'+location.search+'&view=pad'")}</script>
   <script nonce="${nonce}" src="/pad/main.js"></script>
 </body>
 </html>`;
