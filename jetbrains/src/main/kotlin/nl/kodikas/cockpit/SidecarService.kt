@@ -23,6 +23,22 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.credentialStore.CredentialAttributes
+import com.intellij.credentialStore.generateServiceName
+import com.intellij.diff.DiffContentFactory
+import com.intellij.diff.DiffManager
+import com.intellij.diff.requests.SimpleDiffRequest
+import com.intellij.concurrency.JobScheduler
+import com.intellij.ide.passwordSafe.PasswordSafe
+import com.intellij.openapi.fileChooser.FileChooserFactory
+import com.intellij.openapi.fileChooser.FileSaverDescriptor
+import com.intellij.openapi.fileTypes.FileTypeManager
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
+import com.intellij.openapi.wm.WindowManager
+import org.jetbrains.plugins.terminal.TerminalToolWindowManager
+import java.util.concurrent.ConcurrentHashMap
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.CompletableFuture
@@ -136,16 +152,16 @@ private class Handlers(private val project: Project, private val rpc: Rpc) {
             }
             value
         }
-        rpc.on("statusMessage") { null }
+        rpc.on("statusMessage") { p -> statusMessage(p.asJsonObject); null }
         rpc.on("openFile") { p -> openFile(p.asJsonObject); null }
         rpc.on("previewFile") { p -> openFile(p.asJsonObject); null }
         rpc.on("openQuietly") { p -> openFile(p.asJsonObject, focus = false); null }
         rpc.on("findFiles") { p -> findFiles(p.asJsonObject) }
         rpc.on("saveIfDirty") { null }
         rpc.on("openExternal") { p -> com.intellij.ide.BrowserUtil.browse(p.asJsonObject["url"].asString); null }
-        rpc.on("progress.begin") { null }
-        rpc.on("progress.report") { null }
-        rpc.on("progress.end") { null }
+        rpc.on("progress.begin") { p -> progressBegin(p.asJsonObject); null }
+        rpc.on("progress.report") { p -> progressReport(p.asJsonObject); null }
+        rpc.on("progress.end") { p -> progress.remove(p.asJsonObject["id"].asInt)?.done?.complete(Unit); null }
         rpc.on("focusToolWindow") {
             invokeLater {
                 com.intellij.openapi.wm.ToolWindowManager.getInstance(project).getToolWindow("Cockpit")?.activate(null)
@@ -153,14 +169,106 @@ private class Handlers(private val project: Project, private val rpc: Rpc) {
             null
         }
         rpc.on("status") { null }
-        // Not in the first milestone: answered, so the core does not wait for them.
-        rpc.on("showDiff") { null }
-        rpc.on("runInTerminal") { null }
-        rpc.on("openPath") { null }
-        rpc.on("secrets.get") { null }
-        rpc.on("secrets.store") { null }
-        rpc.on("secrets.delete") { null }
-        rpc.on("saveDialog") { null }
+        rpc.on("showDiff") { p -> showDiff(p.asJsonObject); null }
+        rpc.on("runInTerminal") { p -> runInTerminal(p.asJsonObject); null }
+        rpc.on("openPath") { p ->
+            com.intellij.ide.actions.RevealFileAction.openFile(File(p.asJsonObject["path"].asString))
+            null
+        }
+        rpc.on("secrets.get") { p -> PasswordSafe.instance.getPassword(secretAttrs(p.asJsonObject)) }
+        rpc.on("secrets.store") { p ->
+            val o = p.asJsonObject
+            PasswordSafe.instance.setPassword(secretAttrs(o), o["value"].asString)
+            null
+        }
+        rpc.on("secrets.delete") { p -> PasswordSafe.instance.setPassword(secretAttrs(p.asJsonObject), null); null }
+        rpc.on("saveDialog") { p -> saveDialog(p.asJsonObject) }
+    }
+
+    private fun secretAttrs(o: JsonObject) =
+        CredentialAttributes(generateServiceName("Cockpit", o["key"].asString))
+
+    private fun statusMessage(o: JsonObject) {
+        val text = o["text"].asString
+        val ms = o["ms"]?.asLong ?: 5000
+        invokeLater {
+            val bar = WindowManager.getInstance().getStatusBar(project) ?: return@invokeLater
+            bar.info = text
+            JobScheduler.getScheduler().schedule({ invokeLater { if (bar.info == text) bar.info = "" } }, ms, TimeUnit.MILLISECONDS)
+        }
+    }
+
+    private class Progress(val indicator: CompletableFuture<ProgressIndicator>, val done: CompletableFuture<Unit>)
+
+    private val progress = ConcurrentHashMap<Int, Progress>()
+
+    private fun progressBegin(o: JsonObject) {
+        val id = o["id"].asInt
+        val title = o["title"].asString
+        val entry = Progress(CompletableFuture(), CompletableFuture())
+        progress[id] = entry
+        val cancellable = o["cancellable"]?.asBoolean == true
+        ProgressManager.getInstance().run(object : Task.Backgroundable(project, title, cancellable) {
+            override fun run(indicator: ProgressIndicator) {
+                indicator.isIndeterminate = false
+                indicator.fraction = 0.0
+                entry.indicator.complete(indicator)
+                while (!entry.done.isDone) {
+                    if (indicator.isCanceled) { rpc.notify("progress.cancel", mapOf("id" to id)); break }
+                    runCatching { entry.done.get(200, TimeUnit.MILLISECONDS) }
+                }
+            }
+        })
+    }
+
+    private fun progressReport(o: JsonObject) {
+        val entry = progress[o["id"].asInt] ?: return
+        val ind = entry.indicator.getNow(null) ?: return
+        o["message"]?.takeIf { it.isJsonPrimitive }?.let { ind.text = it.asString }
+        o["increment"]?.takeIf { it.isJsonPrimitive }?.let { ind.fraction = (ind.fraction + it.asDouble / 100.0).coerceIn(0.0, 1.0) }
+    }
+
+    private fun diffContent(side: JsonObject, name: String): com.intellij.diff.contents.DiffContent {
+        val factory = DiffContentFactory.getInstance()
+        val fileType = FileTypeManager.getInstance().getFileTypeByFileName(name)
+        side["path"]?.takeIf { it.isJsonPrimitive }?.let { path ->
+            val vf = LocalFileSystem.getInstance().refreshAndFindFileByPath(path.asString)
+            return if (vf != null) factory.create(project, vf) else factory.create(project, "", fileType)
+        }
+        return factory.create(project, side["text"]?.takeIf { it.isJsonPrimitive }?.asString ?: "", fileType)
+    }
+
+    private fun showDiff(o: JsonObject) {
+        val name = o["name"].asString
+        val title = o["title"].asString
+        invokeLater {
+            val left = diffContent(o["left"].asJsonObject, name)
+            val right = diffContent(o["right"].asJsonObject, name)
+            DiffManager.getInstance().showDiff(project, SimpleDiffRequest(title, left, right, name, name))
+        }
+    }
+
+    private fun runInTerminal(o: JsonObject) {
+        val name = o["name"].asString
+        val command = o["command"].asString
+        invokeLater {
+            val widget = TerminalToolWindowManager.getInstance(project).createShellWidget(project.basePath, name, true, true)
+            widget.sendCommandToExecute(command)
+        }
+    }
+
+    private fun saveDialog(o: JsonObject): String? {
+        val target = File(o["defaultPath"].asString)
+        var result: String? = null
+        ApplicationManager.getApplication().invokeAndWait {
+            val ext = o["filters"]?.takeIf { it.isJsonObject }?.asJsonObject?.entrySet()?.firstOrNull()
+                ?.value?.asJsonArray?.map { it.asString }?.toTypedArray() ?: emptyArray()
+            val descriptor = FileSaverDescriptor("Cockpit", "", *ext)
+            val dir = target.parentFile?.let { LocalFileSystem.getInstance().refreshAndFindFileByIoFile(it) }
+            result = FileChooserFactory.getInstance().createSaveFileDialog(descriptor, project)
+                .save(dir, target.name)?.file?.path
+        }
+        return result
     }
 
     private fun notify(o: JsonObject): String? {

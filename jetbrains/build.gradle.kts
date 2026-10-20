@@ -23,6 +23,7 @@ dependencies {
                 .firstOrNull { file(it).exists() }
         if (installed != null) local(installed) else rider("2026.2") { useInstaller = false }
         bundledPlugin("com.intellij.modules.jcef")
+        bundledPlugin("org.jetbrains.plugins.terminal")
         pluginVerifier()
         zipSigner()
     }

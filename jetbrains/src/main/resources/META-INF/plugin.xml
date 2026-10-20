@@ -5,6 +5,7 @@
   <description>Chat with Claude Code in the IDE, with conversations that outlive the window.</description>
   <depends>com.intellij.modules.platform</depends>
   <depends>com.intellij.modules.jcef</depends>
+  <depends>org.jetbrains.plugins.terminal</depends>
 
   <extensions defaultExtensionNs="com.intellij">
     <toolWindow id="Cockpit" anchor="right" factoryClass="nl.kodikas.cockpit.CockpitToolWindowFactory"/>
