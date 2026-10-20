@@ -7,31 +7,9 @@
   <depends>com.intellij.modules.jcef</depends>
   <depends>org.jetbrains.plugins.terminal</depends>
 
-  <extensions defaultExtensionNs="com.intellij">
-    <toolWindow id="Cockpit" anchor="right" icon="/icons/cockpit.svg" factoryClass="nl.kodikas.cockpit.CockpitToolWindowFactory"/>
-    <applicationConfigurable parentId="tools" instance="nl.kodikas.cockpit.CockpitSettings" id="nl.kodikas.cockpit.settings" displayName="Cockpit for Claude Code"/>
-    <fileEditorProvider implementation="nl.kodikas.cockpit.PadEditorProvider"/>
-    <copyPastePreProcessor implementation="nl.kodikas.cockpit.CopyAsReference"/>
-    <postStartupActivity implementation="nl.kodikas.cockpit.EditorEvents"/>
-    <notificationGroup id="Cockpit" displayType="BALLOON"/>
-  </extensions>
-
-  <actions>
-    <group id="Cockpit.Menu" text="Cockpit" popup="true">
-      <add-to-group group-id="ToolsMenu" anchor="last"/>
-      <action id="Cockpit.Open" class="nl.kodikas.cockpit.OpenCockpitAction" text="Open Cockpit" description="Show the Cockpit chat and focus the prompt"/>
-      <action id="Cockpit.NewSession" class="nl.kodikas.cockpit.NewSessionAction" text="New Conversation"/>
-      <action id="Cockpit.Scratchpad" class="nl.kodikas.cockpit.ScratchpadAction" text="Scratchpad"/>
-      <action id="Cockpit.Interrupt" class="nl.kodikas.cockpit.InterruptAction" text="Interrupt Claude"/>
-      <action id="Cockpit.Sessions" class="nl.kodikas.cockpit.SessionsAction" text="Conversations..."/>
-      <separator/>
-      <action id="Cockpit.SettingsPage" class="nl.kodikas.cockpit.SettingsPageAction" text="Settings..."/>
-      <action id="Cockpit.Settings" class="nl.kodikas.cockpit.SettingsFileAction" text="Open Settings File"/>
-      <action id="Cockpit.Login" class="nl.kodikas.cockpit.LoginAction" text="Log In to Claude"/>
-      <action id="Cockpit.Logout" class="nl.kodikas.cockpit.LogoutAction" text="Log Out of Claude"/>
-      <separator/>
-      <action id="Cockpit.RestartDaemon" class="nl.kodikas.cockpit.RestartDaemonAction" text="Restart Daemon"/>
-      <action id="Cockpit.DaemonLog" class="nl.kodikas.cockpit.ShowDaemonLogAction" text="Show Daemon Log"/>
-    </group>
-  </actions>
+  <content>
+    <module name="cockpit.shared" loading="required"/>
+    <module name="cockpit.frontend"/>
+    <module name="cockpit.backend"/>
+  </content>
 </idea-plugin>

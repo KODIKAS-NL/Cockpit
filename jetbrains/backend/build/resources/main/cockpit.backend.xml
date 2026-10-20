@@ -1,0 +1,15 @@
+<idea-plugin>
+  <dependencies>
+    <module name="intellij.platform.backend"/>
+    <module name="intellij.platform.kernel.backend"/>
+    <module name="cockpit.shared"/>
+  </dependencies>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <platform.rpc.backend.remoteApiProvider implementation="nl.kodikas.cockpit.BackendRpcApiProvider"/>
+    <applicationConfigurable parentId="tools" instance="nl.kodikas.cockpit.CockpitSettings" id="nl.kodikas.cockpit.settings" displayName="Cockpit for Claude Code"/>
+    <copyPastePreProcessor implementation="nl.kodikas.cockpit.CopyAsReference"/>
+    <postStartupActivity implementation="nl.kodikas.cockpit.EditorEvents"/>
+    <notificationGroup id="Cockpit" displayType="BALLOON"/>
+  </extensions>
+</idea-plugin>

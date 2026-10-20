@@ -1,8 +1,10 @@
-import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.intellij.platform.gradle.tasks.aware.SplitModeAware
 
 plugins {
-    id("org.jetbrains.kotlin.jvm") version "2.4.21"
-    id("org.jetbrains.intellij.platform") version "2.19.0"
+    id("org.jetbrains.intellij.platform")
+    id("org.jetbrains.kotlin.jvm")
+    id("rpc") apply false
+    id("org.jetbrains.kotlin.plugin.serialization") apply false
 }
 
 group = "nl.kodikas"
@@ -10,9 +12,11 @@ version = providers.exec {
     commandLine("node", "-p", "require('../package.json').version")
 }.standardOutput.asText.get().trim()
 
-repositories {
-    mavenCentral()
-    intellijPlatform { defaultRepositories() }
+subprojects {
+    apply(plugin = "org.jetbrains.intellij.platform.module")
+    apply(plugin = "rpc")
+    apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
 }
 
 dependencies {
@@ -26,12 +30,17 @@ dependencies {
         bundledPlugin("org.jetbrains.plugins.terminal")
         pluginVerifier()
         zipSigner()
+
+        pluginModule(implementation(project(":shared")))
+        pluginModule(implementation(project(":frontend")))
+        pluginModule(implementation(project(":backend")))
     }
 }
 
-kotlin { jvmToolchain(21) }
 
 intellijPlatform {
+    splitMode = true
+    pluginInstallationTarget = SplitModeAware.PluginInstallationTarget.BOTH
     pluginConfiguration {
         name = "Cockpit for Claude Code"
         ideaVersion { sinceBuild = "262" }
