@@ -8,7 +8,7 @@
   <depends>org.jetbrains.plugins.terminal</depends>
 
   <extensions defaultExtensionNs="com.intellij">
-    <toolWindow id="Cockpit" anchor="right" factoryClass="nl.kodikas.cockpit.CockpitToolWindowFactory"/>
+    <toolWindow id="Cockpit" anchor="right" icon="/icons/cockpit.svg" factoryClass="nl.kodikas.cockpit.CockpitToolWindowFactory"/>
     <copyPastePreProcessor implementation="nl.kodikas.cockpit.CopyAsReference"/>
     <postStartupActivity implementation="nl.kodikas.cockpit.EditorEvents"/>
     <notificationGroup id="Cockpit" displayType="BALLOON"/>
@@ -19,6 +19,7 @@
       <add-to-group group-id="ToolsMenu" anchor="last"/>
       <action id="Cockpit.Open" class="nl.kodikas.cockpit.OpenCockpitAction" text="Open Cockpit" description="Show the Cockpit chat and focus the prompt"/>
       <action id="Cockpit.NewSession" class="nl.kodikas.cockpit.NewSessionAction" text="New Conversation"/>
+      <action id="Cockpit.Scratchpad" class="nl.kodikas.cockpit.ScratchpadAction" text="Scratchpad"/>
       <action id="Cockpit.Interrupt" class="nl.kodikas.cockpit.InterruptAction" text="Interrupt Claude"/>
       <action id="Cockpit.Sessions" class="nl.kodikas.cockpit.SessionsAction" text="Conversations..."/>
       <separator/>

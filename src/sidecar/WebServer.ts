@@ -10,12 +10,16 @@ import type { WebviewToHost } from '../../shared/protocol';
 import { HUB_ID, SIDEBAR_ID, panelId, type Surfaces } from '../core/surfaces';
 import { resolveLocale } from '../i18n/host';
 import { log } from '../util/logger';
+import type { ScratchpadHub } from './ScratchpadHub';
+import type { PadToHost } from '../scratchpad/messages';
 import { makeNonce, viewRegionLocale } from '../core/CockpitCore';
 
 const FILES: Record<string, { file: string; type: string }> = {
   '/main.js': { file: 'dist/webview/main.js', type: 'text/javascript; charset=utf-8' },
   '/main.css': { file: 'dist/webview/main.css', type: 'text/css; charset=utf-8' },
   '/icon.png': { file: 'media/icon.png', type: 'image/png' },
+  '/pad/main.js': { file: 'dist/scratchpad/main.js', type: 'text/javascript; charset=utf-8' },
+  '/pad/main.css': { file: 'dist/scratchpad/main.css', type: 'text/css; charset=utf-8' },
 };
 
 /** The browser side of `window.cockpitHost`: postMessage over the WebSocket, state in localStorage. */
@@ -43,6 +47,8 @@ export interface WebServerOptions {
   onMessage(m: WebviewToHost, from: string): void;
   /** The CSS that maps the IDE's colours to `--vscode-*` variables. */
   theme(): string;
+  /** The scratchpad boards. */
+  pads: ScratchpadHub;
 }
 
 export class WebServer {
@@ -93,7 +99,27 @@ export class WebServer {
     return SIDEBAR_ID;
   }
 
+  private attachPad(ws: WebSocket, key: string): void {
+    log(`web socket open: pad ${key}`);
+    this.sockets.add(ws);
+    const conn = this.o.pads.attach(key, (m) => {
+      if (ws.readyState === 1) ws.send(JSON.stringify(m));
+    });
+    ws.on('message', (data) => {
+      try {
+        conn.message(JSON.parse(String(data)) as PadToHost);
+      } catch {
+        /* not JSON: ignore */
+      }
+    });
+    ws.on('close', () => {
+      this.sockets.delete(ws);
+      conn.close();
+    });
+  }
+
   private attach(ws: WebSocket, url: URL): void {
+    if (url.searchParams.get('view') === 'pad') return this.attachPad(ws, url.searchParams.get('key') ?? '');
     const id = this.surfaceId(url);
     log(`web socket open: ${id}`);
     const kind = id === HUB_ID ? 'hub' : id === SIDEBAR_ID ? 'sidebar' : 'panel';
@@ -129,6 +155,11 @@ export class WebServer {
       if (url.searchParams.get('t') !== this.token) return void this.reply(res, 403, 'text/plain', 'forbidden');
       return void this.reply(res, 200, 'text/html; charset=utf-8', this.page(url));
     }
+    if (url.pathname === '/pad') {
+      if (url.searchParams.get('t') !== this.token) return void this.reply(res, 403, 'text/plain', 'forbidden');
+      return void this.reply(res, 200, 'text/html; charset=utf-8', this.padPage());
+    }
+    if (url.pathname.startsWith('/pad/fonts/')) return this.padAsset(res, url.pathname.slice('/pad/'.length));
     const f = FILES[url.pathname];
     if (!f) return void this.reply(res, 404, 'text/plain', 'not found');
     try {
@@ -138,9 +169,41 @@ export class WebServer {
     }
   }
 
+  /** Excalidraw's fonts, from dist/scratchpad (the name may not climb out of it). */
+  private padAsset(res: http.ServerResponse, rel: string): void {
+    const root = path.join(this.o.extensionPath, 'dist', 'scratchpad');
+    const file = path.normalize(path.join(root, decodeURIComponent(rel)));
+    if (!file.startsWith(root + path.sep)) return void this.reply(res, 404, 'text/plain', 'not found');
+    try {
+      const type = file.endsWith('.woff2') ? 'font/woff2' : 'application/octet-stream';
+      this.reply(res, 200, type, fs.readFileSync(file));
+    } catch {
+      this.reply(res, 404, 'text/plain', 'not found');
+    }
+  }
+
   private reply(res: http.ServerResponse, status: number, type: string, body: string | Buffer): void {
     res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store' });
     res.end(body);
+  }
+
+  padPage(): string {
+    const nonce = makeNonce();
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="/pad/main.css" rel="stylesheet" />
+  <style id="ide-theme">${this.o.theme()}</style>
+  <title>Scratchpad</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script nonce="${nonce}">${SHIM}</script>
+  <script nonce="${nonce}" src="/pad/main.js"></script>
+</body>
+</html>`;
   }
 
   page(url: URL): string {

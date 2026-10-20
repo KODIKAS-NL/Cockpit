@@ -1,16 +1,19 @@
 // cockpit-sidecar: runs the editor-neutral core for an IDE plugin (Rider). The plugin starts this
 // with Node, talks to it over stdio (RpcPeer) and shows `url` in a browser view.
 //   node sidecar.js --extension-path <dir holding dist/, l10n/, media/, package.json>
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { RpcPeer } from './rpc';
 import { RpcHost, RpcSecrets } from './RpcHost';
 import { FileSettings, FileStore, manifestDefaults } from './state';
 import { SidecarCore } from './SidecarCore';
+import { ScratchpadHub } from './ScratchpadHub';
 import { WebServer } from './WebServer';
+import { resolveLocale } from '../i18n/host';
 import { runCommand } from './commands';
 import { HostCommands } from '../core/HostCommands';
 import { bundleLocalizer } from '../core/BundleLocalizer';
-import { setLocalizer, setSettings } from '../core/services';
+import { setLocalizer, setSettings, t } from '../core/services';
 import { setDebugLogging, setLogSink, log } from '../util/logger';
 import { daemonHome } from '../daemon/paths';
 
@@ -53,7 +56,22 @@ export function start(argv: string[], input = process.stdin, output = process.st
     const commands = new HostCommands(host, core, store, extensionPath);
     host.installDaemonHandler = () => void commands.installDaemon();
 
+    const pads = new ScratchpadHub({
+      storageDir: daemonHome(),
+      locale: () => resolveLocale(),
+      ...core.padLinks,
+      show: (key, title) => rpc.notify('openPad', { key, title }),
+      exportImage: (image) => {
+        void host
+          .saveDialog({ defaultPath: path.join(host.root ?? '', `scratchpad-${Date.now()}.png`), filters: { Images: ['png'] } })
+          .then((file) => file && fs.writeFileSync(file, Buffer.from(image.data, 'base64')))
+          .catch((e) => host.notify('error', t('Failed to save image: {0}', String(e))));
+      },
+    });
+    core.pads = pads;
+
     const web = new WebServer({
+      pads,
       extensionPath,
       surfaces: core.webSurfaces,
       onMessage: (m, from) => core.receive(m, from),

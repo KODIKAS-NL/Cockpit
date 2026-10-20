@@ -42,7 +42,7 @@ intellijPlatform {
 val sidecarFiles = tasks.register<Sync>("sidecarFiles") {
     val root = layout.projectDirectory.dir("..")
     into(layout.buildDirectory.dir("sidecar"))
-    into("sidecar/dist") { from(root.dir("dist")) { include("sidecar.js", "webview/**") } }
+    into("sidecar/dist") { from(root.dir("dist")) { include("sidecar.js", "webview/**", "scratchpad/**") } }
     into("sidecar/l10n") { from(root.dir("l10n")) }
     into("sidecar/media") { from(root.dir("media")) { include("icon.png") } }
     into("sidecar/dict") { from(root.dir("dict")) }

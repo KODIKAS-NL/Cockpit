@@ -6,10 +6,18 @@ import { SIDEBAR_ID, type Surfaces } from '../core/surfaces';
 import { t } from '../core/services';
 import type { ImageAttachment } from '../../shared/protocol';
 import type { RpcPeer } from './rpc';
+import type { ScratchpadHub } from './ScratchpadHub';
 
 export class SidecarCore extends CockpitCore {
   sidebarShown = true;
   private rpc!: RpcPeer;
+  pads?: ScratchpadHub;
+
+  /** For the scratchpad hub: what the core knows about a conversation's images and sends. */
+  readonly padLinks = {
+    onSend: (key: string, image: ImageAttachment): void => this.onPadSend(key, image),
+    latestImage: (key: string): ImageAttachment | undefined => this.latestChatImage(key),
+  };
 
   get webSurfaces(): Surfaces {
     return this.surfaces;
@@ -50,8 +58,9 @@ export class SidecarCore extends CockpitCore {
   }
   protected startWatchdog = (): void => undefined;
   protected onSurfaceAlive = (): void => undefined;
-  protected openPad(_key: string, _title: string, _image?: ImageAttachment): void {
-    void this.host.notify('info', t('The scratchpad is not available in this editor yet.'));
+  protected openPad(key: string, title: string, image?: ImageAttachment): void {
+    if (this.pads) this.pads.open(key, title, image);
+    else void this.host.notify('info', t('The scratchpad is not available in this editor yet.'));
   }
-  protected disposePads = (): void => undefined;
+  protected disposePads = (): void => this.pads?.dispose();
 }

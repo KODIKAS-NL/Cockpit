@@ -24,6 +24,7 @@ abstract class CockpitAction(private val commandId: String, private val showWind
 
 class OpenCockpitAction : CockpitAction("cockpitDaemon.focusPrompt", showWindow = true)
 class NewSessionAction : CockpitAction("cockpitDaemon.newSession", showWindow = true)
+class ScratchpadAction : CockpitAction("cockpitDaemon.scratchpad")
 class InterruptAction : CockpitAction("cockpitDaemon.interrupt")
 class SessionsAction : CockpitAction("cockpitDaemon.openSessions", showWindow = true)
 class SettingsFileAction : CockpitAction("cockpitDaemon.settings")
