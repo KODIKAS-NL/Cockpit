@@ -5,7 +5,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import * as vscode from 'vscode';
+import type { KeyValueStore } from '../core/host';
 
 export const USAGE_CACHE = path.join(os.homedir(), '.claude', '.tootega-usage.json');
 
@@ -90,7 +90,7 @@ export function isEnabled(): boolean {
 }
 
 /** Installs the wrapper. Returns a message for the user. */
-export function enableUsageTracking(memory: vscode.Memento): string {
+export function enableUsageTracking(memory: KeyValueStore): string {
   if (process.platform !== 'win32') {
     return 'unsupported';
   }
@@ -133,7 +133,7 @@ export function enableUsageTracking(memory: vscode.Memento): string {
 }
 
 /** Removes the wrapper, restoring the original statusline. */
-export function disableUsageTracking(memory: vscode.Memento): string {
+export function disableUsageTracking(memory: KeyValueStore): string {
   const sp = settingsPath();
   let settings: any = {};
   try {

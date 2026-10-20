@@ -1,14 +1,24 @@
-import * as vscode from 'vscode';
+// Where lines go is the host's business: VS Code installs an OutputChannel, another editor its own
+// log. Until a sink is installed, lines are held (bounded) and replayed to the first sink.
+export type LogSink = (line: string) => void;
 
-let channel: vscode.OutputChannel | undefined;
+let sink: LogSink | undefined;
+const pending: string[] = [];
+const PENDING_MAX = 500;
 
-export function getLogger(): vscode.OutputChannel {
-  if (!channel) channel = vscode.window.createOutputChannel('Cockpit for Claude Code');
-  return channel;
+export function setLogSink(fn: LogSink): void {
+  sink = fn;
+  for (const line of pending.splice(0)) fn(line);
 }
 
 export function log(msg: string): void {
-  getLogger().appendLine(`[${new Date().toISOString()}] ${msg}`);
+  const line = `[${new Date().toISOString()}] ${msg}`;
+  if (sink) {
+    sink(line);
+    return;
+  }
+  pending.push(line);
+  if (pending.length > PENDING_MAX) pending.shift();
 }
 
 // Detailed diagnostic log: only writes when the flag is on (cockpitDaemon.debugLog).

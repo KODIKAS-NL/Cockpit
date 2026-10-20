@@ -10,7 +10,8 @@
 // runs a local model, so those panels have nothing to show. `engineCaps` is the
 // single place that says so, instead of scattering `if (engine === ...)` across
 // the UI.
-import * as vscode from 'vscode';
+import { settings } from '../core/services';
+import type { Settings } from '../core/host';
 
 export type EngineId = 'claude' | 'tootega';
 
@@ -28,8 +29,8 @@ const CAPS: Record<EngineId, EngineCaps> = {
   tootega: { account: false, extensions: false, cost: false },
 };
 
-export function cfg(): vscode.WorkspaceConfiguration {
-  return vscode.workspace.getConfiguration('cockpitDaemon');
+export function cfg(): Settings {
+  return settings();
 }
 
 /**

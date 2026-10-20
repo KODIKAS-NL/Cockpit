@@ -9,6 +9,7 @@ import {
 } from './cli/Utf8HookInstaller';
 import { flushStats } from './stats/StatsStore';
 import { log, setDebugLogging } from './util/logger';
+import { registerVsCodeServices } from './vscode/VsCodeServices';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import {
@@ -23,6 +24,7 @@ import {
 } from './daemon/service';
 
 export function activate(context: vscode.ExtensionContext): void {
+  registerVsCodeServices();
   setDebugLogging(vscode.workspace.getConfiguration('cockpitDaemon').get<boolean>('debugLog', false));
   log('Cockpit for Claude Code activating…');
 
