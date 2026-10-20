@@ -39,6 +39,8 @@ dependencies {
 
 
 intellijPlatform {
+    // Outside the repo: Rider turns a stray Program.csproj in the sandbox caches into the open solution.
+    sandboxContainer = layout.dir(providers.provider { file("${System.getProperty("user.home")}/.cache/cockpit-rider-sandbox") })
     splitMode = true
     pluginInstallationTarget = SplitModeAware.PluginInstallationTarget.BOTH
     pluginConfiguration {
