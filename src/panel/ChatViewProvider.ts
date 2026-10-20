@@ -76,6 +76,7 @@ import { Session, type SessionHooks } from '../session/Session';
 import { chooseLocation, type Surface } from './location';
 import { resolveLocale } from '../i18n/host';
 import { settings, t } from '../core/services';
+import { Surfaces, HUB_ID, SIDEBAR_ID, panelId, type Surface as HostSurface } from '../core/surfaces';
 import type { EditorHost, SelectionInfo } from '../core/host';
 import { VsCodeHost } from '../vscode/VsCodeHost';
 import { ScratchpadManager } from '../scratchpad/ScratchpadPanel';
@@ -132,6 +133,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /** Every editor operation goes through the host (see src/core/host.ts). */
   private readonly host: EditorHost = new VsCodeHost();
   private panels = new Map<string, vscode.WebviewPanel>();
+  private readonly surfaces = new Surfaces();
   private webviewSession = new Map<vscode.Webview, string>();
   private hubView?: vscode.WebviewView;
   // The chat in the side bar (secondary side bar, or the Activity Bar on older VS Code): one
@@ -965,6 +967,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         return;
       } catch {
         this.panels.delete(tabId);
+        this.surfaces.remove(panelId(tabId));
         this.webviewSession.delete(existing.webview);
       }
     }
@@ -1004,6 +1007,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
     this.panels.set(tabId, panel);
     this.webviewSession.set(panel.webview, tabId);
+    this.surfaces.set(panelId(tabId), this.panelSurface(panel.webview, tabId));
     this.updateReloadBar();
     const sub = panel.webview.onDidReceiveMessage((m: WebviewToHost) =>
       this.onWebviewMessage(m, panel.webview),
@@ -1033,6 +1037,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
       this.movingTabs.delete(tabId);
       this.panels.delete(tabId);
+      this.surfaces.remove(panelId(tabId));
       this.webviewSession.delete(wv);
       this.lastBeat.delete(tabId);
       this.reloadGuard.delete(tabId);
@@ -1153,6 +1158,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Unbinds before disposing: the old one's onDidDispose would erase the records
     // of the tabId that will belong to the new panel.
     this.panels.delete(tabId);
+    this.surfaces.remove(panelId(tabId));
     this.webviewSession.delete(old.webview);
     try {
       old.dispose();
@@ -3584,27 +3590,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   // ---- util ----
 
   private post(msg: HostToWebview, tab?: string): void {
-    const payload = tab ? { ...msg, tab } : msg;
-    // The hub receives everything (it mirrors the global state + the active session).
-    this.trySend(this.hubView?.webview, payload);
-    // The side bar chat keeps every conversation's state too (it can show any of its tabs).
-    this.trySend(this.chatView?.webview, payload);
-    if (tab) {
-      // Message from one session: only that session's panel.
-      this.trySend(this.panels.get(tab)?.webview, payload);
-    } else {
-      // Global (config/cli/tabs/locale): every chat panel.
-      for (const p of this.panels.values()) this.trySend(p.webview, payload);
-    }
+    this.surfaces.post(msg, tab);
   }
 
-  private trySend(w: vscode.Webview | undefined, payload: unknown): void {
-    if (!w) return;
-    try {
-      void w.postMessage(payload);
-    } catch {
-      /* webview descartado */
-    }
+  private panelSurface(w: vscode.Webview, tab: string): HostSurface {
+    return { kind: 'panel', tab, post: (m) => void w.postMessage(m) };
   }
 
   private getHtml(webview: vscode.Webview, mode: 'chat' | 'hub' | 'sidebar' = 'chat', sessionTab?: string): string {
@@ -3663,6 +3653,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     };
     view.webview.html = this.getHtml(view.webview, 'sidebar');
     this.chatView = view;
+    this.surfaces.set(SIDEBAR_ID, { kind: 'sidebar', post: (m) => void view.webview.postMessage(m) });
     const setKey = (): void => {
       void vscode.commands.executeCommand('setContext', 'cockpitDaemon.sideBarActive', view.visible);
     };
@@ -3676,7 +3667,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       sub.dispose();
       visSub.dispose();
       void vscode.commands.executeCommand('setContext', 'cockpitDaemon.sideBarActive', false);
-      if (this.chatView === view) this.chatView = undefined;
+      if (this.chatView === view) {
+        this.chatView = undefined;
+        this.surfaces.remove(SIDEBAR_ID);
+      }
     });
   }
 
@@ -3690,6 +3684,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     };
     view.webview.html = this.getHtml(view.webview, 'hub');
     this.hubView = view;
+    this.surfaces.set(HUB_ID, { kind: 'hub', post: (m) => void view.webview.postMessage(m) });
     this.lastBeat.set(HUB_SURFACE, Date.now());
     dlog('watchdog', 'hub-view montado (resolveWebviewView)');
     const sub = view.webview.onDidReceiveMessage((m: WebviewToHost) =>
@@ -3703,7 +3698,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       visSub.dispose();
       this.lastBeat.delete(HUB_SURFACE);
       this.reloadGuard.delete(HUB_SURFACE);
-      if (this.hubView === view) this.hubView = undefined;
+      if (this.hubView === view) {
+        this.hubView = undefined;
+        this.surfaces.remove(HUB_ID);
+      }
     });
   }
 }
