@@ -26,6 +26,10 @@ export class Surfaces {
     this.all.set(id, surface);
   }
 
+  has(id: string): boolean {
+    return this.all.has(id);
+  }
+
   remove(id: string): void {
     this.all.delete(id);
   }

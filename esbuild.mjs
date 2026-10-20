@@ -38,6 +38,16 @@ const daemonCtx = await esbuild.context({
   format: 'cjs',
 });
 
+// 2b) cockpit-sidecar — the same core for an IDE plugin (Rider); no 'vscode' anywhere in it.
+const sidecarCtx = await esbuild.context({
+  ...common,
+  entryPoints: ['src/sidecar/main.ts'],
+  outfile: 'dist/sidecar.js',
+  platform: 'node',
+  format: 'cjs',
+  external: ['bufferutil', 'utf-8-validate'],
+});
+
 // 3) Webview — React, roda no browser do webview.
 const webCtx = await esbuild.context({
   ...common,
@@ -71,10 +81,10 @@ fs.cpSync('node_modules/@excalidraw/excalidraw/dist/prod/fonts', 'dist/scratchpa
 });
 
 if (watch) {
-  await Promise.all([hostCtx.watch(), daemonCtx.watch(), webCtx.watch(), padCtx.watch()]);
+  await Promise.all([hostCtx.watch(), daemonCtx.watch(), sidecarCtx.watch(), webCtx.watch(), padCtx.watch()]);
   console.log('[esbuild] watching…');
 } else {
-  await Promise.all([hostCtx.rebuild(), daemonCtx.rebuild(), webCtx.rebuild(), padCtx.rebuild()]);
-  await Promise.all([hostCtx.dispose(), daemonCtx.dispose(), webCtx.dispose(), padCtx.dispose()]);
+  await Promise.all([hostCtx.rebuild(), daemonCtx.rebuild(), sidecarCtx.rebuild(), webCtx.rebuild(), padCtx.rebuild()]);
+  await Promise.all([hostCtx.dispose(), daemonCtx.dispose(), sidecarCtx.dispose(), webCtx.dispose(), padCtx.dispose()]);
   console.log('[esbuild] build complete');
 }

@@ -113,6 +113,11 @@ export interface EditorHost {
   /** The UI is a browser (code-server). */
   isWebUi(): boolean;
 
+  /** A modal question; true when the user picked the `action` button. */
+  confirm(message: string, detail: string, action: string): PromiseLike<boolean>;
+  /** A short message in the status area that fades by itself. */
+  statusMessage(text: string, ms: number): void;
+
   // --- Things the core asks the host to do, by name ---
   openSettings(): void;
   installDaemon(): void;

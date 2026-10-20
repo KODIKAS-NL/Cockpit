@@ -51,6 +51,10 @@ export class FakeHost implements EditorHost {
     return undefined;
   }
   hideNotifications(): void {}
+  async confirm(): Promise<boolean> {
+    return false;
+  }
+  statusMessage(): void {}
   async inputBox(): Promise<undefined> {
     return undefined;
   }

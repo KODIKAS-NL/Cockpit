@@ -23,6 +23,14 @@ export class VsCodeHost implements EditorHost {
         : w.showInformationMessage(message, ...actions);
   }
 
+  async confirm(message: string, detail: string, action: string): Promise<boolean> {
+    return (await vscode.window.showWarningMessage(message, { modal: true, detail }, action)) === action;
+  }
+
+  statusMessage(text: string, ms: number): void {
+    vscode.window.setStatusBarMessage(text, ms);
+  }
+
   hideNotifications(): void {
     void vscode.commands.executeCommand('notifications.hideToasts');
   }

@@ -247,7 +247,8 @@ claude -p --output-format stream-json --input-format stream-json --include-parti
 
 | Path | What is there |
 |------|---------------|
-| `src/core/` | The editor-neutral core (`CockpitCore`, `EditorHost` and the other host interfaces, `Surfaces`); never imports `vscode` (guarded by `test/coreBoundary.test.ts`) |
+| `src/core/` | The editor-neutral core (`CockpitCore`, `HostCommands`, `EditorHost` and the other host interfaces, `Surfaces`); never imports `vscode` (guarded by `test/coreBoundary.test.ts`) |
+| `src/sidecar/` | `cockpit-sidecar` (`dist/sidecar.js`): the core run in Node for an IDE plugin (Rider). The plugin talks to it over stdio JSON-RPC, and the chat UI over a WebSocket |
 | `src/vscode/`, `src/extension.ts` | The VS Code adapter: `ChatViewProvider` (views, panels, status bar, watchdog), `VsCodeHost`, `ScratchpadPanel`, and the extension entry |
 | `src/session/` | `Session` (one conversation's runtime in a window), `SessionStore` (transcripts) |
 | `src/cli/` | Engine contract (`CliProcess`), the daemon client (`RemoteCliProcess`), the Tootega runner (`CliProcessManager`), usage, models, plugins, auth |
