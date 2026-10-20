@@ -57,7 +57,7 @@ On the machine that holds the code (the **backend**, for example a Mac mini):
 On the laptop (the **client**, remote mode only):
 
 - JetBrains Toolbox App, which installs the matching JetBrains Client.
-- Key-based SSH to the backend that works without a prompt: `ssh <host>` must log in by itself.
+- Key-based SSH to the backend that works without a prompt: `ssh <host>` must log in by itself (see [Set up SSH keys](#set-up-ssh-keys)).
   The tunnel runs `ssh` with `BatchMode=yes`, so it cannot ask for a password.
 
 ## Install the plugin
@@ -100,18 +100,53 @@ connects, so you usually install nothing here. If the Cockpit tool window does n
 the same zip in the client: **Settings → Plugins → ⚙ → Install Plugin from Disk…**, then restart the
 client. Client and backend must run the **same plugin version**.
 
+## Set up SSH keys
+
+Remote mode needs `ssh macmini.local` to log in from the laptop **without a password prompt**: Toolbox
+uses it, and so does the Cockpit tunnel (it runs with `BatchMode=yes`, which cannot ask). The same
+key setup serves VS Code Remote-SSH; [remote-setup.md](remote-setup.md) has the host side (Remote
+Login in System Settings, a fixed address). In short, on the **laptop**:
+
+1. Create a key, if you have none (accept the defaults; a passphrase is fine if the key is loaded
+   into the macOS keychain):
+   ```
+   ssh-keygen -t ed25519
+   ```
+2. Put the public key on the backend:
+   ```
+   ssh-copy-id you@macmini.local
+   ```
+   If the host only accepts keys, `ssh-copy-id` cannot log in. Append the contents of
+   `~/.ssh/id_ed25519.pub` to `~/.ssh/authorized_keys` on the host instead (the folder `~/.ssh` needs
+   mode 700, the file mode 600).
+3. Optionally name the host in `~/.ssh/config` on the laptop, so every tool uses one name:
+   ```
+   Host macmini.local
+     User you
+     IdentityFile ~/.ssh/id_ed25519
+     IdentitiesOnly yes
+     AddKeysToAgent yes
+     UseKeychain yes
+   ```
+4. Check it. This must print the host name and **not** ask for anything:
+   ```
+   ssh -o BatchMode=yes macmini.local hostname
+   ```
+
+Use the same host name in Toolbox and in the Cockpit prompt, so one SSH entry covers both.
+
 ## Connect from the laptop
 
 JetBrains Gateway only supports Linux hosts, so for a macOS backend use the **Toolbox App**.
 
 1. Install the JetBrains Toolbox App on the laptop and sign in.
 2. In Toolbox, open the **Remote Development** (SSH) section and add the backend: its host name
-   (for example `delphi.home.kodikas.nl`), your user and your SSH key.
+   (for example `macmini.local`), your user and your SSH key.
 3. Toolbox installs or finds Rider on the backend, and lists the projects. If it offers to select
    which settings to apply, choose **Backend** to keep the backend's settings.
 4. Open the project folder. The JetBrains Client opens on the laptop.
 5. Open the **Cockpit** tool window. The first time, it asks for the **SSH host**: enter the same
-   name you use with `ssh` (for example `delphi.home.kodikas.nl`). It is remembered in the IDE's
+   name you use with `ssh` (for example `macmini.local`). It is remembered in the IDE's
    settings under the key `cockpit.sshHost`. To skip the prompt, set the environment variable
    `COCKPIT_SSH_HOST` for the client.
 
