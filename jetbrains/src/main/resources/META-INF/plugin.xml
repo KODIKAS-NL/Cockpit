@@ -9,6 +9,7 @@
 
   <extensions defaultExtensionNs="com.intellij">
     <toolWindow id="Cockpit" anchor="right" icon="/icons/cockpit.svg" factoryClass="nl.kodikas.cockpit.CockpitToolWindowFactory"/>
+    <applicationConfigurable parentId="tools" instance="nl.kodikas.cockpit.CockpitSettings" id="nl.kodikas.cockpit.settings" displayName="Cockpit for Claude Code"/>
     <fileEditorProvider implementation="nl.kodikas.cockpit.PadEditorProvider"/>
     <copyPastePreProcessor implementation="nl.kodikas.cockpit.CopyAsReference"/>
     <postStartupActivity implementation="nl.kodikas.cockpit.EditorEvents"/>
@@ -24,6 +25,7 @@
       <action id="Cockpit.Interrupt" class="nl.kodikas.cockpit.InterruptAction" text="Interrupt Claude"/>
       <action id="Cockpit.Sessions" class="nl.kodikas.cockpit.SessionsAction" text="Conversations..."/>
       <separator/>
+      <action id="Cockpit.SettingsPage" class="nl.kodikas.cockpit.SettingsPageAction" text="Settings..."/>
       <action id="Cockpit.Settings" class="nl.kodikas.cockpit.SettingsFileAction" text="Open Settings File"/>
       <action id="Cockpit.Login" class="nl.kodikas.cockpit.LoginAction" text="Log In to Claude"/>
       <action id="Cockpit.Logout" class="nl.kodikas.cockpit.LogoutAction" text="Log Out of Claude"/>

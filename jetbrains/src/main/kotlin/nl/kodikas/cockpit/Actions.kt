@@ -32,3 +32,9 @@ class LoginAction : CockpitAction("cockpitDaemon.login")
 class LogoutAction : CockpitAction("cockpitDaemon.logout")
 class RestartDaemonAction : CockpitAction("cockpitDaemon.daemon.restart")
 class ShowDaemonLogAction : CockpitAction("cockpitDaemon.daemon.showLog")
+
+class SettingsPageAction : AnAction(), DumbAware {
+    override fun actionPerformed(e: AnActionEvent) {
+        com.intellij.openapi.options.ShowSettingsUtil.getInstance().showSettingsDialog(e.project, CockpitSettings::class.java)
+    }
+}

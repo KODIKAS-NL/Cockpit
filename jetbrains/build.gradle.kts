@@ -46,7 +46,7 @@ val sidecarFiles = tasks.register<Sync>("sidecarFiles") {
     into("sidecar/l10n") { from(root.dir("l10n")) }
     into("sidecar/media") { from(root.dir("media")) { include("icon.png") } }
     into("sidecar/dict") { from(root.dir("dict")) }
-    into("sidecar") { from(root.file("package.json")) }
+    into("sidecar") { from(root.file("package.json")); from(root.file("package.nls.json")); from(root.file("package.nls.pt-br.json")) }
 }
 
 // Every sandbox (runIde, tests, buildPlugin) gets the sidecar next to the plugin's classes.
