@@ -292,11 +292,19 @@ private class Handlers(private val project: Project, private val rpc: Rpc) {
         invokeLater { OpenFileDescriptor(project, file, line, 0).navigate(focus) }
     }
 
+    private val skipDirs = setOf("node_modules", ".git", "bin", "obj", ".idea", ".gradle", "build", "dist")
+
     private fun findFiles(o: JsonObject): List<String> {
         val name = o["glob"].asString.substringAfterLast('/')
         val max = o["max"]?.asInt ?: 1
-        return com.intellij.openapi.application.runReadAction {
-            FilenameIndex.getVirtualFilesByName(name, GlobalSearchScope.projectScope(project)).take(max).map { it.path }
+        val indexed = com.intellij.openapi.application.runReadAction {
+            runCatching { FilenameIndex.getVirtualFilesByName(name, GlobalSearchScope.projectScope(project)).take(max).map { it.path } }
+                .getOrDefault(emptyList())
         }
+        if (indexed.isNotEmpty()) return indexed
+        // Rider keeps its own file index on the backend, so the platform index can be empty: walk the folder.
+        val root = project.basePath?.let { File(it) } ?: return emptyList()
+        return root.walkTopDown().onEnter { it.name !in skipDirs }.filter { it.isFile && it.name == name }
+            .take(max).map { it.path }.toList()
     }
 }
