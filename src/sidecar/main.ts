@@ -61,7 +61,13 @@ export function start(argv: string[], input = process.stdin, output = process.st
     });
     const port = await web.listen();
 
-    rpc.on('command', (c: { id: string }) => ({ ok: runCommand(c.id, core, commands) }));
+    rpc.on('command', (c: { id: string }) => {
+      if (c.id === 'cockpitDaemon.settings') {
+        host.openSettings();
+        return { ok: true };
+      }
+      return { ok: runCommand(c.id, core, commands) };
+    });
     rpc.on('theme', (t: { css: string }) => {
       theme = t.css;
       web.pushTheme();

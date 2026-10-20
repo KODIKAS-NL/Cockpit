@@ -98,6 +98,11 @@ class SidecarService(private val project: Project) : Disposable {
         rpc?.notify("command", mapOf("id" to id))
     }
 
+    /** A fire-and-forget event to the sidecar (a no-op until it is up). */
+    fun send(method: String, params: Any? = null) {
+        rpc?.notify(method, params)
+    }
+
     fun pushTheme() {
         rpc?.notify("theme", mapOf("css" to ThemeCss.build()))
     }
