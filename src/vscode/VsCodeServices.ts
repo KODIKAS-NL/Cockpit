@@ -14,6 +14,10 @@ export const vsCodeSettings: Settings = {
   get: (key, fallback) => vscode.workspace.getConfiguration('cockpitDaemon').get(key, fallback),
   update: (key, value, scope = 'global') =>
     vscode.workspace.getConfiguration('cockpitDaemon').update(key, value, TARGET[scope]),
+  inspect: (key) => {
+    const i = vscode.workspace.getConfiguration('cockpitDaemon').inspect(key);
+    return i && { defaultValue: i.defaultValue as never, global: i.globalValue as never, workspace: i.workspaceValue as never, folder: i.workspaceFolderValue as never };
+  },
 };
 
 export const vsCodeLocalizer: Localizer = {

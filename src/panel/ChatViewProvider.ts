@@ -1,6 +1,6 @@
 // Webview provider: the bridge between the CLI (engine) and the React UI.
 import * as vscode from 'vscode';
-import { buildRef, isRefWorthy } from '../../shared/codeRef';
+import { buildRef } from '../../shared/codeRef';
 import { removeFeedbackImages, saveFeedbackImages, sweepFeedbackImages, withImagePaths } from '../session/FeedbackImages';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -75,6 +75,9 @@ import type { ImageAttachment, LimitWindow, HostToWebview, WebviewToHost, TabInf
 import { Session, type SessionHooks } from '../session/Session';
 import { chooseLocation, type Surface } from './location';
 import { resolveLocale } from '../i18n/host';
+import { settings, t } from '../core/services';
+import type { EditorHost, SelectionInfo } from '../core/host';
+import { VsCodeHost } from '../vscode/VsCodeHost';
 import { ScratchpadManager } from '../scratchpad/ScratchpadPanel';
 import { latestTranscriptImage, adoptPad, deletePad, migratePad, padKey } from '../scratchpad/store';
 import { daemonHome } from '../daemon/paths';
@@ -126,6 +129,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   // (WebviewView). `surfaces` guarda os webviews ativos (broadcast) — o estado
   // lives in the host and is replicated to every surface.
   // Each context (session) opens as its own WebviewPanel in the editor.
+  /** Every editor operation goes through the host (see src/core/host.ts). */
+  private readonly host: EditorHost = new VsCodeHost();
   private panels = new Map<string, vscode.WebviewPanel>();
   private webviewSession = new Map<vscode.Webview, string>();
   private hubView?: vscode.WebviewView;
@@ -177,7 +182,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   // Ref of the editor's active selection (@file#a-b) to share via the composer.
   private lastSelRef?: string;
   private lastSelUri?: string; // the document the ref points at
-  private selListeners: vscode.Disposable[] = [];
+  private selListeners: Array<{ dispose(): void }> = [];
   private tabSeq = 0;
 
   // Session overrides (in memory — they don't change the user's global settings).
@@ -266,7 +271,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Reload button (status bar, right). Hidden until a context is opened.
     this.reloadBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
     this.reloadBar.text = '$(refresh)';
-    this.reloadBar.tooltip = vscode.l10n.t('Reload Cockpit view (fix gray/blank panel)');
+    this.reloadBar.tooltip = t('Reload Cockpit view (fix gray/blank panel)');
     this.reloadBar.command = 'cockpitDaemon.reloadView';
     this.updateReloadBar();
     setInternalModel(this.cfg().get<string>('internalModel', '')); // model of the internal calls
@@ -277,37 +282,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // It follows the selection, the active editor, and the file's tab: closing the file drops the ref.
     // An undefined active editor is NOT a reason to clear: it is also what a focused chat tab reports.
     this.selListeners.push(
-      vscode.window.onDidChangeTextEditorSelection((e) => this.setSelection(e.textEditor)),
-      vscode.window.onDidChangeActiveTextEditor((ed) => {
-        if (ed) this.setSelection(ed);
-      }),
-      vscode.window.tabGroups.onDidChangeTabs(() => this.dropSelectionIfClosed()),
+      this.host.onSelection((sel) => this.setSelection(sel)),
+      this.host.onTabsChanged(() => this.dropSelectionIfClosed()),
+      this.host.onCopySource((text, ref) => this.post({ kind: 'copySource', text, ref })),
     );
-    // Copying lines in an editor tells the composer where they came from, so pasting them there
-    // becomes a reference chip. No paste edits are provided: pasting in editors is untouched. Older
-    // hosts without the API simply skip it.
-    if (typeof vscode.languages.registerDocumentPasteEditProvider === 'function') {
-      this.selListeners.push(
-        vscode.languages.registerDocumentPasteEditProvider(
-          { scheme: 'file' },
-          {
-            prepareDocumentPaste: (doc, ranges) => {
-              const r = ranges[0];
-              if (ranges.length !== 1 || !r) return;
-              // The data transfer VS Code hands over on copy is empty: the text comes from the document.
-              const text = doc.getText(r);
-              if (!isRefWorthy(text, r.start.line + 1, r.end.line + 1)) return;
-              const rel = vscode.workspace.asRelativePath(doc.uri, false);
-              this.post({ kind: 'copySource', text, ref: buildRef(rel, r.start.line + 1, r.end.line + 1, r.end.character) });
-            },
-          },
-          { providedPasteEditKinds: [], copyMimeTypes: ['application/vnd.cockpit.copy-source'] },
-        ),
-      );
-    }
-    // Automatic keep-alive ping is OFF: any refresh via --resume writes
-    // a real turn into the .jsonl (pollutes the conversation, spends tokens and reaches the agent).
-    // O medidor de vida do cache no painel continua (independe do keeper).
     void this.cacheKeeper; // kept for a future clean reimplementation (without polluting the transcript)
     // OTEL telemetry (opt-in, default OFF): starts the local receiver that collects LOC/
     // sessions/commits from the CLI. When enabled, it injects the export env before the first spawn.
@@ -335,7 +313,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (this.globalStorageDir) migratePad(this.globalStorageDir, this.padDir, key); // boards of 1.0.308+
     this.padTabs.set(key, id);
     const title = this.tabMeta.get(id)?.title || 'Cockpit';
-    this.scratchpads.open(key, vscode.l10n.t('Scratchpad: {0}', title), image);
+    this.scratchpads.open(key, t('Scratchpad: {0}', title), image);
   }
 
   /** The newest image sent in the conversation behind a board. */
@@ -373,34 +351,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.windowStateSub?.dispose();
     this.reloadBar?.dispose();
     for (const d of this.selListeners) d.dispose();
-    this.diffProviderReg?.dispose();
   }
 
   /** Updates the selection ref (@rel#a-b) and notifies the composer. Empty = no selection. */
-  private setSelection(ed: vscode.TextEditor): void {
-    const sel = ed.selection;
-    let ref: string | undefined;
-    if (ed.document.uri.scheme === 'file' && !sel.isEmpty) {
-      const rel = vscode.workspace.asRelativePath(ed.document.uri, false);
-      ref = buildRef(rel, sel.start.line + 1, sel.end.line + 1, sel.end.character);
-    }
-    this.publishSelection(ref, ref ? ed.document.uri.toString() : undefined);
+  private setSelection(sel: SelectionInfo | undefined): void {
+    const ref = sel ? buildRef(sel.path, sel.startLine, sel.endLine, sel.endChar) : undefined;
+    this.publishSelection(ref, sel?.docKey);
   }
 
   /** The file the ref points at lost its tab (closed): the reference goes with it. */
   private dropSelectionIfClosed(): void {
     if (!this.lastSelUri) return;
-    const open = vscode.window.tabGroups.all.some((g) =>
-      g.tabs.some((t) => {
-        const input = t.input;
-        return (
-          (input instanceof vscode.TabInputText && input.uri.toString() === this.lastSelUri) ||
-          (input instanceof vscode.TabInputTextDiff &&
-            (input.modified.toString() === this.lastSelUri || input.original.toString() === this.lastSelUri))
-        );
-      }),
-    );
-    if (!open) this.publishSelection(undefined, undefined);
+    if (!this.host.isDocumentOpen(this.lastSelUri)) this.publishSelection(undefined, undefined);
   }
 
   private publishSelection(ref: string | undefined, uri: string | undefined): void {
@@ -493,13 +455,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       onTurnError: (info) => {
         const message =
           info.kind === 'aborted'
-            ? vscode.l10n.t(
+            ? t(
                 'Claude process exited unexpectedly (code {0}) before finishing the turn. Send again to continue.',
                 String(info.code ?? '?'),
               )
             : info.kind === 'transient'
-              ? vscode.l10n.t('Connection was unstable — the turn may be incomplete. Send again if needed.{0}', info.text ? ` (${info.text})` : '')
-              : vscode.l10n.t('The turn ended with an error.{0}', info.text ? ` ${info.text}` : '');
+              ? t('Connection was unstable — the turn may be incomplete. Send again if needed.{0}', info.text ? ` (${info.text})` : '')
+              : t('The turn ended with an error.{0}', info.text ? ` ${info.text}` : '');
         this.post({ kind: 'error', message }, tabId);
         this.updateStatusBar(this.anyBusy());
       },
@@ -548,17 +510,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (!this.daemon.socketExists()) {
       if (!this.daemonWarned) {
         this.daemonWarned = true;
-        const install = vscode.l10n.t('Install daemon');
-        void vscode.window
-          .showWarningMessage(
-            vscode.l10n.t(
-              'cockpit-daemon is not running ({0}). Claude cannot run until it is: install or start it.',
-              socketPath,
-            ),
+        const install = t('Install daemon');
+        void this.host
+          .notify(
+            'warning',
+            t('cockpit-daemon is not running ({0}). Claude cannot run until it is: install or start it.', socketPath),
             install,
           )
           .then((pick) => {
-            if (pick === install) void vscode.commands.executeCommand('cockpitDaemon.daemon.install');
+            if (pick === install) this.host.installDaemon();
           });
       }
     }
@@ -1264,7 +1224,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private workspaceCwd(): string {
-    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+    return this.host.workspaceRoot() ?? process.cwd();
   }
 
   /**
@@ -1287,7 +1247,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const body = plan.endsWith('\n') ? plan : plan + '\n';
       const recent = findRecentPlan(dir, body);
       if (recent) {
-        openPlanDoc(vscode.Uri.file(recent));
+        this.host.openQuietly(recent);
         return path.relative(root, recent).split(path.sep).join('/');
       }
 
@@ -1301,7 +1261,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       fs.writeFileSync(abs, body, 'utf8');
 
       // Open it without stealing focus from the approval card the user is about to act on.
-      openPlanDoc(vscode.Uri.file(abs));
+      this.host.openQuietly(abs);
 
       return path.relative(root, abs).split(path.sep).join('/');
     } catch (e) {
@@ -1330,7 +1290,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private async openLink(href: string, preview = false): Promise<void> {
     if (!href) return;
     if (/^https?:\/\//i.test(href)) {
-      void vscode.env.openExternal(vscode.Uri.parse(href));
+      this.host.openExternal(href);
       return;
     }
     let raw = href;
@@ -1350,47 +1310,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     raw = raw.normalize('NFC');
 
     const abs = path.isAbsolute(raw) ? raw : path.join(this.workspaceCwd(), raw);
-    let uri = vscode.Uri.file(abs);
+    let file = abs;
 
     if (!fs.existsSync(abs)) {
       // fallback: looks for the file name in the workspace
       const base = path.basename(raw);
       const safe = base.replace(/[*?[\]{}]/g, '');
-      const found = safe
-        ? await vscode.workspace.findFiles(`**/${safe}`, '**/node_modules/**', 1)
-        : [];
-      if (found.length) uri = found[0];
+      const found = safe ? await this.host.findFiles(`**/${safe}`, '**/node_modules/**', 1) : [];
+      if (found.length) file = found[0];
       else {
-        void vscode.window.showWarningMessage(vscode.l10n.t('File not found: {0}', base));
+        void this.host.notify('warning', t('File not found: {0}', base));
         return;
       }
     }
 
     // Preview mode ("View" link): markdown -> native preview, unless the user chose an editor for
-    // Markdown files (workbench.editorAssociations): then their choice opens it. VS Code itself
-    // falls back to the text editor when that editor does not exist in this version. The rest ->
-    // default opener.
+    // Markdown files; the rest -> default opener (see EditorHost.previewFile).
     if (preview) {
-      const cmd =
-        /\.(md|markdown)$/i.test(uri.fsPath) && !hasMarkdownAssociation() ? 'markdown.showPreview' : 'vscode.open';
-      try {
-        await vscode.commands.executeCommand(cmd, uri);
-      } catch {
-        void vscode.commands.executeCommand('vscode.open', uri);
-      }
+      await this.host.previewFile(file);
       return;
     }
 
     try {
-      const doc = await vscode.workspace.openTextDocument(uri);
-      const editor = await vscode.window.showTextDocument(doc, { preview: true });
-      if (line) {
-        const pos = new vscode.Position(Math.max(0, line - 1), 0);
-        editor.selection = new vscode.Selection(pos, pos);
-        editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
-      }
+      await this.host.openFile(file, { line });
     } catch {
-      void vscode.window.showWarningMessage(vscode.l10n.t('File not found: {0}', raw));
+      void this.host.notify('warning', t('File not found: {0}', raw));
     }
   }
 
@@ -1731,7 +1675,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           {
             kind: 'engineNotice',
             id: `remote-fail:${Date.now()}`,
-            text: vscode.l10n.t('Remote Control did not start: {0}', r.error ?? ''),
+            text: t('Remote Control did not start: {0}', r.error ?? ''),
             topic: 'remote_control',
           },
           tabId,
@@ -1743,11 +1687,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           kind: 'engineNotice',
           id: `remote:${Date.now()}`,
           text: on
-            ? vscode.l10n.t(
+            ? t(
                 'Remote Control is on: open {0} on your phone or at claude.ai/code. This conversation stays open in every window.',
                 r.url ?? '',
               )
-            : vscode.l10n.t('Remote Control is off.'),
+            : t('Remote Control is off.'),
           topic: 'remote_control',
         },
         tabId,
@@ -1996,7 +1940,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       if (mode === 'ai') {
         const gen = markdown ? await this.generateDocAI(tabId, markdown) : undefined;
         if (!gen) {
-          void vscode.window.showErrorMessage(
+          void this.host.notify(
+            'error',
             pt ? 'Falha ao gerar o documento com IA.' : 'Failed to generate the document with AI.',
           );
           return;
@@ -2007,7 +1952,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // there is nothing to write — never fall back to the markdown, which would silently
         // hand the user a different format than the one requested.
         if (!html) {
-          void vscode.window.showErrorMessage(
+          void this.host.notify(
+            'error',
             pt ? 'Falha ao capturar a timeline.' : 'Failed to capture the timeline.',
           );
           return;
@@ -2016,11 +1962,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
       const fallback = mode === 'ai' ? 'conversa.md' : 'conversa.html';
       const target = uniqueFilePath(path.join(this.workspaceCwd(), fileName || fallback));
-      await vscode.workspace.fs.writeFile(vscode.Uri.file(target), Buffer.from(content, 'utf8'));
-      await vscode.window.showTextDocument(vscode.Uri.file(target), { preview: false });
+      await fs.promises.writeFile(target, content, 'utf8');
+      await this.host.openFile(target, { preview: false });
     } catch (e) {
       log(`exportConversation: ${String(e)}`);
-      void vscode.window.showErrorMessage(pt ? 'Falha ao exportar a conversa.' : 'Failed to export the conversation.');
+      void this.host.notify('error', pt ? 'Falha ao exportar a conversa.' : 'Failed to export the conversation.');
     }
   }
 
@@ -2042,14 +1988,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const useShell = process.platform === 'win32';
     const exe = useShell && /\s/.test(this.claudePath()) ? `"${this.claudePath()}"` : this.claudePath();
 
-    return Promise.resolve(vscode.window.withProgress<string | undefined>(
-      { location: vscode.ProgressLocation.Notification, title: this.docProgressTitle(model, effort), cancellable: true },
-      (_p, token) =>
+    return Promise.resolve(this.host.withProgress<string | undefined>(
+      this.docProgressTitle(model, effort),
+      (progress) =>
         new Promise((resolve) => {
           let out = '';
           const proc = spawn(exe, args, { cwd: this.workspaceCwd(), env: process.env, shell: useShell });
           const killer = setTimeout(() => { try { proc.kill(); } catch { /* noop */ } }, 180_000);
-          token.onCancellationRequested(() => { try { proc.kill(); } catch { /* noop */ } });
+          progress.onCancel(() => { try { proc.kill(); } catch { /* noop */ } });
           try {
             proc.stdin?.write(prompt);
             proc.stdin?.end();
@@ -2062,6 +2008,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             resolve(extractCliResult(out));
           });
         }),
+      { cancellable: true },
     ));
   }
 
@@ -2170,18 +2117,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const fp = (input as { file_path?: unknown })?.file_path;
     if (typeof fp !== 'string' || !fp) return;
     const abs = path.isAbsolute(fp) ? fp : path.join(this.workspaceCwd(), fp);
-    for (const doc of vscode.workspace.textDocuments) {
-      if (doc.isDirty && doc.uri.fsPath === abs) {
-        void doc.save();
-        return;
-      }
-    }
+    this.host.saveIfDirty(abs);
   }
-
-  // Virtual content (the "proposed" side) of the native diff, per URI.
-  private diffContent = new Map<string, string>();
-  private diffProviderReg?: vscode.Disposable;
-  private diffSeq = 0;
 
   /** Abre o diff proposto (Edit/Write/MultiEdit) no diff nativo do VS Code. */
   private async openNativeDiff(tool: string, input: unknown): Promise<void> {
@@ -2204,24 +2141,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         newText = newText.split(str(e.old_string)).join(str(e.new_string));
       }
     }
-    // Provider lazy do esquema virtual p/ o lado "proposto".
-    if (!this.diffProviderReg) {
-      this.diffProviderReg = vscode.workspace.registerTextDocumentContentProvider('cockpit-diff', {
-        provideTextDocumentContent: (uri) => this.diffContent.get(uri.toString()) ?? '',
-      });
-    }
     const fileExists = fs.existsSync(abs);
-    const rightUri = vscode.Uri.parse(`cockpit-diff:/${this.diffSeq++}/${path.basename(abs)}`);
-    this.diffContent.set(rightUri.toString(), newText);
-    const leftUri = fileExists
-      ? vscode.Uri.file(abs)
-      : (() => {
-          const u = vscode.Uri.parse(`cockpit-diff:/${this.diffSeq++}/old-${path.basename(abs)}`);
-          this.diffContent.set(u.toString(), oldText);
-          return u;
-        })();
     const title = `${path.basename(abs)} — proposed (${tool})`;
-    await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
+    await this.host.showDiff(fileExists ? { path: abs } : { text: oldText }, { text: newText }, abs, title);
   }
 
   /**
@@ -2249,9 +2171,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Arquivos do workspace.
     try {
       const glob = query ? `**/*${query.replace(/[^\w./-]/g, '')}*` : '**/*';
-      const uris = await vscode.workspace.findFiles(glob, '**/node_modules/**', 30);
-      const files = uris
-        .map((u) => vscode.workspace.asRelativePath(u, false))
+      const found = await this.host.findFiles(glob, '**/node_modules/**', 30);
+      const files = found
+        .map((f) => this.host.relativePath(f))
         .sort((a, b) => a.length - b.length)
         .map((label): MentionItem => ({ label, kind: 'file' }));
       items.push(...files);
@@ -2269,7 +2191,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const order = [this.activeTab, ...this.sessions.keys()];
     const tabId = order.find((id) => id && this.sessions.get(id)?.hasPendingPrompt());
     if (!tabId) {
-      void vscode.window.showInformationMessage(vscode.l10n.t('No prompt is waiting for an answer.'));
+      void this.host.notify('info', t('No prompt is waiting for an answer.'));
       return;
     }
     this.openSessionPanel(tabId);
@@ -2299,13 +2221,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     setTimeout(() => {
       const session = this.sessions.get(tabId);
       if (!session?.hasPendingPermission(p.requestId) || this.chatInView(tabId)) return;
-      const allow = vscode.l10n.t('Allow');
-      const always = vscode.l10n.t('Always allow');
-      const deny = vscode.l10n.t('Deny');
+      const allow = t('Allow');
+      const always = t('Always allow');
+      const deny = t('Deny');
       this.permissionNotices.add(p.requestId);
-      void vscode.window
-        .showWarningMessage(
-          vscode.l10n.t('Claude wants to use {0}: {1}', p.title, p.detail),
+      void this.host
+        .notify(
+          'warning',
+          t('Claude wants to use {0}: {1}', p.title, p.detail),
           ...(p.canAlways ? [allow, always, deny] : [allow, deny]),
         )
         .then((pick) => {
@@ -2320,7 +2243,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /** The request was answered or withdrawn: take its notification down. */
   private closePermissionNotice(requestId: string): void {
     if (this.permissionNotices.delete(requestId)) {
-      void vscode.commands.executeCommand('notifications.hideToasts');
+      this.host.hideNotifications();
     }
   }
 
@@ -2329,7 +2252,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Notifies when no chat panel is visible.
     for (const p of this.panels.values()) if (p.visible) return;
     if (this.chatView?.visible) return;
-    void vscode.window.showInformationMessage(vscode.l10n.t('Claude finished responding.'));
+    void this.host.notify('info', t('Claude finished responding.'));
   }
 
   private renameSession(id: string, name: string): void {
@@ -2597,28 +2520,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   async setApiKeyInteractive(): Promise<void> {
     if (!this.secrets) {
-      void vscode.window.showWarningMessage(
-        vscode.l10n.t('SecretStorage unavailable — cannot store the API key on this host.'),
-      );
+      void this.host.notify('warning', t('SecretStorage unavailable — cannot store the API key on this host.'));
       return;
     }
     const current = await this.getApiKey();
-    const value = await vscode.window.showInputBox({
-      title: vscode.l10n.t('Anthropic API key (model discovery)'),
-      prompt: vscode.l10n.t('Stored encrypted in the OS keychain. Leave empty to remove.'),
+    const value = await this.host.inputBox({
+      title: t('Anthropic API key (model discovery)'),
+      prompt: t('Stored encrypted in the OS keychain. Leave empty to remove.'),
       password: true,
       value: current,
-      ignoreFocusOut: true,
-      placeHolder: 'sk-ant-…',
+      placeholder: 'sk-ant-…',
     });
     if (value === undefined) return; // cancelou
     const trimmed = value.trim();
     if (trimmed) {
       await this.secrets.store(API_KEY_SECRET, trimmed);
-      void vscode.window.showInformationMessage(vscode.l10n.t('API key saved to the OS keychain.'));
+      void this.host.notify('info', t('API key saved to the OS keychain.'));
     } else {
       await this.secrets.delete(API_KEY_SECRET);
-      void vscode.window.showInformationMessage(vscode.l10n.t('API key removed.'));
+      void this.host.notify('info', t('API key removed.'));
     }
     this.refreshModels();
   }
@@ -2626,7 +2546,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /** Remove a API key do SecretStorage. Comando `cockpitDaemon.clearApiKey`. */
   async clearApiKey(): Promise<void> {
     if (this.secrets) await this.secrets.delete(API_KEY_SECRET);
-    void vscode.window.showInformationMessage(vscode.l10n.t('API key removed.'));
+    void this.host.notify('info', t('API key removed.'));
     this.refreshModels();
   }
 
@@ -2647,10 +2567,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const newDefault = inspected?.defaultValue ?? '';
       // Rewrite only the scopes whose EXPLICIT value is the old default (an untouched user has
       // no explicit value at all — that one already gets the new default for free).
-      const scopes: Array<[string | undefined, vscode.ConfigurationTarget]> = [
-        [inspected?.globalValue, vscode.ConfigurationTarget.Global],
-        [inspected?.workspaceValue, vscode.ConfigurationTarget.Workspace],
-        [inspected?.workspaceFolderValue, vscode.ConfigurationTarget.WorkspaceFolder],
+      const scopes: Array<[string | undefined, 'global' | 'workspace' | 'folder']> = [
+        [inspected?.global, 'global'],
+        [inspected?.workspace, 'workspace'],
+        [inspected?.folder, 'folder'],
       ];
       for (const [value, target] of scopes) {
         if (value === OLD_DEFAULT) {
@@ -2677,9 +2597,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
       // Cleared from all 3 scopes so no plain-text trace is left.
       const cfg = this.cfg();
-      await cfg.update('apiKey', undefined, vscode.ConfigurationTarget.Global);
-      await cfg.update('apiKey', undefined, vscode.ConfigurationTarget.Workspace);
-      await cfg.update('apiKey', undefined, vscode.ConfigurationTarget.WorkspaceFolder);
+      await cfg.update('apiKey', undefined, 'global');
+      await cfg.update('apiKey', undefined, 'workspace');
+      await cfg.update('apiKey', undefined, 'folder');
       log('[apiKey] migrada da setting p/ SecretStorage; setting removida');
       this.refreshModels();
     } catch (e) {
@@ -2751,10 +2671,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
       for (const [id, other] of this.sessions) {
         if (id !== tabId && other.engine() === 'tootega') {
-          void vscode.window.showWarningMessage(
-            vscode.l10n.t(
-              'Only one Tootega tab at a time: the local server answers one request at a time and keeps a single cache.',
-            ),
+          void this.host.notify(
+            'warning',
+            t('Only one Tootega tab at a time: the local server answers one request at a time and keeps a single cache.'),
           );
           this.sendConfig();
           return;
@@ -2915,7 +2834,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // The OS clipboard is the one of the machine this host runs on. Over Remote-SSH or in
         // a browser (code-server) that is not where you copied, so the paste's own content
         // (the webview's fallback) is the only right answer there.
-        const local = !vscode.env.remoteName && vscode.env.uiKind !== vscode.UIKind.Web;
+        const local = this.host.isLocalUi();
         const paths = local ? readClipboardFiles() : [];
         this.post({
           kind: 'resolvedPath',
@@ -3008,7 +2927,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // The last choice is where new conversations start. Not Bypass: a new chat that
         // silently skips every permission prompt is too easy to miss.
         if (m.mode !== 'bypassPermissions' && PERMISSION_MODES.includes(m.mode)) {
-          void this.cfg().update('permissionMode', m.mode, vscode.ConfigurationTarget.Global);
+          void this.cfg().update('permissionMode', m.mode, 'global');
         }
         this.sendConfig();
         break;
@@ -3017,13 +2936,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Pins the current model/effort to a mode for every conversation (user setting).
         if (!PERMISSION_MODES.includes(m.mode)) break;
         const pins = { ...this.modePins(), [m.mode]: { model: m.model, effort: m.effort } };
-        void this.cfg().update('modePins', pins, vscode.ConfigurationTarget.Global).then(() => this.sendConfig());
+        void this.cfg().update('modePins', pins, 'global').then(() => this.sendConfig());
         break;
       }
       case 'unpinMode': {
         const pins = { ...this.modePins() };
         delete pins[m.mode];
-        void this.cfg().update('modePins', pins, vscode.ConfigurationTarget.Global).then(() => this.sendConfig());
+        void this.cfg().update('modePins', pins, 'global').then(() => this.sendConfig());
         break;
       }
       case 'setEngine':
@@ -3094,7 +3013,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'openSettings':
         // Single entry point: the command resolves the extension id from the manifest.
-        void vscode.commands.executeCommand('cockpitDaemon.settings');
+        this.host.openSettings();
         break;
       case 'openLink':
         void this.openLink(m.href, m.preview);
@@ -3103,7 +3022,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.installCli();
         break;
       case 'daemonInstall':
-        void vscode.commands.executeCommand('cockpitDaemon.daemon.install');
+        this.host.installDaemon();
         break;
       case 'updateCli':
         this.updateCli();
@@ -3152,7 +3071,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'openFolder':
         // Abre a pasta no gerenciador de arquivos do SO (Explorer/Finder).
-        void vscode.env.openExternal(vscode.Uri.file(m.path));
+        this.host.openPath(m.path);
         break;
       case 'saveImage':
         void this.saveImage(m.mediaType, m.data);
@@ -3219,11 +3138,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const r = enableUsageTracking(this.memory);
         const msg =
           r === 'ok'
-            ? vscode.l10n.t('Usage tracking enabled. Real limits appear after Claude refreshes the statusline.')
+            ? t('Usage tracking enabled. Real limits appear after Claude refreshes the statusline.')
             : r === 'unsupported'
-              ? vscode.l10n.t('Live usage tracking is only available on Windows for now.')
-              : vscode.l10n.t('Could not enable usage tracking (settings.json could not be updated).');
-        void vscode.window.showInformationMessage(msg);
+              ? t('Live usage tracking is only available on Windows for now.')
+              : t('Could not enable usage tracking (settings.json could not be updated).');
+        void this.host.notify('info', msg);
         void this.sendUsage(); // reflete o novo estado de tracking no modal
         break;
       }
@@ -3244,7 +3163,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const tab = this.activeTab;
     const store = this.creds;
     if (!store) {
-      this.post({ kind: 'credsError', message: vscode.l10n.t('Secret storage is unavailable.') }, tab);
+      this.post({ kind: 'credsError', message: t('Secret storage is unavailable.') }, tab);
       return;
     }
     const sendData = async () => {
@@ -3335,17 +3254,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private async saveImage(mediaType: string, data: string): Promise<void> {
     const ext = (mediaType.split('/')[1] || 'png').replace('+xml', '').replace('jpeg', 'jpg');
     const def = `image-${Date.now()}.${ext}`;
-    const uri = await vscode.window.showSaveDialog({
-      defaultUri: vscode.Uri.file(path.join(this.workspaceCwd(), def)),
-      filters: { [vscode.l10n.t('Images')]: [ext] },
+    const target = await this.host.saveDialog({
+      defaultPath: path.join(this.workspaceCwd(), def),
+      filters: { [t('Images')]: [ext] },
     });
-    if (!uri) return; // the user cancelled
+    if (!target) return; // the user cancelled
     try {
-      fs.writeFileSync(uri.fsPath, Buffer.from(data, 'base64'));
+      fs.writeFileSync(target, Buffer.from(data, 'base64'));
     } catch (e) {
-      void vscode.window.showErrorMessage(
-        vscode.l10n.t('Failed to save image: {0}', String(e)),
-      );
+      void this.host.notify('error', t('Failed to save image: {0}', String(e)));
     }
   }
 
@@ -3365,7 +3282,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private cfg() {
-    return vscode.workspace.getConfiguration('cockpitDaemon');
+    return settings();
   }
 
   // Resolved path per engine: with tabs on different engines, both binaries
@@ -3438,8 +3355,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         timeout: 8000,
       });
       log(`Added to user PATH: ${bin}`);
-      void vscode.window.showInformationMessage(
-        vscode.l10n.t('Added Claude to your PATH: {0}. Restart open terminals to use it.', bin),
+      void this.host.notify('info', 
+        t('Added Claude to your PATH: {0}. Restart open terminals to use it.', bin),
       );
     } catch (e) {
       log(`PATH update failed: ${String(e)}`);
@@ -3456,9 +3373,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     const before = CliProcessManager.resolve(enginePath(), currentEngine()).version;
-    const term = vscode.window.createTerminal('Claude Update');
-    term.show();
-    term.sendText(`${this.claudeCmd()} update`);
+    this.host.runInTerminal('Claude Update', `${this.claudeCmd()} update`);
     this.pollForCliUpdate(before);
   }
 
@@ -3479,8 +3394,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.cliUpdatePoll = undefined;
         if (changed) {
           this.reportCliStatus();
-          void vscode.window.showInformationMessage(
-            vscode.l10n.t('Claude Code CLI detected: {0}', r.version ?? ''),
+          void this.host.notify('info', 
+            t('Claude Code CLI detected: {0}', r.version ?? ''),
           );
         }
       }
@@ -3504,11 +3419,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // and the bare name then fails although the CLI is installed (resolve also probes there).
     const path = this.cfg().get<string>('claudePath', 'claude');
     if (CliProcessManager.resolve(path).ok) return;
-    const download = vscode.l10n.t('Download');
-    const installer = vscode.l10n.t('Use the official installer');
-    const docs = vscode.l10n.t('Documentation');
-    const pick = await vscode.window.showWarningMessage(
-      vscode.l10n.t(
+    const download = t('Download');
+    const installer = t('Use the official installer');
+    const docs = t('Documentation');
+    const pick = await this.host.notify('warning', 
+      t(
         'Claude Code CLI not found. Cockpit can keep its own copy (about 230 MB, downloaded from Anthropic and checked against its published checksum).',
       ),
       download,
@@ -3518,9 +3433,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (pick === download) this.installCli();
     else if (pick === installer) this.installCliInTerminal();
     else if (pick === docs) {
-      void vscode.env.openExternal(
-        vscode.Uri.parse('https://docs.claude.com/en/docs/claude-code/overview'),
-      );
+      this.host.openExternal('https://docs.claude.com/en/docs/claude-code/overview');
     }
   }
 
@@ -3536,12 +3449,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   private async downloadManagedCli(update: boolean): Promise<void> {
     try {
-      const result = await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: update ? vscode.l10n.t('Updating Claude Code CLI…') : vscode.l10n.t('Downloading Claude Code CLI…'),
-          cancellable: false,
-        },
+      const result = await this.host.withProgress(
+        update ? t('Updating Claude Code CLI…') : t('Downloading Claude Code CLI…'),
         async (progress) => {
           let last = 0;
           return installManaged({
@@ -3549,7 +3458,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
               if (!total) return;
               const pct = Math.floor((done / total) * 100);
               if (pct > last) {
-                progress.report({ increment: pct - last, message: `${pct}%` });
+                progress.report(pct - last, `${pct}%`);
                 last = pct;
               }
             },
@@ -3558,15 +3467,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       );
       log(`[cli] managed copy ${result.changed ? 'installed' : 'already current'}: ${result.version} @ ${result.path}`);
       this.reportCliStatus();
-      void vscode.window.showInformationMessage(
-        vscode.l10n.t('Claude Code CLI {0} is ready (kept in {1}).', result.version, managedRoot()),
+      void this.host.notify('info', 
+        t('Claude Code CLI {0} is ready (kept in {1}).', result.version, managedRoot()),
       );
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       log(`[cli] managed download failed: ${message}`);
-      const installer = vscode.l10n.t('Use the official installer');
-      const pick = await vscode.window.showErrorMessage(
-        vscode.l10n.t('Could not download Claude Code CLI: {0}', message),
+      const installer = t('Use the official installer');
+      const pick = await this.host.notify('error', 
+        t('Could not download Claude Code CLI: {0}', message),
         installer,
       );
       if (pick === installer) this.installCliInTerminal();
@@ -3575,17 +3484,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** The official installer in a terminal (installs for the user under ~/.local). */
   private installCliInTerminal(): void {
-    const term = vscode.window.createTerminal('Claude Code · install');
-    term.show();
     // Official NATIVE installer: it doesn't depend on Node/npm (solves the "npm not
     // recognized" case). It brings Claude Code's own runtime.
     const cmd =
       process.platform === 'win32'
         ? 'powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://claude.ai/install.ps1 | iex"'
         : 'curl -fsSL https://claude.ai/install.sh | bash';
-    term.sendText(cmd);
-    void vscode.window.showInformationMessage(
-      vscode.l10n.t('Installing Claude Code CLI… it will be detected automatically when ready.'),
+    this.host.runInTerminal('Claude Code · install', cmd);
+    void this.host.notify('info', 
+      t('Installing Claude Code CLI… it will be detected automatically when ready.'),
     );
     this.pollForCli();
   }
@@ -3600,8 +3507,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         clearInterval(iv);
         if (r.ok) {
           this.reportCliStatus(); // validates + restores version/latest in the Cockpit
-          void vscode.window.showInformationMessage(
-            vscode.l10n.t('Claude Code CLI detected: {0}', r.version ?? ''),
+          void this.host.notify('info', 
+            t('Claude Code CLI detected: {0}', r.version ?? ''),
           );
         }
       }
@@ -3614,22 +3521,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * to open the REPL or type /login. The Cockpit never touches credentials.
    */
   loginCli(): void {
-    const term = vscode.window.createTerminal('Claude Code · login');
-    term.show();
-    term.sendText(`${this.claudeCmd()} auth login`); // abre OAuth no browser; --console p/ API billing
-    void vscode.window.showInformationMessage(
-      vscode.l10n.t('Signing in via your browser. Approve the request, then click "Re-check".'),
+    this.host.runInTerminal('Claude Code · login', `${this.claudeCmd()} auth login`); // abre OAuth no browser; --console p/ API billing
+    void this.host.notify('info', 
+      t('Signing in via your browser. Approve the request, then click "Re-check".'),
     );
     this.scheduleAuthRefresh(); // the flow is asynchronous in the terminal: re-check right after
   }
 
   /** Native CLI logout (`claude auth logout`) in a terminal. The Cockpit never touches credentials. */
   logoutCli(): void {
-    const term = vscode.window.createTerminal('Claude Code · logout');
-    term.show();
-    term.sendText(`${this.claudeCmd()} auth logout`);
-    void vscode.window.showInformationMessage(
-      vscode.l10n.t('Signing out in the terminal. Use Sign in when you want to log back in.'),
+    this.host.runInTerminal('Claude Code · logout', `${this.claudeCmd()} auth logout`);
+    void this.host.notify('info', 
+      t('Signing out in the terminal. Use Sign in when you want to log back in.'),
     );
     this.scheduleAuthRefresh();
   }
@@ -3730,7 +3633,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
   <div id="root"></div>
-  <script nonce="${nonce}">window.__TOOTEGA_VIEW__ = ${JSON.stringify(mode)}; window.__TOOTEGA_SESSION__ = ${JSON.stringify(sessionTab ?? '')}; window.__TOOTEGA_REGION__ = ${JSON.stringify(viewRegionLocale())}; window.__TOOTEGA_ICON__ = ${JSON.stringify(iconUri.toString())};</script>
+  <script nonce="${nonce}">window.__TOOTEGA_VIEW__ = ${JSON.stringify(mode)}; window.__TOOTEGA_SESSION__ = ${JSON.stringify(sessionTab ?? '')}; window.__TOOTEGA_REGION__ = ${JSON.stringify(viewRegionLocale(this.host.isWebUi()))}; window.__TOOTEGA_ICON__ = ${JSON.stringify(iconUri.toString())};</script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
@@ -3878,21 +3781,6 @@ function extractCliResult(out: string): string | undefined {
   return stripWrappingFence(trimmed);
 }
 
-/** Opens a saved plan without taking focus, in the editor the user chose for Markdown (else text). */
-function openPlanDoc(uri: vscode.Uri): void {
-  if (hasMarkdownAssociation()) {
-    void vscode.commands.executeCommand('vscode.open', uri, { preview: true, preserveFocus: true });
-  } else {
-    void vscode.window.showTextDocument(uri, { preview: true, preserveFocus: true });
-  }
-}
-
-/** The user picked an editor for Markdown files (`*.md`, `*.{md,…}`) in workbench.editorAssociations. */
-function hasMarkdownAssociation(): boolean {
-  const assoc = vscode.workspace.getConfiguration('workbench').get<Record<string, string>>('editorAssociations') ?? {};
-  return Object.keys(assoc).some((k) => /(^|[*{,.])(md|markdown)([,}]|$)/.test(k));
-}
-
 /** Removes a code fence wrapping the whole document (```markdown … ```). */
 function stripWrappingFence(s: string): string {
   const m = s.match(/^```[a-zA-Z]*\n([\s\S]*?)\n```$/);
@@ -3960,8 +3848,8 @@ function osRegionLocale(): string {
  *     machine, but a desktop webview only gets VS Code's display language, no region, so this is
  *     the best there is; `cockpitDaemon.dateLocale` overrides it.
  */
-function viewRegionLocale(): string {
-  const set = (vscode.workspace.getConfiguration('cockpitDaemon').get<string>('dateLocale') ?? '').trim();
+function viewRegionLocale(webUi: boolean): string {
+  const set = (settings().get<string>('dateLocale', '') ?? '').trim();
   if (set) {
     try {
       new Intl.DateTimeFormat(set);
@@ -3970,7 +3858,7 @@ function viewRegionLocale(): string {
       /* not a valid locale: ignore it */
     }
   }
-  if (vscode.env.uiKind === vscode.UIKind.Web) return '';
+  if (webUi) return '';
   return osRegionLocale();
 }
 

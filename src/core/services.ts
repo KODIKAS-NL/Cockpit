@@ -5,6 +5,7 @@ import type { Localizer, Settings } from './host';
 const defaultSettings: Settings = {
   get: (_key, fallback) => fallback,
   update: () => Promise.resolve(),
+  inspect: () => undefined,
 };
 
 const format = (message: string, args: Array<string | number | boolean>): string =>
@@ -31,3 +32,7 @@ export function setLocalizer(l: Localizer): void {
 export function localizer(): Localizer {
   return currentLocalizer;
 }
+
+/** Shorthand for the host's translator. */
+export const t = (message: string, ...args: Array<string | number | boolean>): string =>
+  currentLocalizer.t(message, ...args);
