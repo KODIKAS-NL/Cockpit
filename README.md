@@ -2,7 +2,7 @@
 
 *by KODIKAS*
 
-**Install:** [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=KODIKAS-NL.cockpit-claude-code-daemon) · [Open VSX](https://open-vsx.org/extension/KODIKAS-NL/cockpit-claude-code-daemon) (code-server, VSCodium, Cursor)
+**Install:** [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=KODIKAS-NL.cockpit-claude-code-daemon) · [Open VSX](https://open-vsx.org/extension/KODIKAS-NL/cockpit-claude-code-daemon) (code-server, VSCodium, Cursor) · [JetBrains Rider](https://github.com/KODIKAS-NL/Cockpit/releases) (plugin zip, see [Docs/jetbrains.md](Docs/jetbrains.md))
 
 Cockpit keeps your Claude Code conversations running when your window goes away. A small background
 service, the daemon, owns the `claude` process, so you can start a task on one device, continue it on
@@ -140,6 +140,15 @@ The full list is in [Docs/features.md](Docs/features.md), and
 With `cockpitDaemon.autoResumeLastSession` on (the default), opening a folder resumes its most recent
 session.
 
+## JetBrains Rider
+
+The same Cockpit also runs as a plugin for **JetBrains Rider 2026.2**, locally or through Remote
+Development (JetBrains Client on a laptop, Rider backend on the machine that holds the code and the
+daemon). Download `cockpit-<version>.zip` from the
+[GitHub releases](https://github.com/KODIKAS-NL/Cockpit/releases) (tags `rider-v…`) and install it
+with Settings, Plugins, Install Plugin from Disk. It needs Node.js 20 or newer on the machine that
+holds the code. Install, SSH keys, connecting and troubleshooting: [Docs/jetbrains.md](Docs/jetbrains.md).
+
 ## Using it from other devices
 
 [Docs/remote-setup.md](Docs/remote-setup.md) walks through the setup: the host Mac, a laptop with
@@ -150,6 +159,7 @@ Remote-SSH, and a tablet with code-server behind HTTPS.
 - [Features](Docs/features.md): what each part does.
 - [Comparison with the official extension](Docs/comparison.md)
 - [Settings, commands and shortcuts](Docs/settings.md)
+- [Rider plugin](Docs/jetbrains.md): install, Remote Development, building.
 - [Daemon mode](Docs/daemon-mode.md) and [Using it from other devices](Docs/remote-setup.md)
 - [Development](Docs/development.md): architecture, building, the event protocol, contributing.
 - [FAQ](Docs/FAQ.md), [implementation status](Docs/implementation-status.md) and the
