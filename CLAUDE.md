@@ -248,6 +248,7 @@ claude -p --output-format stream-json --input-format stream-json --include-parti
 | Path | What is there |
 |------|---------------|
 | `src/core/` | The editor-neutral core (`CockpitCore`, `HostCommands`, `EditorHost` and the other host interfaces, `Surfaces`); never imports `vscode` (guarded by `test/coreBoundary.test.ts`) |
+| `jetbrains/` | The Rider plugin (Kotlin, split into `shared`, `frontend`, `backend` modules); see `Docs/jetbrains.md` |
 | `src/sidecar/` | `cockpit-sidecar` (`dist/sidecar.js`): the core run in Node for an IDE plugin (Rider). The plugin talks to it over stdio JSON-RPC, and the chat UI over a WebSocket |
 | `src/vscode/`, `src/extension.ts` | The VS Code adapter: `ChatViewProvider` (views, panels, status bar, watchdog), `VsCodeHost`, `ScratchpadPanel`, and the extension entry |
 | `src/session/` | `Session` (one conversation's runtime in a window), `SessionStore` (transcripts) |
@@ -297,6 +298,7 @@ mac/CockpitDaemon/scripts/build-app.sh [--install]   # the macOS app
 
 - [README.md](README.md) — what the extension is and how to start.
 - [Docs/daemon-mode.md](Docs/daemon-mode.md) — the daemon: pieces, flows, wire protocol, operations.
+- [Docs/jetbrains.md](Docs/jetbrains.md) — the Rider plugin: install, remote development, build.
 - [Docs/remote-setup.md](Docs/remote-setup.md) — Remote-SSH, code-server and phone setup.
 - [Docs/features.md](Docs/features.md) — what is implemented, partial or planned.
 - [Docs/settings.md](Docs/settings.md) — settings, commands, shortcuts, slash commands.
