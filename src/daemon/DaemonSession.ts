@@ -67,6 +67,9 @@ const KEEPALIVE_BACKOFF_MS = [2000, 10_000, 30_000, 60_000];
 const KEEPALIVE_MAX_FAILURES = 5;
 const KEEPALIVE_HEALTHY_MS = 120_000;
 
+/** How long a finished background task may keep the session busy before a turn must have started. */
+const NOTICE_TURN_MS = 20_000;
+
 export class DaemonSession {
   readonly id: string;
   readonly cwd: string;
@@ -101,6 +104,8 @@ export class DaemonSession {
   private autoCompact: string;
   private remotePending = new Map<string, { client?: SessionClient; reqId?: string; on: boolean; attempt?: number }>();
   private resyncTimer?: ReturnType<typeof setTimeout>;
+  /** Guards the busy state a finished background task sets: no turn follows → it is cleared. */
+  private noticeTimer?: ReturnType<typeof setTimeout>;
   // Keep-alive under Remote Control (see keepAlive): the phone can only reach a running process.
   private disposed = false;
   private restartTimer?: ReturnType<typeof setTimeout>;
@@ -297,12 +302,18 @@ export class DaemonSession {
   dispose(): void {
     this.disposed = true;
     this.clearRestartTimer();
+    this.clearNoticeTimer();
     this.stop();
   }
 
   /** Tells every attached window the session is gone (forgotten), so none keeps sending to it. */
   announceGone(): void {
     this.broadcast({ type: 'gone', sessionId: this.id });
+  }
+
+  private clearNoticeTimer(): void {
+    if (this.noticeTimer) clearTimeout(this.noticeTimer);
+    this.noticeTimer = undefined;
   }
 
   private clearRestartTimer(): void {
@@ -428,6 +439,7 @@ export class DaemonSession {
 
   private onEvent(ev: Record<string, any>): void {
     this.lastActivity = Date.now();
+    if (ev.type === 'stream_event' || ev.type === 'assistant' || ev.type === 'user' || ev.type === 'result') this.clearNoticeTimer();
     switch (ev.type) {
       case 'control_response': {
         const requestId = String(ev.response?.request_id ?? '');
@@ -504,7 +516,19 @@ export class DaemonSession {
         }
         // A background task that finished opens a turn on its own.
         if (ev.subtype === 'task_notification' && (ev.status === 'completed' || ev.status === 'failed')) {
-          this.busy = true;
+          if (!this.busy) {
+            this.busy = true;
+            // The CLI answers it with a turn, but not always (it may have been read during a turn
+            // already). If no turn event shows up, the session is not busy: do not stay stuck.
+            this.clearNoticeTimer();
+            this.noticeTimer = setTimeout(() => {
+              this.noticeTimer = undefined;
+              if (!this.busy || this.unconsumed > 0) return;
+              this.hooks.log(`[${this.id}] busy after a task notification, but no turn followed: clearing`);
+              this.busy = false;
+              this.hooks.changed();
+            }, NOTICE_TURN_MS);
+          }
         }
         break;
       case 'stream_event':
@@ -548,6 +572,7 @@ export class DaemonSession {
     const deliberate = this.stopping;
     this.hooks.log(`[${this.id}] exit ${code}${deliberate ? ' (stopped)' : ''}`);
     this.proc = null;
+    this.clearNoticeTimer();
     this.busy = false;
     this.bgTasks = 0;
     this.unconsumed = 0;
