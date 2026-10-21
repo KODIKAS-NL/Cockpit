@@ -5,6 +5,7 @@
 #
 #   scripts/publish.sh                 # everything
 #   SKIP_DAEMON=1 scripts/publish.sh   # only the two extension registries
+#   ONLY_DAEMON=1 scripts/publish.sh   # only the daemon app and its GitHub release
 #
 # Needs: the .vsix of this version (npm run vsix), `gh` logged in, and for the daemon the Developer
 # ID certificate in your keychain and the notarytool profile `cockpit`
@@ -17,11 +18,13 @@ VSIX="cockpit-claude-code-daemon-$VERSION.vsix"
 [[ -f "$VSIX" ]] || { echo "$VSIX is missing: run npm run vsix first" >&2; exit 1; }
 echo "Publishing $VERSION"
 
-read -s "VSCE_PAT?Marketplace token: " && export VSCE_PAT && echo
-npm run publish:marketplace
+if [[ "${ONLY_DAEMON:-0}" != "1" ]]; then
+  read -s "VSCE_PAT?Marketplace token: " && export VSCE_PAT && echo
+  npm run publish:marketplace
 
-read -s "OVSX_PAT?Open VSX token: " && export OVSX_PAT && echo
-npm run publish:openvsx
+  read -s "OVSX_PAT?Open VSX token: " && export OVSX_PAT && echo
+  npm run publish:openvsx
+fi
 
 if [[ "${SKIP_DAEMON:-0}" != "1" ]]; then
   IDENTITY="$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' | head -1)"
