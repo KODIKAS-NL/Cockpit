@@ -38,3 +38,7 @@ HANDOFF.md
 Planing/**
 tmp-img/**
 .playwright-mcp/**
+
+# The Rider plugin ships separately (GitHub release), never inside the .vsix
+jetbrains/**
+.cockpit/**
