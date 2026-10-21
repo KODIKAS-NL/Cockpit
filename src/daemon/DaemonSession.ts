@@ -113,8 +113,11 @@ export class DaemonSession {
   private quickFailures = 0;
   /** A setting the CLI only reads at start changed mid-turn: restart once the turn is over. */
   private restartWhenIdle = false;
-  /** Background tasks the CLI reports running (a restart would kill them). */
-  private bgTasks = 0;
+  /**
+   * The background tasks the CLI reports running (a restart would kill them). The complete list,
+   * not just the count: a window that attaches gets it in the snapshot to reconcile with.
+   */
+  private bgTasks: unknown[] = [];
 
   constructor(data: PersistedSession, hooks: DaemonSessionHooks) {
     this.id = data.id;
@@ -151,7 +154,7 @@ export class DaemonSession {
     this.hooks.changed();
     this.broadcast({ type: 'autocompact_state', sessionId: this.id, value: v });
     if (!this.proc) return;
-    if (this.busy || this.bgTasks > 0) this.restartWhenIdle = true;
+    if (this.busy || this.bgTasks.length > 0) this.restartWhenIdle = true;
     else this.restart();
   }
 
@@ -208,6 +211,7 @@ export class DaemonSession {
       session: this.info(),
       partial: [...this.partial],
       pendingControl: [...this.pending.values()],
+      backgroundTasks: [...this.bgTasks],
     };
   }
 
@@ -512,7 +516,7 @@ export class DaemonSession {
           this.hooks.changed();
         }
         if (ev.subtype === 'background_tasks_changed') {
-          this.bgTasks = Array.isArray(ev.tasks) ? ev.tasks.length : 0;
+          this.bgTasks = Array.isArray(ev.tasks) ? ev.tasks : [];
         }
         // A background task that finished opens a turn on its own.
         if (ev.subtype === 'task_notification' && (ev.status === 'completed' || ev.status === 'failed')) {
@@ -564,7 +568,7 @@ export class DaemonSession {
       this.restartWhenIdle &&
       !this.busy &&
       this.pending.size === 0 &&
-      this.bgTasks === 0;
+      this.bgTasks.length === 0;
     if (settled) this.restart();
   }
 
@@ -574,7 +578,7 @@ export class DaemonSession {
     this.proc = null;
     this.clearNoticeTimer();
     this.busy = false;
-    this.bgTasks = 0;
+    this.bgTasks = [];
     this.unconsumed = 0;
     this.stopping = false;
     this.partial = [];

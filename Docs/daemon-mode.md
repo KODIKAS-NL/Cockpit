@@ -72,7 +72,9 @@ It does:
 - **Refuse overlapping turns.** While a turn is running, a new user message is not queued: the
   window that sent it gets a refusal, and the text goes back to its input box.
 - **Help late windows catch up.** A window attaching mid-turn gets a snapshot: the deltas of
-  the message being written right now and the prompts still waiting.
+  the message being written right now, the prompts still waiting, and the background tasks
+  running (the CLI only announces those when the list changes, so a window that was away
+  cannot learn them from the stream).
 - **Remember its sessions.** Across a restart or reboot, sessions are listed as idle and are
   resumed with `--resume` on the next message.
 - **Keep Remote Control reachable.** A session with Remote Control on always has a process:
@@ -107,7 +109,8 @@ It doesn't:
    `--resume` and the window's current arguments. Not found: it starts a new one.
 3. The daemon answers with a snapshot. The window has already painted the history from the
    transcript; it now replays the snapshot (message in progress, waiting prompts) without
-   repeating side effects such as writing the plan file again.
+   repeating side effects such as writing the plan file again, and reconciles its background
+   task list with the daemon's.
 4. From then on, the window receives the session's events live.
 
 When a window opens, its first tab attaches to the most recently active running

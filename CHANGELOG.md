@@ -43,6 +43,11 @@ and the project adopts semantic versioning.
   ended never saw the end of it and kept the busy state; it now clears it when the daemon says the session is
   not busy. The daemon itself could stay busy after a background task finished without a turn following; it
   now clears that state after 20 seconds without a turn. (The daemon app has to be rebuilt and reinstalled.)
+- **The background task indicator no longer keeps finished jobs (nor misses running ones).** The CLI only
+  announces background tasks when the list changes, so a window that was cut off (the socket dropped, the
+  laptop slept) missed both the ones that ended — leaving them in the badge until a window reload — and the
+  ones that started. The daemon now sends the complete list when a window attaches, and the window reconciles
+  against it. (The daemon app has to be rebuilt and reinstalled.)
 - **The selection reference goes away when its file is closed.** The `⧉ @file#a-b` chip above the prompt box
   stayed after the file's tab was closed, and after switching to another file. It now follows the active
   editor and drops when the file has no tab left (a focused chat tab does not clear it).

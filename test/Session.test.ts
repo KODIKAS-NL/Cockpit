@@ -359,6 +359,44 @@ describe('Session — background tasks', () => {
     started('task-2', 't2');
     expect(lists().pop()).toEqual(['task-2']);
   });
+
+  // The CLI only emits `background_tasks_changed` on a change: whatever happened while this
+  // window was cut off (the socket dropped, the laptop slept) is never re-sent. Without the
+  // snapshot's list the indicator keeps a finished task for ever — only a window reload cleared it.
+  const snapshot = (tasks?: unknown[], state: string = 'running') =>
+    spawns[0].emit('snapshot', {
+      session: { id: 'd1', state, cwd: '/w', cwdKey: 'w', pendingPrompts: 0, clients: 1, lastActivity: 0, createdAt: 0 },
+      partial: [],
+      pendingControl: [],
+      backgroundTasks: tasks,
+    });
+
+  it('reattaching drops a task that finished while the window was away', () => {
+    const { lists, toolUse, started, result } = setup();
+    toolUse('t1', { command: 'sleep 100' });
+    started('task-1', 't1');
+    result('t1');
+    expect(lists().pop()).toEqual(['task-1']);
+
+    snapshot([]);
+    expect(lists().pop()).toEqual([]);
+  });
+
+  it('reattaching picks up a task that started while the window was away', () => {
+    const { lists } = setup();
+    snapshot([{ task_id: 'task-9', task_type: 'local_bash', description: 'npm run watch' }]);
+    expect(lists().pop()).toEqual(['task-9']);
+  });
+
+  // The two ship separately: an older daemon sends no list, and `[]` would be a lie.
+  it('an older daemon (no list in the snapshot) leaves the tasks alone', () => {
+    const { lists, toolUse, started, result } = setup();
+    toolUse('t1', { command: 'sleep 100' });
+    started('task-1', 't1');
+    result('t1');
+    snapshot(undefined);
+    expect(lists().pop()).toEqual(['task-1']);
+  });
 });
 
 describe('Session — overrides de skills', () => {

@@ -62,6 +62,13 @@ export interface SessionSnapshot {
   /** `control_request`s from the CLI nobody has answered yet, in arrival order. */
   pendingControl: unknown[];
   /**
+   * The background tasks running right now: the `tasks` of the last `background_tasks_changed`.
+   * The CLI only emits that event on a change, so a window that was away misses both the ones
+   * that started and the ones that finished — it needs the complete list to reconcile against.
+   * Absent (an older daemon) = unknown: the window keeps what it has.
+   */
+  backgroundTasks?: unknown[];
+  /**
    * This `open` started the process, from the spec it sent. False: the process was already
    * running with the spec it was started with (settings changed since must be applied live).
    */

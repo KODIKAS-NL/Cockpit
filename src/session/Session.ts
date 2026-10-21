@@ -657,6 +657,9 @@ export class Session {
   /** Shows the pending prompts again (the webview clears them when it repaints history). */
   reemitPrompts(): void {
     for (const msg of this.pendingPromptMsg.values()) this.emit(msg);
+    // A remounted webview starts with an empty background list, and the next
+    // `background_tasks_changed` may be hours away (or never, if nothing changes again).
+    this.emitBackground();
   }
 
   // ---- the daemon: staying in step with other windows ----
@@ -686,6 +689,10 @@ export class Session {
       this.hooks.onResult();
       this.resetStreamingState();
     }
+    // Background tasks: the daemon's list is the truth. The CLI only emits
+    // `background_tasks_changed` on a change, so one that finished while this window was cut off
+    // would stay in the indicator for ever (and one that started would never show up).
+    if (Array.isArray(snap.backgroundTasks)) this.syncBgTasks(snap.backgroundTasks);
     if (snap.session.remote?.on) this.onRemoteState(true, snap.session.remote.url);
     this.replaying = true;
     try {
