@@ -286,7 +286,7 @@ export const Composer = memo(function Composer({
     requestAnimationFrame(() => ref.current?.focus());
   };
   // requestId -> paste context (bitmaps for a screenshot; directPaths for the non-Windows fallback).
-  const pending = useRef<Map<string, { bitmaps: File[]; directPaths: string[] }>>(new Map());
+  const pending = useRef<Map<string, { bitmaps: File[]; directPaths: string[]; uploads?: File[] }>>(new Map());
 
   // Host response: has path(s) -> insert; empty -> fallback (bitmap or directPaths).
   useEffect(() => {
@@ -297,6 +297,7 @@ export const Composer = memo(function Composer({
         pending.current.delete(m.requestId);
         if (m.text) insertAtCaret(m.text); // host autoritativo (Windows): acentos OK
         else if (ctx.directPaths.length) requestPaths(ctx.directPaths); // non-Windows
+        else if (ctx.uploads?.length) uploadFiles(ctx.uploads); // files with no path on the host
         else ctx.bitmaps.forEach(attachImage); // it was a screenshot
       }
     };
@@ -397,6 +398,30 @@ export const Composer = memo(function Composer({
     reader.readAsDataURL(f);
   };
 
+  // Files that have no path the host can see (dragged from another device, pasted in a browser):
+  // send their bytes; the host saves them in the workspace and answers with the path to insert.
+  const uploadFiles = (files: File[]) => {
+    const small = files; // the host refuses what is too large and says so
+    if (!small.length) return;
+    Promise.all(
+      small.map(
+        (f) =>
+          new Promise<{ name: string; data: string }>((resolve) => {
+            const r = new FileReader();
+            r.onload = () => {
+              const s = String(r.result);
+              resolve({ name: f.name || 'file', data: s.slice(s.indexOf(',') + 1) });
+            };
+            r.readAsDataURL(f);
+          }),
+      ),
+    ).then((payload) => {
+      const requestId = rid();
+      pending.current.set(requestId, { bitmaps: [], directPaths: [] });
+      send({ kind: 'uploadFiles', requestId, files: payload });
+    });
+  };
+
   const requestPaths = (absPaths: string[]) => {
     const requestId = rid();
     pending.current.set(requestId, { bitmaps: [], directPaths: [] });
@@ -411,21 +436,24 @@ export const Composer = memo(function Composer({
     const files = Array.from(dt.files || []);
     const directPaths: string[] = [];
     const bitmaps: File[] = [];
+    const uploads: File[] = [];
     for (const f of files) {
       const p = (f as unknown as { path?: string }).path;
       if (p) directPaths.push(p);
       else if (f.type.startsWith('image/')) bitmaps.push(f);
+      else if (f.size > 0 || f.name) uploads.push(f);
     }
-    if (directPaths.length === 0) {
+    if (directPaths.length === 0 && uploads.length === 0) {
       const uri = dt.getData('text/uri-list');
       for (const line of uri.split('\n').map((s) => s.trim())) {
         if (line.startsWith('file:')) directPaths.push(fileUriToPath(line));
       }
     }
-    if (!directPaths.length && !bitmaps.length) return; // nada de arquivo: deixa o default (texto)
+    if (!directPaths.length && !bitmaps.length && !uploads.length) return; // nada de arquivo: deixa o default (texto)
     e.preventDefault();
     if (directPaths.length) requestPaths(directPaths);
     bitmaps.forEach(attachImage);
+    if (uploads.length) uploadFiles(uploads);
   };
 
   const inl = useInlineRefs({ t, ref, hlRef, text, setText, lastCopy });
@@ -444,12 +472,14 @@ export const Composer = memo(function Composer({
     // Webview fallbacks (used only when the host returns no files — e.g. non-Windows).
     const directPaths: string[] = [];
     const bitmaps: File[] = [];
+    const uploads: File[] = [];
     for (const it of fileItems) {
       const f = it.getAsFile();
       if (!f) continue;
       const p = (f as unknown as { path?: string }).path;
       if (p) directPaths.push(p);
       else if (f.type.startsWith('image/')) bitmaps.push(f);
+      else uploads.push(f);
     }
     if (directPaths.length === 0) {
       const uri = cd.getData('text/uri-list');
@@ -461,7 +491,7 @@ export const Composer = memo(function Composer({
     // Authoritative source: the host reads the OS FileDropList (exact Unicode path, accents OK).
     // When it comes back empty (it was a screenshot or a non-Windows OS) -> bitmap/directPaths.
     const requestId = rid();
-    pending.current.set(requestId, { bitmaps, directPaths });
+    pending.current.set(requestId, { bitmaps, directPaths, uploads });
     send({ kind: 'readClipboardFiles', requestId });
   };
 

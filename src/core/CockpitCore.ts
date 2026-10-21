@@ -983,6 +983,35 @@ export abstract class CockpitCore {
     return absPath; // fora do contexto -> absoluto
   }
 
+  /** Biggest file taken from a drop or a paste, in bytes. */
+  protected static readonly UPLOAD_MAX = 25 * 1024 * 1024;
+
+  /**
+   * Writes files that arrived as bytes (dropped from another device, pasted in a browser) to
+   * `<workspace>/.cockpit/uploads/`, where Claude can read them, and returns their absolute paths.
+   */
+  protected saveUploads(files: { name: string; data: string }[]): string[] {
+    const dir = path.join(this.workspaceCwd(), '.cockpit', 'uploads');
+    const out: string[] = [];
+    for (const f of files) {
+      const buf = Buffer.from(f.data, 'base64');
+      if (buf.length > CockpitCore.UPLOAD_MAX) {
+        void this.host.notify('warning', t('{0} is larger than 25 MB and was not attached.', f.name));
+        continue;
+      }
+      const safe = path.basename(f.name).replace(/[^\w.\- ()]/g, '_').slice(-120) || 'file';
+      const target = path.join(dir, `${Date.now()}-${safe}`);
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(target, buf);
+        out.push(target);
+      } catch (e) {
+        void this.host.notify('error', t('Failed to save {0}: {1}', f.name, String(e)));
+      }
+    }
+    return out;
+  }
+
   /** Resolved path in quotes (handles spaces). */
   protected quoteResolved(absPath: string): string {
     return `"${this.resolvePath(absPath)}"`;
@@ -2524,6 +2553,15 @@ export abstract class CockpitCore {
           text: m.absPaths.map((p) => this.quoteResolved(p)).join(' '),
         });
         break;
+      case 'uploadFiles': {
+        const saved = this.saveUploads(m.files);
+        this.post({
+          kind: 'resolvedPath',
+          requestId: m.requestId,
+          text: saved.map((p) => this.quoteResolved(p)).join(' '),
+        });
+        break;
+      }
       case 'readClipboardFiles': {
         // The OS clipboard is the one of the machine this host runs on. Over Remote-SSH or in
         // a browser (code-server) that is not where you copied, so the paste's own content

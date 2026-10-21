@@ -52,5 +52,7 @@
   "Could not download Claude Code CLI: {0}": "Não foi possível baixar o CLI do Claude Code: {0}",
   "Remote Control did not start: {0}": "O Remote Control não iniciou: {0}",
   "Remote Control is on: open {0} on your phone or at claude.ai/code. This conversation stays open in every window.": "Remote Control ligado: abra {0} no celular ou em claude.ai/code. Esta conversa continua aberta em todas as janelas.",
-  "Remote Control is off.": "Remote Control desligado."
+  "Remote Control is off.": "Remote Control desligado.",
+  "{0} is larger than 25 MB and was not attached.": "{0} tem mais de 25 MB e não foi anexado.",
+  "Failed to save {0}: {1}": "Falha ao salvar {0}: {1}"
 }

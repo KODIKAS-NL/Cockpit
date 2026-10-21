@@ -87,4 +87,15 @@ describe('CockpitCore', () => {
     core.send({ kind: 'setPermissionMode', mode: 'acceptEdits' } as WebviewToHost);
     expect(settings.updates).toContainEqual({ key: 'permissionMode', value: 'acceptEdits', scope: 'global' });
   });
+
+  it('uploadFiles saves the bytes in the workspace and answers with the path', () => {
+    const data = Buffer.from('hello').toString('base64');
+    core.send({ kind: 'uploadFiles', requestId: 'r1', files: [{ name: '../evil name.txt', data }] } as WebviewToHost);
+    const reply = core.hub.got.find((m) => m.kind === 'resolvedPath') as { requestId: string; text: string };
+    expect(reply.requestId).toBe('r1');
+    const rel = reply.text.replace(/"/g, '');
+    expect(rel.startsWith('.cockpit/uploads/')).toBe(true);
+    expect(rel).toMatch(/evil name\.txt$/);
+    expect(fs.readFileSync(path.join(dir, rel), 'utf8')).toBe('hello');
+  });
 });

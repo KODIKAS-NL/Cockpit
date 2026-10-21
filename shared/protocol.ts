@@ -662,6 +662,8 @@ export type WebviewToHost =
   | { kind: 'sendMessage'; text: string; images?: ImageAttachment[]; force?: boolean; selection?: string; uuid?: string; now?: boolean }
   | { kind: 'resolvePaths'; requestId: string; absPaths: string[] }
   | { kind: 'readClipboardFiles'; requestId: string }
+  // Files dropped or pasted that have no path on the host (another device, a browser): their bytes (base64).
+  | { kind: 'uploadFiles'; requestId: string; files: { name: string; data: string }[] }
   | { kind: 'openLink'; href: string; preview?: boolean }
   | { kind: 'interrupt' }
   | { kind: 'newSession' }

@@ -427,6 +427,10 @@ and stops capture.
   (`file://…`); when the webview exposes neither, the host reads the OS clipboard
   (cross-platform: `Get-Clipboard` on Windows, AppleScript on macOS, `wl-paste`/`xclip`
   on Linux).
+- **Drop or paste a file with no path on the host** (dragged from another device, or pasted in a
+  browser such as code-server): the webview sends the file's bytes (up to 25 MB each); the host
+  saves them in `<workspace>/.cockpit/uploads/` on the machine that holds the code and inserts
+  that path, so Claude can read it. Add `.cockpit/` to your `.gitignore` to keep uploads out of git.
 
 ## Real account usage (statusline)
 

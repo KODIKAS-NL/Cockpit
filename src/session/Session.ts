@@ -676,6 +676,16 @@ export class Session {
       this.setBusy(true);
       this.stats.beginTurn();
     }
+    // Reconnected after the turn ended while this window was cut off: the `result` never arrived, so
+    // the chat would show "in progress" for ever. The daemon is the truth: it is not busy.
+    if (snap.session.state !== 'busy' && this.busy && this.unconsumed.size === 0 && !this.interrupting) {
+      dlog('session', 'daemon attach: turn already finished, clearing the busy state');
+      this.stats.endTurn();
+      this.emit({ kind: 'stats', stats: this.stats.snapshot() });
+      this.setBusy(false);
+      this.hooks.onResult();
+      this.resetStreamingState();
+    }
     if (snap.session.remote?.on) this.onRemoteState(true, snap.session.remote.url);
     this.replaying = true;
     try {
