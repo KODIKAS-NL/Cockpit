@@ -429,8 +429,10 @@ and stops capture.
   on Linux).
 - **Drop or paste a file with no path on the host** (dragged from another device, or pasted in a
   browser such as code-server): the webview sends the file's bytes (up to 25 MB each); the host
-  saves them in `<workspace>/.cockpit/uploads/` on the machine that holds the code and inserts
-  that path, so Claude can read it. Add `.cockpit/` to your `.gitignore` to keep uploads out of git.
+  saves them in `<workspace>/.cockpit/uploads/` on the machine that holds the code, named
+  `<content hash>-<name>` so the same file twice is one file. Each file shows as a **pill** above the
+  prompt; sending adds the file's path to the message, and the ✕ on the pill takes it out and
+  **deletes the saved copy**. Add `.cockpit/` to your `.gitignore` to keep uploads out of git.
 
 ## Real account usage (statusline)
 

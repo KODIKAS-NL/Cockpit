@@ -545,6 +545,7 @@ type HostMsg =
   | { kind: 'slashResearching'; busy: boolean }
   | { kind: 'history'; items: HistoryItem[] }
   | { kind: 'resolvedPath'; requestId: string; text: string }
+  | { kind: 'uploadedFiles'; requestId: string; files: { abs: string; rel: string; name: string; size: number }[] }
   | { kind: 'openSessions' }
   | { kind: 'usageData'; data: UsageData } // resposta ao botão "Usage"
   | { kind: 'effortGate'; selected: string; min: string } // effort < the folder CLAUDE.md minimum: confirm first
@@ -664,6 +665,8 @@ export type WebviewToHost =
   | { kind: 'readClipboardFiles'; requestId: string }
   // Files dropped or pasted that have no path on the host (another device, a browser): their bytes (base64).
   | { kind: 'uploadFiles'; requestId: string; files: { name: string; data: string }[] }
+  // The pill of an uploaded file was removed before sending: delete the file the host saved.
+  | { kind: 'deleteUpload'; abs: string }
   | { kind: 'openLink'; href: string; preview?: boolean }
   | { kind: 'interrupt' }
   | { kind: 'newSession' }

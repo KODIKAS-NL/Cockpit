@@ -1,6 +1,7 @@
 // The editor-neutral core: the bridge between the CLI (engine) and the React UI. It never imports 'vscode'.
 import { buildRef } from '../../shared/codeRef';
 import { removeFeedbackImages, saveFeedbackImages, sweepFeedbackImages, withImagePaths } from '../session/FeedbackImages';
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -986,13 +987,18 @@ export abstract class CockpitCore {
   /** Biggest file taken from a drop or a paste, in bytes. */
   protected static readonly UPLOAD_MAX = 25 * 1024 * 1024;
 
+  private uploadsDir(): string {
+    return path.join(this.workspaceCwd(), '.cockpit', 'uploads');
+  }
+
   /**
    * Writes files that arrived as bytes (dropped from another device, pasted in a browser) to
-   * `<workspace>/.cockpit/uploads/`, where Claude can read them, and returns their absolute paths.
+   * `<workspace>/.cockpit/uploads/`, where Claude can read them. The name starts with a hash of the
+   * content, so the same file twice is one file.
    */
-  protected saveUploads(files: { name: string; data: string }[]): string[] {
-    const dir = path.join(this.workspaceCwd(), '.cockpit', 'uploads');
-    const out: string[] = [];
+  protected saveUploads(files: { name: string; data: string }[]): { abs: string; name: string; size: number }[] {
+    const dir = this.uploadsDir();
+    const out: { abs: string; name: string; size: number }[] = [];
     for (const f of files) {
       const buf = Buffer.from(f.data, 'base64');
       if (buf.length > CockpitCore.UPLOAD_MAX) {
@@ -1000,16 +1006,29 @@ export abstract class CockpitCore {
         continue;
       }
       const safe = path.basename(f.name).replace(/[^\w.\- ()]/g, '_').slice(-120) || 'file';
-      const target = path.join(dir, `${Date.now()}-${safe}`);
+      const hash = createHash('sha256').update(buf).digest('hex').slice(0, 10);
+      const target = path.join(dir, `${hash}-${safe}`);
       try {
         fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(target, buf);
-        out.push(target);
+        if (!fs.existsSync(target)) fs.writeFileSync(target, buf);
+        out.push({ abs: target, name: f.name, size: buf.length });
       } catch (e) {
         void this.host.notify('error', t('Failed to save {0}: {1}', f.name, String(e)));
       }
     }
     return out;
+  }
+
+  /** Deletes an uploaded file, and only a file that sits in the uploads folder. */
+  protected deleteUpload(abs: string): void {
+    const dir = this.uploadsDir();
+    const target = path.resolve(abs);
+    if (path.dirname(target) !== path.resolve(dir)) return;
+    try {
+      fs.rmSync(target, { force: true });
+    } catch {
+      /* already gone */
+    }
   }
 
   /** Resolved path in quotes (handles spaces). */
@@ -2553,15 +2572,16 @@ export abstract class CockpitCore {
           text: m.absPaths.map((p) => this.quoteResolved(p)).join(' '),
         });
         break;
-      case 'uploadFiles': {
-        const saved = this.saveUploads(m.files);
+      case 'uploadFiles':
         this.post({
-          kind: 'resolvedPath',
+          kind: 'uploadedFiles',
           requestId: m.requestId,
-          text: saved.map((p) => this.quoteResolved(p)).join(' '),
+          files: this.saveUploads(m.files).map((f) => ({ ...f, rel: this.resolvePath(f.abs) })),
         });
         break;
-      }
+      case 'deleteUpload':
+        this.deleteUpload(m.abs);
+        break;
       case 'readClipboardFiles': {
         // The OS clipboard is the one of the machine this host runs on. Over Remote-SSH or in
         // a browser (code-server) that is not where you copied, so the paste's own content

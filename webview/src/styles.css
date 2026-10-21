@@ -7267,3 +7267,43 @@ body {
   left: 0;
   right: auto;
 }
+
+.file-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.file-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 4px 2px 8px;
+  border: 1px solid var(--vscode-panel-border, #555);
+  border-radius: 10px;
+  background: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #fff);
+  font-size: 11px;
+}
+.file-pill-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+.file-pill-size {
+  opacity: 0.7;
+}
+.file-pill-remove {
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 10px;
+  opacity: 0.8;
+}
+.file-pill-remove:hover {
+  opacity: 1;
+}

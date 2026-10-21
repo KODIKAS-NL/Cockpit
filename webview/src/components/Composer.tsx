@@ -26,7 +26,7 @@ import {
 } from '../spell/spell';
 import { useImageViewer } from './ImageViewer';
 import { SpellDropdown } from './SpellDropdown';
-import { Attachments } from './Attachments';
+import { Attachments, FilePills, type UploadedFile } from './Attachments';
 import { Icon } from './Icon';
 import { parseRef, refLines } from '../../../shared/codeRef';
 import { Tooltip } from './Tooltip';
@@ -132,6 +132,9 @@ export const Composer = memo(function Composer({
   const liveSel = selectionRef && selectionRef !== sentSel && !refs.includes(selectionRef) ? selectionRef : undefined;
   const [text, setText] = useState('');
   const [images, setImages] = useState<PendingImage[]>([]);
+  // Files saved by the host for this prompt (dropped or pasted with no path on the host): one pill each.
+  const [files, setFiles] = useState<UploadedFile[]>([]);
+  const uploadReqs = useRef<Set<string>>(new Set());
   const openImage = useImageViewer();
   const [slashIdx, setSlashIdx] = useState(0);
   const [slashDismissed, setSlashDismissed] = useState(false);
@@ -292,6 +295,15 @@ export const Composer = memo(function Composer({
   useEffect(() => {
     const h = (e: MessageEvent) => {
       const m = e.data;
+      if (m?.kind === 'uploadedFiles' && uploadReqs.current.has(m.requestId)) {
+        uploadReqs.current.delete(m.requestId);
+        const got = (m.files ?? []) as { abs: string; rel: string; name: string; size: number }[];
+        setFiles((prev) => {
+          const seen = new Set(prev.map((f) => f.abs));
+          return [...prev, ...got.filter((f) => !seen.has(f.abs) && seen.add(f.abs)).map((f) => ({ id: rid(), ...f }))];
+        });
+        return;
+      }
       if (m?.kind === 'resolvedPath' && pending.current.has(m.requestId)) {
         const ctx = pending.current.get(m.requestId) ?? { bitmaps: [], directPaths: [] };
         pending.current.delete(m.requestId);
@@ -417,7 +429,7 @@ export const Composer = memo(function Composer({
       ),
     ).then((payload) => {
       const requestId = rid();
-      pending.current.set(requestId, { bitmaps: [], directPaths: [] });
+      uploadReqs.current.add(requestId);
       send({ kind: 'uploadFiles', requestId, files: payload });
     });
   };
@@ -590,16 +602,18 @@ export const Composer = memo(function Composer({
     }
     if (correcting) setCorrecting(false); // cancels the correction in progress, sends what it has
     const v = text.trim();
-    if ((!v && images.length === 0) || disabled) return;
+    if ((!v && images.length === 0 && files.length === 0) || disabled) return;
+    const body = files.length ? [v, ...files.map((f) => `"${f.rel}"`)].filter(Boolean).join(' ') : v;
     // Remote Control stays on: the phone shares this window's live process, it is not handed over.
     onSend(
-      v,
+      body,
       images.map((i) => ({ mediaType: i.mediaType, data: i.data })),
       allRefs.length ? allRefs.join('\n') : undefined,
       now,
     );
     setText('');
     setImages([]);
+    setFiles([]); // sent: the files stay, Claude reads them
     setMention(null);
     // Sent: clears the mirrored draft (local + host) so old text isn't restored.
     saveState({ draft: '' });
@@ -765,7 +779,7 @@ export const Composer = memo(function Composer({
 
   const mentionOpen = mention !== null && mentionItems.length > 0;
 
-  const canSend = !disabled && !correcting && (!!text.trim() || images.length > 0);
+  const canSend = !disabled && !correcting && (!!text.trim() || images.length > 0 || files.length > 0);
 
   // How many tool icons fit beside the chips. The chips keep their natural width; the icons
   // take what is left, one by one, and the rest go behind the [›]. Only when not even the [›]
@@ -950,6 +964,15 @@ export const Composer = memo(function Composer({
   return (
     <div className="composer">
       <Attachments t={t} images={images} onRemove={(id) => setImages((prev) => prev.filter((x) => x.id !== id))} />
+      <FilePills
+        t={t}
+        files={files}
+        onRemove={(id) => {
+          const f = files.find((x) => x.id === id);
+          if (f) send({ kind: 'deleteUpload', abs: f.abs });
+          setFiles((prev) => prev.filter((x) => x.id !== id));
+        }}
+      />
       {mentionOpen && (
         <div className="slash-menu mention-menu">
           {mentionItems.map((it, i) => (

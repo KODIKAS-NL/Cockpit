@@ -168,6 +168,7 @@ export const ptBR: Partial<Strings> = {
   'composer.collapseAll': 'Contrair todos os cards deste contexto',
   'composer.newSession': 'Nova sessão',
   'attach.remove': 'Remover anexo',
+  'attach.removeFile': 'Remover arquivo (apaga a cópia salva)',
   'attach.view': 'Ver imagem',
   'pad.open': 'Rascunho: desenhe ou anote e anexe o resultado',
   'pad.annotate': 'Anotar',

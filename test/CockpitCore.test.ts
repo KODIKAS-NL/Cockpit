@@ -88,14 +88,25 @@ describe('CockpitCore', () => {
     expect(settings.updates).toContainEqual({ key: 'permissionMode', value: 'acceptEdits', scope: 'global' });
   });
 
-  it('uploadFiles saves the bytes in the workspace and answers with the path', () => {
+  it('uploadFiles saves the bytes once per content, and deleteUpload removes the file', () => {
     const data = Buffer.from('hello').toString('base64');
-    core.send({ kind: 'uploadFiles', requestId: 'r1', files: [{ name: '../evil name.txt', data }] } as WebviewToHost);
-    const reply = core.hub.got.find((m) => m.kind === 'resolvedPath') as { requestId: string; text: string };
-    expect(reply.requestId).toBe('r1');
-    const rel = reply.text.replace(/"/g, '');
-    expect(rel.startsWith('.cockpit/uploads/')).toBe(true);
-    expect(rel).toMatch(/evil name\.txt$/);
-    expect(fs.readFileSync(path.join(dir, rel), 'utf8')).toBe('hello');
+    const up = (id: string) => {
+      core.send({ kind: 'uploadFiles', requestId: id, files: [{ name: '../evil name.txt', data }] } as WebviewToHost);
+      return core.hub.got.filter((m) => m.kind === 'uploadedFiles').pop() as unknown as {
+        requestId: string;
+        files: { abs: string; rel: string; name: string; size: number }[];
+      };
+    };
+    const one = up('r1');
+    expect(one.requestId).toBe('r1');
+    expect(one.files[0].rel.startsWith('.cockpit/uploads/')).toBe(true);
+    expect(one.files[0].rel).toMatch(/evil name\.txt$/);
+    expect(fs.readFileSync(one.files[0].abs, 'utf8')).toBe('hello');
+    const two = up('r2');
+    expect(two.files[0].abs).toBe(one.files[0].abs); // the same content is the same file
+    expect(fs.readdirSync(path.join(dir, '.cockpit', 'uploads'))).toHaveLength(1);
+    core.send({ kind: 'deleteUpload', abs: path.join(dir, 'outside.txt') } as WebviewToHost); // not in the folder: ignored
+    core.send({ kind: 'deleteUpload', abs: one.files[0].abs } as WebviewToHost);
+    expect(fs.existsSync(one.files[0].abs)).toBe(false);
   });
 });

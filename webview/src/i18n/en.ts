@@ -236,6 +236,7 @@ export const en = {
   'composer.collapseAll': 'Collapse all cards in this context',
   'composer.newSession': 'New session',
   'attach.remove': 'Remove attachment',
+  'attach.removeFile': 'Remove file (deletes the saved copy)',
   'attach.view': 'View image',
   'pad.open': 'Scratchpad: draw or annotate, then attach the result',
   'pad.annotate': 'Annotate',

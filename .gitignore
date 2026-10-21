@@ -27,3 +27,4 @@ jetbrains/.gradle/
 jetbrains/.intellijPlatform/
 jetbrains/.kotlin/
 .idea/
+.cockpit/

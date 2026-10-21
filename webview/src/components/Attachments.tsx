@@ -54,3 +54,32 @@ export function Attachments({ t, images, onRemove, small }: Props) {
     </div>
   );
 }
+
+/** A file the host saved for this prompt (dropped or pasted with no path on the host). */
+export interface UploadedFile {
+  id: string;
+  abs: string;
+  rel: string;
+  name: string;
+  size: number;
+}
+
+const fmtSize = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+/** One pill per uploaded file; the ✕ takes it out of the prompt and deletes the saved copy. */
+export function FilePills({ t, files, onRemove }: { t: Translator; files: UploadedFile[]; onRemove: (id: string) => void }) {
+  if (files.length === 0) return null;
+  return (
+    <div className="file-pills">
+      {files.map((f) => (
+        <span className="file-pill" key={f.id} title={f.rel}>
+          <span className="file-pill-name">{f.name}</span>
+          <span className="file-pill-size">{fmtSize(f.size)}</span>
+          <button type="button" className="file-pill-remove" title={t('attach.removeFile')} onClick={() => onRemove(f.id)}>
+            ✕
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
