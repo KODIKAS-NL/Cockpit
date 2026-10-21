@@ -52,6 +52,7 @@
   "cfg.verbosity": "How much of the timeline to show (display only — does not change the agent). Verbose = everything; Necessary = edits + final explanations; Dialogo = edits + what it's doing; Quiet = final explanations only.",
   "cfg.model": "Default model for new sessions. Leave 'default' to let the CLI choose. There is no fixed list here: the Model dropdown in the panel offers what your account actually has (live discovery); change it there to override just the current session.",
   "cfg.effort": "Default reasoning effort for new sessions. 'CLI default' uses your ~/.claude/settings.json effortLevel. Reflected (pre-selected) in the Effort dropdown in the panel; change it there to override just the current session.",
+  "cfg.uploadRetentionDays": "Files you dropped or pasted into the chat are kept in .cockpit/uploads/ of the workspace. Files older than this many days are deleted when Cockpit starts. 0 keeps them all.",
   "cfg.autoResumeLastSession": "When opening a folder, automatically resume the most recent session for that folder (loads its history). Turn off to always start empty.",
   "cfg.autosave": "Auto-save an open file before Claude reads or writes it, so the agent works on the latest content.",
   "cmd.daemonInstall": "Install daemon (keep Claude running across windows)",

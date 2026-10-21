@@ -369,6 +369,12 @@
           "default": "default",
           "description": "%cfg.effort%"
         },
+        "cockpitDaemon.uploadRetentionDays": {
+          "type": "number",
+          "default": 30,
+          "minimum": 0,
+          "description": "%cfg.uploadRetentionDays%"
+        },
         "cockpitDaemon.autoResumeLastSession": {
           "type": "boolean",
           "default": true,

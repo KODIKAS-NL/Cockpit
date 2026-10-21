@@ -109,4 +109,18 @@ describe('CockpitCore', () => {
     core.send({ kind: 'deleteUpload', abs: one.files[0].abs } as WebviewToHost);
     expect(fs.existsSync(one.files[0].abs)).toBe(false);
   });
+
+  it('old uploads are swept at start, young ones stay', () => {
+    const up = path.join(dir, '.cockpit', 'uploads');
+    fs.mkdirSync(up, { recursive: true });
+    const old = path.join(up, 'old.txt');
+    const young = path.join(up, 'young.txt');
+    fs.writeFileSync(old, 'x');
+    fs.writeFileSync(young, 'x');
+    const past = new Date(Date.now() - 40 * 86_400_000);
+    fs.utimesSync(old, past, past);
+    new TestCore(host).dispose();
+    expect(fs.existsSync(old)).toBe(false);
+    expect(fs.existsSync(young)).toBe(true);
+  });
 });

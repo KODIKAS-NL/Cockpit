@@ -11,6 +11,7 @@ All under **Settings → Extensions → Cockpit for Claude Code** (prefix `cockp
 | `dateLocale` | string | `""` | Locale for dates and times, for example `nl-NL` or `en-GB`. Empty: the region of the machine VS Code runs on (on a Mac, System Settings, Region), or, in a browser, the browser's own locale. Applies when a view is next opened |
 | `model` | enum | `default` | Default model for new sessions; reflected in the panel dropdown |
 | `effort` | enum | `default` | Default effort (`low`…`max`); `default` uses the CLI's `effortLevel` |
+| `uploadRetentionDays` | number | `30` | Files dropped or pasted into the chat (kept in `.cockpit/uploads/`) are deleted after this many days, when Cockpit starts. `0` keeps them all |
 | `autoResumeLastSession` | boolean | `true` | On opening the folder, resume the most recent session for that directory |
 | `permissionMode` | enum | `default` | Permission mode forwarded to the CLI (always sent, `default` included); reflected in the dropdown |
 | `notifyOnComplete` | boolean | `true` | Notify when the agent finishes and the panel is not visible |

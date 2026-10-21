@@ -238,6 +238,7 @@ export abstract class CockpitCore {
     this.defaults = readClaudeDefaults();
     setOneMContextDisabled(oneMContextDisabled(this.workspaceCwd()));
     sweepFeedbackImages(this.workspaceCwd()); // images left behind by a window that closed mid-turn
+    this.sweepUploads();
     this.observedDefaultModel = this.memory.get<string>('defaultModel');
     this.restoreDiscovery();
     setInternalModel(this.cfg().get<string>('internalModel', '')); // model of the internal calls
@@ -1011,12 +1012,34 @@ export abstract class CockpitCore {
       try {
         fs.mkdirSync(dir, { recursive: true });
         if (!fs.existsSync(target)) fs.writeFileSync(target, buf);
+        else fs.utimesSync(target, new Date(), new Date()); // used again: it is young again
         out.push({ abs: target, name: f.name, size: buf.length });
       } catch (e) {
         void this.host.notify('error', t('Failed to save {0}: {1}', f.name, String(e)));
       }
     }
     return out;
+  }
+
+  /** Removes uploaded files older than `uploadRetentionDays` (0 keeps them all). */
+  protected sweepUploads(): void {
+    const days = Number(this.cfg().get<number>('uploadRetentionDays', 30));
+    if (!Number.isFinite(days) || days <= 0) return;
+    const dir = this.uploadsDir();
+    const cutoff = Date.now() - days * 86_400_000;
+    try {
+      for (const name of fs.readdirSync(dir)) {
+        const file = path.join(dir, name);
+        try {
+          const st = fs.statSync(file);
+          if (st.isFile() && st.mtimeMs < cutoff) fs.rmSync(file, { force: true });
+        } catch {
+          /* gone or unreadable: leave it */
+        }
+      }
+    } catch {
+      /* no uploads folder */
+    }
   }
 
   /** Deletes an uploaded file, and only a file that sits in the uploads folder. */
