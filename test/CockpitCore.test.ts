@@ -26,6 +26,9 @@ class TestCore extends CockpitCore {
   send(m: WebviewToHost): void {
     this.onWebviewMessage(m, HUB_ID);
   }
+  savePlan(plan: string, previous?: string): string | undefined {
+    return this.savePlanFile(plan, previous);
+  }
   protected hasPanel = () => false;
   protected panelVisible = () => false;
   protected anyPanelVisible = () => false;
@@ -64,6 +67,23 @@ describe('CockpitCore', () => {
   afterEach(() => {
     core.dispose();
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('a plan revision replaces the earlier file and takes the name of the revision', () => {
+    const first = core.savePlan('# Plan one\nv1')!;
+    expect(first).toMatch(/^Planing\/\d{4}-\d{2}-\d{2}-\d{4}-plan-one\.md$/);
+    const outside = path.join(dir, 'keep.md');
+    fs.writeFileSync(outside, 'x');
+
+    const second = core.savePlan('# Plan one, renamed\nv2', first)!;
+    expect(second).toMatch(/plan-one-renamed\.md$/);
+    expect(fs.existsSync(path.join(dir, first))).toBe(false);
+    expect(fs.readFileSync(path.join(dir, second), 'utf8')).toBe('# Plan one, renamed\nv2\n');
+    expect(fs.readdirSync(path.join(dir, 'Planing'))).toEqual([path.basename(second)]);
+
+    // only a plan file of Planing/ is ever removed
+    core.savePlan('# Plan two', 'keep.md');
+    expect(fs.existsSync(outside)).toBe(true);
   });
 
   it('init posts the config, the tabs and the CLI status', () => {

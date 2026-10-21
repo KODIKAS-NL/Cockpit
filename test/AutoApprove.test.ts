@@ -55,6 +55,7 @@ import { Session, type SessionHooks } from '../src/session/Session';
 // Mensagens que chegariam à webview — um card de permissão aqui significa prompt na tela.
 let emitted: any[] = [];
 let savedPlans: string[] = [];
+let previousPlans: (string | undefined)[] = [];
 
 function makeSession(permission: string): Session {
   const hooks: SessionHooks = {
@@ -74,9 +75,10 @@ function makeSession(permission: string): Session {
     extraSystemPrompt: () => undefined,
     quietPrompt: () => undefined,
     daemon: () => ({}) as never,
-    savePlan: (p: string) => {
+    savePlan: (p: string, previous?: string) => {
       savedPlans.push(p);
-      return '/tmp/proj/Planing/plan.md';
+      previousPlans.push(previous);
+      return `Planing/plan-${savedPlans.length}.md`;
     },
   };
   return new Session(hooks);
@@ -87,6 +89,7 @@ describe('Bypass — auto-aprovação no can_use_tool', () => {
     spawns.length = 0;
     emitted = [];
     savedPlans = [];
+    previousPlans = [];
   });
 
   it('aprova sozinho e NÃO emite card quando o modo é bypassPermissions', () => {
@@ -140,5 +143,48 @@ describe('Bypass — auto-aprovação no can_use_tool', () => {
 
     expect(spawns[0].control[0].response.behavior).toBe('allow');
     expect(emitted.filter((m) => m.kind === 'permissionRequest')).toHaveLength(0);
+  });
+});
+
+describe('Plan revisions replace the plan file', () => {
+  beforeEach(() => {
+    spawns.length = 0;
+    emitted = [];
+    savedPlans = [];
+    previousPlans = [];
+  });
+
+  it('a plan sent back with "Keep planning" is replaced by its revision; an approved plan is final', () => {
+    const s = makeSession('default');
+    s.send('prompt');
+    spawns[0].firePermission('req-1', 'ExitPlanMode', { plan: '# Plan\nv1' });
+    s.decide('req-1', 'deny', 'change step 2');
+    spawns[0].firePermission('req-2', 'ExitPlanMode', { plan: '# Plan\nv2' });
+    s.decide('req-2', 'allow');
+    spawns[0].firePermission('req-3', 'ExitPlanMode', { plan: '# Next plan' });
+
+    expect(previousPlans).toEqual([undefined, 'Planing/plan-1.md', undefined]);
+  });
+
+  // A prompt answered in another window arrives here only as "settled": the decision is not
+  // known. Were the pointer kept, an approval elsewhere would make the next plan delete a plan
+  // that is already final.
+  it('a plan answered in another window is not replaced by the next one', () => {
+    const s = makeSession('default');
+    s.send('prompt');
+    spawns[0].firePermission('req-1', 'ExitPlanMode', { plan: '# Plan\nv1' });
+    spawns[0].emit('settled', 'req-1');
+    spawns[0].firePermission('req-2', 'ExitPlanMode', { plan: '# Next plan' });
+
+    expect(previousPlans).toEqual([undefined, undefined]);
+  });
+
+  it('in Bypass every plan is approved at once, so each gets its own file', () => {
+    const s = makeSession('bypassPermissions');
+    s.send('prompt');
+    spawns[0].firePermission('req-1', 'ExitPlanMode', { plan: '# A' });
+    spawns[0].firePermission('req-2', 'ExitPlanMode', { plan: '# B' });
+
+    expect(previousPlans).toEqual([undefined, undefined]);
   });
 });

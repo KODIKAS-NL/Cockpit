@@ -80,6 +80,7 @@ and the project adopts semantic versioning.
 - The language label of a code block no longer overlaps its copy button.
 
 ### Changed
+- **A plan revision replaces its plan file.** A plan sent back with **Keep planning** and then revised no longer leaves a dated copy per revision in `Planing/`. The revision is written under its own timestamp and slug, and the file of the earlier revision is removed (only a plan file of `Planing/` is ever removed). Once a plan is approved it is final, and the next plan gets a new file. In Bypass every plan is approved at once, so every plan keeps its own file.
 - Background-task notifications (the CLI's `<task-notification>` messages) show as one muted line, "Background task finished" with the summary, instead of a raw user bubble.
 - The chevron on the docked question and plan cards points down while open and up once folded, and a folded card keeps its title line.
 - After **Update** on the CLI (non-managed install) the dashboard re-reads the version every 3 seconds until it changes, instead of staying on the old version.

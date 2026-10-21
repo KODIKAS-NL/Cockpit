@@ -62,7 +62,9 @@ export interface SessionHooks {
   // Plan mode (ExitPlanMode): persist the proposed plan as a markdown file under Planing/ at the
   // repo root and open it in the editor. Returns the workspace-relative path written, or undefined
   // when nothing could be saved (no workspace, write error). The approval gate stays in the UI.
-  savePlan?: (plan: string) => string | undefined;
+  // `previous` is the file of the last revision of the same plan (sent back with "Keep planning"):
+  // a revision replaces it instead of adding a copy.
+  savePlan?: (plan: string, previous?: string) => string | undefined;
   /** Executable for an engine. Without an argument: the window's default. */
   claudePath: (engine?: EngineId) => string;
   cwd: () => string;
@@ -162,6 +164,9 @@ export class Session {
   // event isn't emitted a second time (same guard as `streamedText` for the main agent).
   private subagentStreamed = new Set<string>();
   private pendingPerm = new Map<string, { tool: string; input: unknown; suggestions?: unknown[] }>();
+  // The plan file of the plan that is still being revised; cleared when a plan is approved, so the
+  // next plan gets a file of its own.
+  private planFile: string | undefined;
   // The card/question emitted for each pending prompt, to show it again after the webview
   // repaints its history (which clears prompts) or when another window catches up.
   private pendingPromptMsg = new Map<string, HostToWebview>();
@@ -723,6 +728,10 @@ export class Session {
 
   /** Another window answered this prompt: close it here. */
   private onPromptSettled(requestId: string): void {
+    // Answered elsewhere (or the process died): the decision is unknown here. If it was an
+    // approval, keeping the pointer would make the NEXT plan delete a plan that is already final
+    // — so forget it. The cost of being wrong is one extra file, not a lost plan.
+    if (this.pendingPerm.get(requestId)?.tool === 'ExitPlanMode') this.planFile = undefined;
     this.pendingPerm.delete(requestId);
     this.pendingPromptMsg.delete(requestId);
     this.emit({ kind: 'promptSettled', requestId });
@@ -927,6 +936,8 @@ export class Session {
     this.pendingPerm.delete(requestId);
     this.pendingPromptMsg.delete(requestId);
     this.hooks.onPromptClosed?.(requestId);
+    // An approved plan is final: the next ExitPlanMode starts a new plan file.
+    if (pend?.tool === 'ExitPlanMode' && decision !== 'deny') this.planFile = undefined;
     if (pend?.tool) {
       // On denials, records the reason (the user's feedback) in the denial log.
       this.stats.recordDecision(pend.tool, decision, decision === 'deny' ? message : undefined);
@@ -1227,7 +1238,8 @@ export class Session {
             // silent regression.
             if (tool === 'ExitPlanMode' && !this.replaying) {
               const plan = typeof (input as any)?.plan === 'string' ? (input as any).plan : '';
-              if (plan) this.hooks.savePlan?.(plan);
+              if (plan) this.hooks.savePlan?.(plan, this.planFile);
+              this.planFile = undefined;
             }
             this.decide(reqId, 'allow');
             break;
@@ -1243,7 +1255,8 @@ export class Session {
             let planFile: string | undefined;
             if (tool === 'ExitPlanMode' && !this.replaying) {
               const plan = typeof (input as any)?.plan === 'string' ? (input as any).plan : '';
-              if (plan) planFile = this.hooks.savePlan?.(plan);
+              if (plan) planFile = this.hooks.savePlan?.(plan, this.planFile) ?? this.planFile;
+              this.planFile = planFile;
             }
             const card: HostToWebview = {
               kind: 'permissionRequest',

@@ -448,7 +448,7 @@ export abstract class CockpitCore {
       },
       fileText: (tool, input) => this.currentFileText(tool, input),
       onToolUse: (tool, input) => this.autoSaveForTool(tool, input),
-      savePlan: (plan) => this.savePlanFile(plan),
+      savePlan: (plan, previous) => this.savePlanFile(plan, previous),
       claudePath: (engine) => this.claudePath(engine),
       cwd: () => this.workspaceCwd(),
       engine: () => currentEngine(),
@@ -937,9 +937,11 @@ export abstract class CockpitCore {
    *
    * The file is the plan's primary surface now — the permission card keeps only the approval
    * gate. The name carries a sortable timestamp plus a short slug taken from the first heading,
-   * so the folder reads as a history rather than one overwritten file.
+   * so the folder reads as a history of plans. A revision of the same plan (`previous`, the file of
+   * the revision sent back with "Keep planning") replaces that file: the folder keeps one file per
+   * plan, named after its last revision.
    */
-  protected savePlanFile(plan: string): string | undefined {
+  protected savePlanFile(plan: string, previous?: string): string | undefined {
     const root = this.workspaceCwd();
     if (!root) return undefined;
     try {
@@ -963,6 +965,12 @@ export abstract class CockpitCore {
       const abs = path.join(dir, name);
 
       fs.writeFileSync(abs, body, 'utf8');
+
+      // The earlier revision goes; only a plan file of this folder is ever removed.
+      const old = previous ? path.resolve(root, previous) : undefined;
+      if (old && old !== abs && path.dirname(old) === dir && old.endsWith('.md')) {
+        fs.rmSync(old, { force: true });
+      }
 
       // Open it without stealing focus from the approval card the user is about to act on.
       this.host.openQuietly(abs);
