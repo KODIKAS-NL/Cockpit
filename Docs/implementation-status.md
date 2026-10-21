@@ -65,6 +65,11 @@ Updated per the first build cycle. Tracks the [execution plan](execution-plan.md
   **relative** to the context cwd if inside it, otherwise **absolute** (resolved on the host with `path.relative`).
   The path comes from `File.path` (Electron) or from `text/uri-list` (`file://…`) as a fallback.
 
+- **Drop or paste a file with no path on the host** (another device, a browser): the webview sends the bytes
+  (`uploadFiles`), the host saves them in `<workspace>/.cockpit/uploads/<hash>-<name>` and answers
+  `uploadedFiles`; each file is a pill above the prompt, and removing it sends `deleteUpload`. Files older than
+  `cockpitDaemon.uploadRetentionDays` are swept at start.
+
 ### Permissions and interaction (Phase 3) — functional end to end
 - **Enablement:** spawn with `--permission-prompt-tool stdio` + `initialize` handshake —
   this is what makes the CLI route `can_use_tool` instead of silently denying in headless.

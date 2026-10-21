@@ -171,6 +171,7 @@ Remote mode has been verified with a MacBook client and a Mac mini backend.
 
 ## Known limits
 
+- Dropping or pasting a file (the upload pill) in Rider's embedded browser has not been tested.
 - JCEF cursor changes (the pointer on buttons) may not show.
 - The scratchpad editor tab, login/secret flows and the settings form have been tested locally;
   in remote mode check them on your setup and report anything off.

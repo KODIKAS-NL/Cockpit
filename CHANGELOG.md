@@ -7,6 +7,18 @@ and the project adopts semantic versioning.
 ## [Unreleased]
 
 ### Added
+- **Rider plugin.** Cockpit also runs in JetBrains Rider 2026.2, locally or through Remote Development
+  (JetBrains Client on a laptop, backend on the machine that holds the code and the daemon). It is a split
+  plugin (shared, frontend and backend modules): the backend runs the sidecar (`dist/sidecar.js`, the
+  editor-neutral core), the client shows the chat, the Hub and the scratchpad in a browser view and reaches the
+  sidecar directly or through an SSH tunnel that restarts itself after sleep or a network drop. See
+  [Docs/jetbrains.md](Docs/jetbrains.md).
+- **Drop or paste any file.** A file dropped on the prompt box or pasted, with no path the host can see
+  (another device, a browser such as code-server), is uploaded: it is saved in `<workspace>/.cockpit/uploads/`
+  on the machine that holds the code, named by a hash of its content so the same file twice is one file, and
+  shows as a pill above the prompt. Sending adds its path to the message; the ✕ on the pill deletes the saved
+  copy. Up to 25 MB per file. `cockpitDaemon.uploadRetentionDays` (default 30, `0` keeps all) deletes older
+  uploads when Cockpit starts.
 - **Code references.** Copy two or more lines in an editor and paste them into the prompt box: they become a
   chip (`Composer.tsx:10-12  webview/src/components`) instead of raw code, and Claude gets an `@file#L10-12`
   mention and reads those lines itself. Collect several, from different files. The chip's buttons open the
@@ -27,6 +39,10 @@ and the project adopts semantic versioning.
   The canvas is always white, whatever the VS Code theme.
 
 ### Fixed
+- **"In progress" no longer sticks after a reload or reconnect.** A window that reattached after the turn had
+  ended never saw the end of it and kept the busy state; it now clears it when the daemon says the session is
+  not busy. The daemon itself could stay busy after a background task finished without a turn following; it
+  now clears that state after 20 seconds without a turn. (The daemon app has to be rebuilt and reinstalled.)
 - **The selection reference goes away when its file is closed.** The `⧉ @file#a-b` chip above the prompt box
   stayed after the file's tab was closed, and after switching to another file. It now follows the active
   editor and drops when the file has no tab left (a focused chat tab does not clear it).

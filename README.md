@@ -33,6 +33,7 @@ it in the open under the MIT license, which is what makes this fork possible.
 | **Conversations that outlive the window** | Claude runs in a background daemon, so closing the lid, dropping the connection or reloading VS Code does not stop it. Any window attaches to a running conversation, and the phone joins it through Remote Control. |
 | **Plan feedback with references and images** | Copy lines from the plan or any file and paste them into the notes: they become an inline reference pill (as in the prompt box) and go to Claude as quoted lines. Paste a screenshot too. The same notes box exists on every question. |
 | **Code references in the prompt** | Copy code in the editor and paste it in the prompt: it becomes an inline `@file#L12-30` pill that Backspace removes in one go, and shows as a chip in the timeline. |
+| **Drop or paste any file** | Drag a file onto the prompt box, or paste it, from another device or a browser too (code-server, the iPad). It is saved on the machine that holds the code and shows as a pill; the ✕ on the pill deletes the saved copy. |
 | **A scratchpad per conversation** | Annotate a screenshot or sketch, then send the board to Claude as an image. |
 | **A model and effort per mode** | Opus on high effort to plan, Sonnet to build, switched live when you approve the plan. |
 | **The numbers** | Context, prompt cache with a keep-alive, cost per turn and session, and subscription limits with pacing. |
@@ -100,7 +101,7 @@ The scratchpad adds about 4 MB to the extension and loads only when you open a b
   dashboard shows the context window; the rest sits under the (i) icon on the active session.
 - **Sessions.** A list per folder with resume, rename, delete, rewind to an earlier prompt, and
   remote control from your phone.
-- **Input.** `@` file mentions, images (pasted, or drawn and annotated in the scratchpad), slash
+- **Input.** `@` file mentions, images (pasted, or drawn and annotated in the scratchpad), files (dropped or pasted, from any device), slash
   commands, voice dictation and an inline spell-checker for Portuguese and English.
 - **Languages.** The interface is in Brazilian Portuguese and English, switchable without a reload.
 

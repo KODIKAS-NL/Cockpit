@@ -244,6 +244,7 @@ run until it is up; there is no local fallback. The Tootega engine is not affect
 | `~/Library/LaunchAgents/local.cockpit.daemon.plist` | install command | The launchd agent. |
 | `$TMPDIR/cockpit-daemon-*/` | daemon | Per-process files the CLI reads (`--settings`, appended system prompt). Removed when the process exits. |
 | `~/.claude/projects/…/*.jsonl` | Claude CLI | The transcripts, as always. |
+| `<workspace>/.cockpit/uploads/` | the extension (core) | Files dropped or pasted into the chat with no path on the host. Swept after `cockpitDaemon.uploadRetentionDays`. |
 
 ## Side bar chat and where a conversation lives
 
@@ -316,6 +317,7 @@ knows the session id, so a restart always continues the same transcript.
 | Daemon starts, but every session fails at once | It cannot find `claude` or `node`. Check the `spawn` lines and errors in the log; re-run **Install daemon** from a shell where `which claude` works. |
 | A conversation does not show as live in another window | The windows have different workspace folders (exact folder, not parent/child), or the conversation has not received its first message yet (it has no session id until then). |
 | "This session is busy…" | A turn started on another device is still running. Wait for it, or interrupt it (interrupt always goes through). |
+| A conversation shows "in progress" but nothing is running | An older daemon could stay busy after a background task finished with no turn following. Current builds clear it after 20 seconds; rebuild and reinstall the daemon app, or restart the daemon, then reload the window. |
 | After a daemon restart the first message takes a while | The CLI is being restarted with `--resume`; this is a normal cold start. |
 | Two windows show slightly different usage numbers | Each window counts usage for the turns it saw; the transcript remains the source of truth. |
 

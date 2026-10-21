@@ -76,7 +76,7 @@ UTF-8 and is left untouched.
 
 In the composer: **Enter** sends · **Shift+Enter** new line · **Ctrl+F** finds in the
 conversation · **@** opens the file autocomplete · the **/** button opens the slash-command
-menu · the **▾** button opens options · **drag files** onto it to attach.
+menu · the **▾** button opens options · **drag files** onto it to attach (files with no path on the host, from another device or a browser, are uploaded and shown as a pill; the ✕ deletes the saved copy).
 
 On a session card in the dashboard, a small icon tab holds: **details** (always visible on the
 active session), **remote control** (phone icon), **reload**, **rename** and **delete**. The others

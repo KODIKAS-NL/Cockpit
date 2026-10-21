@@ -135,6 +135,15 @@ supported today. **Rewind** currently restores the *conversation* (transcript tr
 and Git file-restore checkpoints are **planned** — see
 [Docs/implementation-status.md](implementation-status.md).
 
+### Can I drop or paste a file into the chat?
+Yes. Drag a file onto the prompt box or paste it. A file that has a path on the machine running Cockpit
+is added to the prompt as a path. A file that does not (dragged from another device, or pasted in a
+browser such as code-server) is uploaded: it is saved in `.cockpit/uploads/` of the workspace, on the
+machine that holds the code, and shows as a pill above the prompt. The ✕ on the pill removes it and deletes
+the saved copy; once sent, the file stays so Claude can read it again. Up to 25 MB each. Files older than
+`cockpitDaemon.uploadRetentionDays` (default 30) are deleted when Cockpit starts. Add `.cockpit/` to your
+`.gitignore`.
+
 ### What is the scratchpad?
 A whiteboard (Excalidraw) tied to each conversation. Paste or open a screenshot, annotate it with
 arrows, boxes and text, or sketch an idea, then press **Send to chat**: the board is attached to your

@@ -108,7 +108,7 @@ Legend: ✓ yes · partial · – no · n/a not applicable · planned.
 | Theme synced with VS Code | ✓ | ✓ | `var(--vscode-*)` |
 | Bilingual i18n (pt-BR + EN), runtime switch | ✓ | – | host + webview, no reload |
 | Image paste / screenshot | ✓ | ✓ | Cockpit also pastes **file paths** (Unicode-safe on Windows) |
-| Drag-to-attach files | ✓ | ✓ | drop files on the composer (reuses the path resolver) |
+| Drag-to-attach files | ✓ | ✓ | drop files on the composer (reuses the path resolver); files with no path on the host (another device, a browser) are uploaded to `.cockpit/uploads/` and shown as a pill |
 | Status-bar entry + spinner | ✓ | ✓ | Cockpit: idle/busy dot + model chip |
 | Editor-toolbar entry point | ✓ | ✓ | ✦ icon opens the Cockpit from the editor title bar |
 | Auto-save before read/write | ✓ | ✓ | flushes a dirty buffer before the agent touches the file (`cockpitDaemon.autosave`) |
