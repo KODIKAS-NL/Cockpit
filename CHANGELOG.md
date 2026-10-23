@@ -39,6 +39,12 @@ and the project adopts semantic versioning.
   The canvas is always white, whatever the VS Code theme.
 
 ### Fixed
+- **A long conversation no longer comes back empty.** A transcript over 512 MB could not be read at all: it was
+  loaded as one string, and that is Node's limit, so the session lost its history and its title and vanished from
+  the dashboard while the daemon still had it running. Transcripts are now read line by line, with the memory
+  bounded whatever the file contains, so the conversation is intact. Nothing was lost on disk: a session that
+  went blank this way comes back by itself once the extension is updated. (Most of the weight of such a file is
+  the CLI's own `api-request` debug records, not the conversation.)
 - **"In progress" no longer sticks after a reload or reconnect.** A window that reattached after the turn had
   ended never saw the end of it and kept the busy state; it now clears it when the daemon says the session is
   not busy. The daemon itself could stay busy after a background task finished without a turn following; it
