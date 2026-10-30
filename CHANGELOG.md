@@ -39,6 +39,7 @@ and the project adopts semantic versioning.
   The canvas is always white, whatever the VS Code theme.
 
 ### Fixed
+- **The timeline no longer jumps when a command is added to a running sequence.** A new Bash call appeared as a card of its own and merged into the run a moment later, moving everything under it. The cause was the assistant message carrying the call: empty while it streams, it broke the run, and it is dropped once complete, which re-merged the card. An assistant message that shows nothing now leaves the run alone.
 - **A long conversation no longer comes back empty.** A transcript over 512 MB could not be read at all: it was
   loaded as one string, and that is Node's limit, so the session lost its history and its title and vanished from
   the dashboard while the daemon still had it running. Transcripts are now read line by line, with the memory
@@ -86,6 +87,7 @@ and the project adopts semantic versioning.
 - The language label of a code block no longer overlaps its copy button.
 
 ### Changed
+- **A merged run of Bash commands shows the command running now.** The card's description came from the first call of the run and stayed there; it now follows the last one, so a sequence of commands keeps the header current instead of naming what started it.
 - **A plan revision replaces its plan file.** A plan sent back with **Keep planning** and then revised no longer leaves a dated copy per revision in `Planing/`. The revision is written under its own timestamp and slug, and the file of the earlier revision is removed (only a plan file of `Planing/` is ever removed). Once a plan is approved it is final, and the next plan gets a new file. In Bypass every plan is approved at once, so every plan keeps its own file.
 - Background-task notifications (the CLI's `<task-notification>` messages) show as one muted line, "Background task finished" with the summary, instead of a raw user bubble.
 - The chevron on the docked question and plan cards points down while open and up once folded, and a folded card keeps its title line.

@@ -429,10 +429,14 @@ function ClaudeTurnView({
       }
       continue;
     }
+    // Nothing to show yet (AssistantContent renders nothing): no step, so no dot of its own —
+    // and no break in the tool run either. An assistant message that carries only a tool call is
+    // empty while it streams and is dropped from `visible` once it is `done` (isEmptyAssistant),
+    // so breaking the group here would split the card and then merge it a moment later, which
+    // moved the timeline under the reader.
+    if (!it.text && (hideThinking || !it.thinking)) continue;
     // Assistente (texto/thinking): quebra o grupo.
     flushGroup();
-    // Nothing to show yet (AssistantContent renders nothing): no step, so no dot of its own.
-    if (!it.text && (hideThinking || !it.thinking)) continue;
     nodes.push(
       <div key={it.id} className="tl-step text">
         <AssistantContent item={it} t={t} defaultShowThinking={defaultShowThinking} hideThinking={hideThinking} />
@@ -834,6 +838,8 @@ function ToolCard({
   // The global default (setting) changed: re-syncs the already mounted cards.
   useEffect(() => setOpen(defaultOpen), [defaultOpen]);
   const item = items[0]; // primary (header)
+  // The LAST call of a merged run drives the description: while a sequence of Bash commands is
+  // still arriving, the header says what is running now instead of what started the run.
   const last = items[items.length - 1];
   const peek = !open && item.name === 'Bash' ? bashPeek(items) : undefined;
   const peekHtml = useMemo(() => (peek ? highlightCode(peek.text, 'bash').html : ''), [peek?.text]);
@@ -843,8 +849,11 @@ function ToolCard({
   const filePath = typeof input.file_path === 'string' ? input.file_path : undefined;
   const name = item.name;
   // What Claude says a Bash command is for (the `description` it passes), like the official panel.
+  const lastInput = (last.input ?? {}) as Record<string, unknown>;
   const description =
-    showDescription && name === 'Bash' && typeof input.description === 'string' ? input.description.trim() : '';
+    showDescription && name === 'Bash' && typeof lastInput.description === 'string'
+      ? lastInput.description.trim()
+      : '';
   // EndConversation: the agent closed the session itself. Surface the reason it gave.
   const endReason =
     name === 'EndConversation'
