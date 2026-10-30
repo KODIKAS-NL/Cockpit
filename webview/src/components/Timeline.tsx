@@ -797,9 +797,11 @@ function AssistantContent({
 const PEEK_LINES = 3;
 
 /**
- * What a collapsed Bash card shows: the command itself, at most PEEK_LINES lines. A single call
- * shows its first lines; a merged card shows one line per command. `cut` says something is
- * hidden, so the last line fades out only then.
+ * What a collapsed Bash card shows: the command itself, at most PEEK_LINES lines, reading like a
+ * terminal — the END of the run, newest at the bottom. A single call shows its last lines; a
+ * merged card shows one line per command. `cut` says something is hidden ABOVE, so the first line
+ * fades out only then. Nothing scrolls: keeping the tail is the same result without the jitter of
+ * scrolling a box that grows while the run is still going.
  */
 function bashPeek(items: ToolItem[]): { text: string; cut: boolean } | undefined {
   const cmds = items
@@ -809,12 +811,11 @@ function bashPeek(items: ToolItem[]): { text: string; cut: boolean } | undefined
   if (cmds.length === 0) return undefined;
   if (cmds.length === 1) {
     const lines = cmds[0];
-    return { text: lines.slice(0, PEEK_LINES).join('\n'), cut: lines.length > PEEK_LINES };
+    return { text: lines.slice(-PEEK_LINES).join('\n'), cut: lines.length > PEEK_LINES };
   }
-  const shown = cmds.slice(0, PEEK_LINES);
+  const shown = cmds.slice(-PEEK_LINES);
   const text = shown.map((l) => (l.length > 1 ? `${l[0]} …` : l[0])).join('\n');
-  const last = shown[shown.length - 1];
-  return { text, cut: cmds.length > PEEK_LINES || last.length > 1 };
+  return { text, cut: cmds.length > PEEK_LINES };
 }
 
 /** Aggregated status of a (merged) tool card: error when any failed, busy while any runs. */

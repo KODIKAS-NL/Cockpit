@@ -1346,7 +1346,8 @@ body {
   max-height: 50vh;
   overflow: auto;
 }
-/* Collapsed Bash card: the command in at most 3 lines, the last one fading out when cut. */
+/* Collapsed Bash card: the command in at most 3 lines, reading like a terminal — the newest at
+   the bottom, the first one fading out when there is more above. */
 .tool-peek {
   padding: 0 8px 6px;
   cursor: pointer;
@@ -1370,8 +1371,8 @@ body {
   text-overflow: ellipsis;
 }
 .tool-peek.cut .tool-peek-code {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 1.6em), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 1.6em), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.6em);
+  mask-image: linear-gradient(to bottom, transparent, #000 1.6em);
 }
 
 /* Edições mescladas (mesmo arquivo, seguidas): separador entre cada diff. */
