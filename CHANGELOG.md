@@ -39,6 +39,7 @@ and the project adopts semantic versioning.
   The canvas is always white, whatever the VS Code theme.
 
 ### Fixed
+- **Every tab keeps its own prompt.** The prompt box is a single one shared by all tabs, so what was typed in one conversation followed you into the next. What is being composed — text, pasted images and uploaded files — is now parked under the tab you leave and put back when you open it again.
 - **The timeline no longer jumps when a command is added to a running sequence.** A new Bash call appeared as a card of its own and merged into the run a moment later, moving everything under it. The cause was the assistant message carrying the call: empty while it streams, it broke the run, and it is dropped once complete, which re-merged the card. An assistant message that shows nothing now leaves the run alone.
 - **A long conversation no longer comes back empty.** A transcript over 512 MB could not be read at all: it was
   loaded as one string, and that is Node's limit, so the session lost its history and its title and vanished from

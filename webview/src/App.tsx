@@ -26,6 +26,7 @@ import { createTranslator } from './i18n';
 import { CliMissing } from './components/CliMissing';
 import { Timeline } from './components/Timeline';
 import { Composer } from './components/Composer';
+import type { UploadedFile } from './components/Attachments';
 import { HubView } from './components/HubView';
 import { UsageModal } from './components/UsageModal';
 import { PluginsModal } from './components/PluginsModal';
@@ -61,7 +62,14 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
   // so it can be re-sent with force=true if the user confirms.
   const [confirmEffort, setConfirmEffort] = useState<{ selected: string; min: string } | null>(null);
   const lastSendRef = useRef<{ text: string; images: ImageAttachment[]; uuid?: string } | null>(null);
-  const [draftRestore, setDraftRestore] = useState<{ text: string; images: ImageAttachment[] } | null>(null);
+  type Draft = { text: string; images: ImageAttachment[]; files?: UploadedFile[] };
+  const [draftRestore, setDraftRestore] = useState<Draft | null>(null);
+  // One Composer serves every tab (it is hidden, never unmounted, so its state survives a
+  // switch). The draft therefore belongs to the tab, not to the box: what is being composed is
+  // parked here under the tab being left and put back when it is opened again.
+  const draftsByTab = useRef(new Map<string, Draft>());
+  const liveDraft = useRef<Draft>({ text: '', images: [], files: [] });
+  const draftTab = useRef('');
   const [padImages, setPadImages] = useState<ImageAttachment[] | null>(null);
   const [showUsage, setShowUsage] = useState(false);
   const [usage, setUsage] = useState<UsageData | null>(null);
@@ -218,6 +226,23 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
     if (el && atBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [items]);
 
+  // Tab switch: park what is composed under the tab being left and restore the new tab's.
+  useEffect(() => {
+    const to = state.activeTab;
+    const from = draftTab.current;
+    if (from === to) return;
+    draftTab.current = to;
+    // First run: only note which tab is open. Nothing is composed yet, and the host restores
+    // this tab's own draft (`draftRestore`) around now — injecting an empty one would eat it.
+    if (!from) return;
+    const d = liveDraft.current;
+    if (d.text || d.images.length || d.files?.length) draftsByTab.current.set(from, d);
+    else draftsByTab.current.delete(from);
+    if (!to) return;
+    // Always injected, empty included: a tab with nothing parked must clear the box, not inherit it.
+    setDraftRestore(draftsByTab.current.get(to) ?? { text: '', images: [], files: [] });
+  }, [state.activeTab]);
+
   // Tab switch: goes to the bottom and resets the "at bottom" state.
   useEffect(() => {
     const el = scrollRef.current;
@@ -263,6 +288,9 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
   }, []);
   const onRewind = useCallback((idx: number) => setConfirmRewind(idx), []);
   const onDraftInjected = useCallback(() => setDraftRestore(null), []);
+  const onDraftChange = useCallback((d: Draft) => {
+    liveDraft.current = d;
+  }, []);
   const onImagesInjected = useCallback(() => setPadImages(null), []);
   const onTextInjected = useCallback(() => setInjectText(null), []);
   const onToggleExpandAll = useCallback(() => setAllExpanded((a) => !(a ?? false)), []);
@@ -841,6 +869,7 @@ export function App({ view, sessionId }: { view: 'chat' | 'hub' | 'sidebar'; ses
         slashBusy={state.slashResearching}
         injectDraft={draftRestore}
         onDraftInjected={onDraftInjected}
+        onDraftChange={onDraftChange}
         injectImages={padImages}
         onImagesInjected={onImagesInjected}
         injectText={injectText}

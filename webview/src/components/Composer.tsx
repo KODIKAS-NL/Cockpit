@@ -44,8 +44,13 @@ interface Props {
   slashMeta: Record<string, SlashCmdMeta>;
   slashBusy: boolean;
   // Draft a restaurar no input (ex.: cancelou o gate de effort). Muda de ref p/ disparar.
-  injectDraft?: { text: string; images: ImageAttachment[] } | null;
+  injectDraft?: { text: string; images: ImageAttachment[]; files?: UploadedFile[] } | null;
   onDraftInjected?: () => void;
+  /**
+   * Every change of what is composed, undebounced. The parent keeps it per tab: one Composer
+   * serves every tab, so without this a draft follows the reader into the next conversation.
+   */
+  onDraftChange?: (draft: { text: string; images: ImageAttachment[]; files: UploadedFile[] }) => void;
   /** Images to append to the attachments (the scratchpad's board). */
   injectImages?: ImageAttachment[] | null;
   onImagesInjected?: () => void;
@@ -104,6 +109,7 @@ export const Composer = memo(function Composer({
   slashBusy,
   injectDraft,
   onDraftInjected,
+  onDraftChange,
   injectImages,
   onImagesInjected,
   injectText,
@@ -522,6 +528,17 @@ export const Composer = memo(function Composer({
   // renderer's death — blank screen). Debounced so it doesn't flood. Restored on reload.
   const draftTimer = useRef<number | undefined>(undefined);
   const mirroredOnce = useRef(false);
+  // What is composed right now, for the parent to park under the tab being left. Undebounced:
+  // a switch straight after the last keystroke must not lose it.
+  useEffect(() => {
+    onDraftChange?.({
+      text,
+      images: images.map(({ mediaType, data }) => ({ mediaType, data })),
+      files,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, images, files]);
+
   useEffect(() => {
     // Doesn't erase the host's draft on mount with empty text (a race with the
     // restore still on its way). It only starts mirroring after the first content.
@@ -548,6 +565,7 @@ export const Composer = memo(function Composer({
         url: `data:${i.mediaType};base64,${i.data}`,
       })),
     );
+    setFiles(injectDraft.files ?? []);
     requestAnimationFrame(() => ref.current?.focus());
     onDraftInjected?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
