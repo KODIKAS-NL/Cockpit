@@ -546,6 +546,21 @@ type HostMsg =
   | { kind: 'history'; items: HistoryItem[] }
   | { kind: 'resolvedPath'; requestId: string; text: string }
   | { kind: 'uploadedFiles'; requestId: string; files: { abs: string; rel: string; name: string; size: number }[] }
+  /**
+   * What the host knows about a file the agent sent with `SendUserFile` (answer to `fileCard`):
+   * `path` as the card asked for it, the resolved path to open, and the bytes of an image small
+   * enough to show inline — a webview cannot read the disk, and the file is rarely under a root
+   * it is allowed to load from.
+   */
+  | {
+      kind: 'fileCardInfo';
+      path: string;
+      abs: string;
+      name: string;
+      exists: boolean;
+      size?: number;
+      dataUri?: string;
+    }
   | { kind: 'openSessions' }
   | { kind: 'usageData'; data: UsageData } // resposta ao botão "Usage"
   | { kind: 'effortGate'; selected: string; min: string } // effort < the folder CLAUDE.md minimum: confirm first
@@ -668,6 +683,8 @@ export type WebviewToHost =
   // The pill of an uploaded file was removed before sending: delete the file the host saved.
   | { kind: 'deleteUpload'; abs: string }
   | { kind: 'openLink'; href: string; preview?: boolean }
+  /** A file card (`SendUserFile`) asks the host for the file: size, and the bytes when it is an image. */
+  | { kind: 'fileCard'; path: string }
   | { kind: 'interrupt' }
   | { kind: 'newSession' }
   | {

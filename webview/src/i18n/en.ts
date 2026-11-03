@@ -393,6 +393,10 @@ export const en = {
   'tool.endConversation': 'The agent ended the conversation',
   'tool.subagent': 'Subagent output',
 
+  'file.sent': 'Sent to you',
+  'file.missing': 'File not found',
+  'file.zoom': 'Open the image',
+
   'status.idle': 'Idle',
   'status.busy': 'Working…',
   'background.title': 'Running in the background',

@@ -7,6 +7,10 @@ and the project adopts semantic versioning.
 ## [Unreleased]
 
 ### Added
+- **A file the agent sends you is shown, not described.** `SendUserFile` — how Claude hands you a diagram, a
+  report, a screenshot or a built artifact — used to render as a tool card with its raw JSON. It is now a file
+  card: the caption, the image inline (click to open it in the viewer), and a line per file with its size that
+  opens it in the editor. Files sent this way stay visible at every verbosity.
 - **Rider plugin.** Cockpit also runs in JetBrains Rider 2026.2, locally or through Remote Development
   (JetBrains Client on a laptop, backend on the machine that holds the code and the daemon). It is a split
   plugin (shared, frontend and backend modules): the backend runs the sidecar (`dist/sidecar.js`, the

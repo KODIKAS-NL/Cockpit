@@ -19,6 +19,7 @@ import { Markdown } from './Markdown';
 import { CodeBlock } from './CodeBlock';
 import { DiffView } from './DiffView';
 import { TodoCard } from './Todos';
+import { FileCard } from './FileCard';
 import { useImageViewer } from './ImageViewer';
 import { Tooltip, type TooltipRow } from './Tooltip';
 import { Icon } from './Icon';
@@ -338,7 +339,9 @@ function visibleInTimeline(it: TimelineItem, verbosity: string, lastAssistId?: s
   // Aviso do engine aparece em qualquer verbosidade: é a causa de algo que o usuário vai notar.
   if (it.kind === 'notice') return true;
   // tool
-  if (it.name === 'AskUserQuestion' || isTodoToolName(it.name)) return true;
+  // A file the agent handed to the reader is the point of the call, not a step: it stays visible
+  // at every verbosity, like a question.
+  if (it.name === 'AskUserQuestion' || it.name === 'SendUserFile' || isTodoToolName(it.name)) return true;
   if (verbosity === 'quiet') return false;
   return MERGE_EDIT.test(it.name); // necessary/dialogo: edits only
 }
@@ -406,6 +409,16 @@ function ClaudeTurnView({
         );
         todoShown = true;
       }
+      continue;
+    }
+    // SendUserFile: a file card, never merged and never folded.
+    if (it.kind === 'tool' && it.name === 'SendUserFile') {
+      flushGroup();
+      nodes.push(
+        <div key={it.id} className="tl-step tool ok">
+          <FileCard item={it} t={t} />
+        </div>,
+      );
       continue;
     }
     // AskUserQuestion: its own card (not merged).

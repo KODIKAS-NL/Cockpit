@@ -1029,6 +1029,50 @@ export abstract class CockpitCore {
     return out;
   }
 
+  /** Biggest image the chat shows inline on a file card, in bytes. */
+  protected static readonly CARD_IMAGE_MAX = 8 * 1024 * 1024;
+
+  /** Image types a webview can show from a data URI. */
+  private static readonly CARD_IMAGE_TYPES: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.bmp': 'image/bmp',
+    '.avif': 'image/avif',
+    '.svg': 'image/svg+xml',
+  };
+
+  /**
+   * Answers a file card (`SendUserFile`): the file as the host sees it. The webview cannot read
+   * the disk — a file in /tmp is outside every root it may load from — so an image small enough
+   * goes along as a data URI and is shown inline; anything else is a line the reader can open.
+   */
+  protected fileCard(p: string): void {
+    const abs = path.isAbsolute(p) ? p : path.join(this.workspaceCwd(), p);
+    const name = path.basename(abs);
+    let size: number;
+    try {
+      const st = fs.statSync(abs);
+      if (!st.isFile()) throw new Error('not a file');
+      size = st.size;
+    } catch {
+      this.post({ kind: 'fileCardInfo', path: p, abs, name, exists: false });
+      return;
+    }
+    const mediaType = CockpitCore.CARD_IMAGE_TYPES[path.extname(abs).toLowerCase()];
+    let dataUri: string | undefined;
+    if (mediaType && size <= CockpitCore.CARD_IMAGE_MAX) {
+      try {
+        dataUri = `data:${mediaType};base64,${fs.readFileSync(abs).toString('base64')}`;
+      } catch {
+        /* unreadable: the card still shows the file, without the preview */
+      }
+    }
+    this.post({ kind: 'fileCardInfo', path: p, abs, name, exists: true, size, dataUri });
+  }
+
   /** Removes uploaded files older than `uploadRetentionDays` (0 keeps them all). */
   protected sweepUploads(): void {
     const days = Number(this.cfg().get<number>('uploadRetentionDays', 30));
@@ -2612,6 +2656,9 @@ export abstract class CockpitCore {
         break;
       case 'deleteUpload':
         this.deleteUpload(m.abs);
+        break;
+      case 'fileCard':
+        this.fileCard(m.path);
         break;
       case 'readClipboardFiles': {
         // The OS clipboard is the one of the machine this host runs on. Over Remote-SSH or in

@@ -7308,3 +7308,84 @@ body {
 .file-pill-remove:hover {
   opacity: 1;
 }
+
+/* File card (SendUserFile): what the agent handed to the reader, not a step of the work. */
+.file-card {
+  border: 1px solid var(--vscode-panel-border, rgba(127, 127, 127, 0.3));
+  border-left: 3px solid var(--vscode-charts-blue, #3794ff);
+  border-radius: 8px;
+  background: var(--vscode-editorWidget-background, transparent);
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+.file-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.file-card-icon {
+  font-size: 12px;
+  opacity: 0.9;
+}
+.file-card-title {
+  font-weight: 600;
+  font-size: 12px;
+}
+.file-card-caption {
+  margin: 4px 0 2px;
+  opacity: 0.9;
+  white-space: pre-wrap;
+}
+.file-card-file {
+  margin-top: 6px;
+}
+.file-card-thumb {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+}
+.file-card-thumb img {
+  max-width: 100%;
+  /* Tall output (a page render) is capped: the viewer shows it whole. */
+  max-height: 340px;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid var(--vscode-panel-border, transparent);
+}
+.file-card-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11px;
+  margin-top: 2px;
+}
+.file-card-name {
+  font-family: var(--vscode-editor-font-family, monospace);
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-card-name:hover {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: underline;
+}
+.file-card-size,
+.file-card-missing {
+  color: var(--vscode-descriptionForeground, #8a8a8a);
+}
+.file-card-missing {
+  color: var(--vscode-charts-red, #f85149);
+}
+.file-card-open {
+  margin-left: auto;
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+}
+.file-card-open:hover {
+  text-decoration: underline;
+}

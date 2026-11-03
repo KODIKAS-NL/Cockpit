@@ -102,6 +102,46 @@ describe('CockpitCore', () => {
     expect(host.opened[0]).toMatchObject({ path: file, line: 3 });
   });
 
+  it('fileCard answers with the image bytes, and says when the file is gone', () => {
+    // a 1x1 PNG
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const img = path.join(dir, 'shot.png');
+    fs.writeFileSync(img, png);
+    core.send({ kind: 'fileCard', path: img } as WebviewToHost);
+    const info = core.hub.got.filter((m) => m.kind === 'fileCardInfo').pop() as unknown as {
+      path: string;
+      abs: string;
+      name: string;
+      exists: boolean;
+      size: number;
+      dataUri?: string;
+    };
+    expect(info).toMatchObject({ path: img, abs: img, name: 'shot.png', exists: true, size: png.length });
+    expect(info.dataUri).toBe(`data:image/png;base64,${png.toString('base64')}`);
+
+    // a text file is a line in the card, never bytes
+    const txt = path.join(dir, 'report.md');
+    fs.writeFileSync(txt, '# hi');
+    core.send({ kind: 'fileCard', path: 'report.md' } as WebviewToHost);
+    const doc = core.hub.got.filter((m) => m.kind === 'fileCardInfo').pop() as unknown as {
+      path: string;
+      abs: string;
+      exists: boolean;
+      dataUri?: string;
+    };
+    expect(doc).toMatchObject({ path: 'report.md', abs: txt, exists: true });
+    expect(doc.dataUri).toBeUndefined();
+
+    core.send({ kind: 'fileCard', path: path.join(dir, 'gone.png') } as WebviewToHost);
+    expect(core.hub.got.filter((m) => m.kind === 'fileCardInfo').pop()).toMatchObject({
+      exists: false,
+      name: 'gone.png',
+    });
+  });
+
   it('setPermissionMode writes the setting', () => {
     core.send({ kind: 'init' } as WebviewToHost);
     core.send({ kind: 'setPermissionMode', mode: 'acceptEdits' } as WebviewToHost);

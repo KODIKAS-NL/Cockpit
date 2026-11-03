@@ -323,6 +323,10 @@ export const ptBR: Partial<Strings> = {
   'tool.endConversation': 'O agente encerrou a conversa',
   'tool.subagent': 'Saída do subagente',
 
+  'file.sent': 'Enviado para você',
+  'file.missing': 'Arquivo não encontrado',
+  'file.zoom': 'Abrir a imagem',
+
   'status.idle': 'Ocioso',
   'status.busy': 'Trabalhando…',
   'background.title': 'Executando em segundo plano',
