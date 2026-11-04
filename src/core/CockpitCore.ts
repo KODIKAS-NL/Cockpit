@@ -1333,8 +1333,7 @@ export abstract class CockpitCore {
           source: this.lastUsageSource,
           // Falling back to the estimate is never silent: the modal says why the real source
           // (OAuth API) didn't answer.
-          sourceError:
-            this.lastUsageSource === 'estimate' ? usageDiagnostics().lastError : undefined,
+          sourceError: this.lastUsageSource === 'estimate' ? usageSourceError() : undefined,
           trackingEnabled: usageTrackingEnabled(),
           breakdown: local.breakdown,
           attribution: local.attribution,
@@ -3512,6 +3511,18 @@ function stripWrappingFence(s: string): string {
 }
 
 /** LimitWindow (interno) -> UsageBucket (protocolo do modal Usage). */
+/**
+ * Why the panel is on the local estimate. A 429 also says when the API will be asked again:
+ * the hold is deliberate (every window on the machine shares one reading), not a failure
+ * waiting to be retried on the next refresh.
+ */
+function usageSourceError(): string | undefined {
+  const d = usageDiagnostics();
+  if (!d.lastError) return undefined;
+  if (d.retryInMs == null) return d.lastError;
+  return `${d.lastError} (next try in ${Math.max(1, Math.round(d.retryInMs / 60_000))} min)`;
+}
+
 function toBucket(w?: LimitWindow): UsageBucket | undefined {
   if (!w) return undefined;
   return { usedPct: w.usedPct, resetsAt: w.resetsAt, tokens: w.tokens, usd: w.usd };

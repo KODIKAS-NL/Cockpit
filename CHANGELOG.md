@@ -43,6 +43,14 @@ and the project adopts semantic versioning.
   The canvas is always white, whatever the VS Code theme.
 
 ### Fixed
+- **One usage reading per machine, not per window.** Every window asked the account API on its own, every
+  two minutes and at the end of each turn, which earned an HTTP 429 and dropped the panel to the local
+  estimate. The reading is now shared through `~/.cockpit/usage-api.json`: the API is asked at most every
+  5 minutes per machine (30 s for the Usage button), only one process fetches at a time, and a window that
+  reloads starts from the last reading. A 429 is no longer retried — it sets a growing hold, never shorter
+  than the server's `Retry-After`, shared with every other window, and the Usage modal says when the next
+  try is. A good reading also stays usable for 30 minutes instead of 15, so a hold shows a real percentage
+  from minutes ago rather than falling back to the estimate.
 - **Every tab keeps its own prompt.** The prompt box is a single one shared by all tabs, so what was typed in one conversation followed you into the next. What is being composed — text, pasted images and uploaded files — is now parked under the tab you leave and put back when you open it again.
 - **The timeline no longer jumps when a command is added to a running sequence.** A new Bash call appeared as a card of its own and merged into the run a moment later, moving everything under it. The cause was the assistant message carrying the call: empty while it streams, it broke the run, and it is dropped once complete, which re-merged the card. An assistant message that shows nothing now leaves the run alone.
 - **A long conversation no longer comes back empty.** A transcript over 512 MB could not be read at all: it was
