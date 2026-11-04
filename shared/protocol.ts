@@ -399,6 +399,8 @@ export interface SessionInfo {
   model?: string; // last observed model
   // Daemon mode: the session's process is alive in cockpit-daemon (busy = a turn is running).
   live?: 'busy' | 'running';
+  /** Remote Control is on for this conversation (the phone / claude.ai/code share it). */
+  remote?: boolean;
 }
 
 // One option of an AskUserQuestion question.

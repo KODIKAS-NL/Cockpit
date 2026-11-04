@@ -578,6 +578,7 @@ export const en = {
   'sessions.details': 'Session details',
   'sessions.reload': 'Reload view (fix gray/blank panel)',
   'sessions.remote': 'Remote control (follow & interact from your phone)',
+  'sessions.remoteOn': 'Remote control is on — click to turn it off',
   'sessions.openHint': 'Click to open in its tab (or a new one).',
   'model.default': 'Default',
   'effort.default': 'Default',

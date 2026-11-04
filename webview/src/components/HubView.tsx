@@ -407,7 +407,15 @@ function SessionCard({
       {/* A small tab on the card's top edge, outside the button: the title keeps the full width. */}
       <span className="ctx-card-tools">
         <CardAction icon="info" label={t('sessions.details')} pressed={infoOpen} keep onClick={() => setInfoOpen((o) => !o)} />
-        <CardAction icon="remote" label={t('sessions.remote')} onClick={() => onRemote(s.id)} />
+        {/* On: the icon stays lit and visible without hovering — it is a state, not just a button. */}
+        <CardAction
+          icon="remote"
+          label={t(s.remote ? 'sessions.remoteOn' : 'sessions.remote')}
+          pressed={s.remote}
+          keep={s.remote}
+          on={s.remote}
+          onClick={() => onRemote(s.id)}
+        />
         <CardAction icon="reload" label={t('sessions.reload')} onClick={() => onReload(s.id)} />
         <CardAction icon="edit" label={t('sessions.rename')} onClick={startEdit} />
         <CardAction icon="trash" label={t('sessions.delete')} danger onClick={() => onDelete(s)} />
@@ -452,6 +460,7 @@ function CardAction({
   pressed,
   danger,
   keep,
+  on,
   onClick,
 }: {
   icon: IconName;
@@ -459,11 +468,12 @@ function CardAction({
   pressed?: boolean;
   danger?: boolean;
   keep?: boolean; // stays visible on the active card; the others show on hover
+  on?: boolean; // the thing it toggles is ON (shown in the "live" colour)
   onClick: () => void;
 }) {
   return (
     <span
-      className={`ctx-card-act ${pressed ? 'open' : ''} ${danger ? 'danger' : ''} ${keep ? 'keep' : ''}`}
+      className={`ctx-card-act ${pressed ? 'open' : ''} ${danger ? 'danger' : ''} ${keep ? 'keep' : ''} ${on ? 'on' : ''}`}
       title={label}
       aria-label={label}
       role="button"

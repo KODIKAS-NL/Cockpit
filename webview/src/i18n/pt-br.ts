@@ -508,6 +508,7 @@ export const ptBR: Partial<Strings> = {
   'sessions.details': 'Detalhes da sessão',
   'sessions.reload': 'Recarregar visão (corrige painel cinza/branco)',
   'sessions.remote': 'Controle remoto (acompanhe e interaja pelo celular)',
+  'sessions.remoteOn': 'Controle remoto ligado — clique para desligar',
   'sessions.openHint': 'Clique para abrir na aba dela (ou em uma nova).',
   'model.default': 'Padrão',
   'effort.default': 'Padrão',

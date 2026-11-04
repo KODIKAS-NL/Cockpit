@@ -389,7 +389,14 @@ export abstract class CockpitCore {
 
   protected hooksFor(tabId: string): SessionHooks {
     return {
-      emit: (msg) => this.post(msg, tabId),
+      emit: (msg) => {
+        this.post(msg, tabId);
+        // Remote Control went on or off — here, or in another window the daemon told us about.
+        // The Hub's phone icon shows that state, so the list is worth re-reading.
+        if (msg.kind === 'remoteState') {
+          void this.refreshDaemonSessions().then(() => this.sendSessions());
+        }
+      },
       onBusy: (busy) => {
         this.setTabStatus(tabId, busy ? 'busy' : 'idle');
         // Turn finished on the local engine: repaint from the transcript the
@@ -1236,12 +1243,16 @@ export abstract class CockpitCore {
     sessions.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
     if (this.daemonSessions.length) {
       const live = new Map<string, 'busy' | 'running'>();
+      const remote = new Set<string>();
       for (const d of this.daemonSessions) {
-        if (d.cliSessionId && d.state !== 'idle') live.set(d.cliSessionId, d.state);
+        if (!d.cliSessionId) continue;
+        if (d.state !== 'idle') live.set(d.cliSessionId, d.state);
+        if (d.remote?.on) remote.add(d.cliSessionId);
       }
       for (const info of sessions) {
         const state = live.get(info.id);
         if (state) info.live = state;
+        if (remote.has(info.id)) info.remote = true;
       }
     }
     this.post({ kind: 'sessions', sessions, cwd });

@@ -100,6 +100,10 @@ and the project adopts semantic versioning.
 - The language label of a code block no longer overlaps its copy button.
 
 ### Changed
+- **The phone icon on a session card shows whether Remote Control is on.** It was a button with no state:
+  the same icon whether the conversation was shared or not. It now lights up green and stays visible while
+  Remote Control is on for that conversation, and says so in its tooltip. The state comes from the daemon,
+  so turning it on in another window (or from the phone) is reflected here too.
 - **The collapsed Bash card reads like a terminal.** It showed the first three lines of a run and faded out at the bottom, so a long sequence kept showing how it started. It now shows the last three — newest at the bottom — and fades at the top to say there is more above.
 - **A merged run of Bash commands shows the command running now.** The card's description came from the first call of the run and stayed there; it now follows the last one, so a sequence of commands keeps the header current instead of naming what started it.
 - **A plan revision replaces its plan file.** A plan sent back with **Keep planning** and then revised no longer leaves a dated copy per revision in `Planing/`. The revision is written under its own timestamp and slug, and the file of the earlier revision is removed (only a plan file of `Planing/` is ever removed). Once a plan is approved it is final, and the next plan gets a new file. In Bypass every plan is approved at once, so every plan keeps its own file.

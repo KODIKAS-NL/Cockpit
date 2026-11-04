@@ -7389,3 +7389,13 @@ body {
 .file-card-open:hover {
   text-decoration: underline;
 }
+
+/* A card action whose thing is ON (Remote Control): the live colour, always visible. */
+.ctx-card-act.on {
+  color: var(--vscode-charts-green, #3fb950);
+  opacity: 1;
+  background: color-mix(in srgb, var(--vscode-charts-green, #3fb950) 18%, transparent);
+}
+.ctx-card-act.on:hover {
+  background: color-mix(in srgb, var(--vscode-charts-green, #3fb950) 30%, transparent);
+}
