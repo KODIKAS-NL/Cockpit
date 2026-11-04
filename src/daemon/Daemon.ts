@@ -214,10 +214,13 @@ export class Daemon {
       case 'send':
         this.need(msg.sessionId).send(conn, msg.msg);
         return;
-      case 'stop':
-        this.log(`[${msg.sessionId}] stop requested by ${conn.id}`);
-        this.need(msg.sessionId).stop();
+      case 'stop': {
+        this.log(`[${msg.sessionId}] stop requested by ${conn.id}${msg.byUser ? ' (a person pressed Stop)' : ''}`);
+        const s = this.need(msg.sessionId);
+        if (msg.byUser) s.stopByUser();
+        else s.stop();
         return;
+      }
       case 'forget': {
         const s = this.need(msg.sessionId);
         this.log(`[${s.id}] forget (${s.info().cliSessionId ?? 'no CLI session yet'}) requested by ${conn.id}`);

@@ -325,6 +325,24 @@ export class DaemonSession {
     this.restartTimer = undefined;
   }
 
+  /**
+   * Somebody asked for this conversation's process to stop (the daemon app's Stop button, a
+   * window's Stop). Remote Control is turned off first: it is the one thing that would start
+   * the process again a second later (keepAlive), and a stop a person pressed means stop. The
+   * phone can be given the conversation again whenever it is running.
+   */
+  stopByUser(): void {
+    this.clearRestartTimer(); // a keep-alive restart already on its way
+    if (this.remoteOn) {
+      this.hooks.log(`[${this.id}] stop requested: turning Remote Control off, it would restart the process`);
+      this.remoteOn = false;
+      this.remoteUrl = undefined;
+      this.hooks.changed();
+      this.broadcast({ type: 'remote_state', sessionId: this.id, on: false, url: undefined });
+    }
+    this.stop();
+  }
+
   stop(): void {
     const proc = this.proc;
     if (!proc) return;

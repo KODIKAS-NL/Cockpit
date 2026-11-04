@@ -72,7 +72,9 @@ enum DaemonSocket {
         let reqId = "app-stop-\(UUID().uuidString)"
         _ = try exchange(
             socketPath: socketPath,
-            messages: [["op": "stop", "sessionId": id], ["op": "list", "reqId": reqId]],
+            // byUser: a person pressed Stop, so the daemon turns Remote Control off with it —
+            // keep-alive would otherwise start the process again a second later.
+            messages: [["op": "stop", "sessionId": id, "byUser": true], ["op": "list", "reqId": reqId]],
             timeout: 3
         ) { $0["reqId"] as? String == reqId }
     }

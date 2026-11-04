@@ -542,6 +542,13 @@ type HostMsg =
   | { kind: 'background'; tasks: BackgroundTask[] }
   | { kind: 'error'; message: string }
   | { kind: 'sessions'; sessions: SessionInfo[]; cwd: string }
+  /**
+   * Only the badges the daemon owns (running, Remote Control), for the list already on screen.
+   * The full `sessions` costs a read of every transcript in the folder, so it is sent when the
+   * dashboard opens; this is what keeps it current, including for conversations no window here
+   * has open.
+   */
+  | { kind: 'sessionsLive'; live: Record<string, 'busy' | 'running'>; remote: string[] }
   | { kind: 'slashCommands'; commands: string[] }
   | { kind: 'slashMeta'; meta: Record<string, SlashCmdMeta> }
   | { kind: 'slashResearching'; busy: boolean }

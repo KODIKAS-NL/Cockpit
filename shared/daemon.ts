@@ -96,8 +96,14 @@ export type ClientMessage =
   | { op: 'respec'; sessionId: string; spawn: SpawnSpec }
   /** One JSON line for the CLI's stdin (the same objects the CLI's stream-json takes). */
   | { op: 'send'; sessionId: string; msg: Record<string, unknown> }
-  /** Ends the CLI process; the session stays listed (idle) and restarts on the next send. */
-  | { op: 'stop'; sessionId: string }
+  /**
+   * Ends the CLI process; the session stays listed (idle) and restarts on the next send.
+   * `byUser`: a person pressed Stop (the daemon app, the window's command), as opposed to a
+   * restart to apply a setting. Remote Control is turned off with it — otherwise keep-alive
+   * starts the process again a second later and the stop looks ignored. An older daemon
+   * ignores the field and keeps the process alive, as it did before.
+   */
+  | { op: 'stop'; sessionId: string; byUser?: boolean }
   /** Ends the process and drops the session from the daemon's list. */
   /**
    * With a `reqId` the daemon answers `forgotten` once the process has really exited: the CLI

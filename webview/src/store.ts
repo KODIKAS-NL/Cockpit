@@ -229,6 +229,20 @@ export function reducer(state: UiState, action: Action): UiState {
       return { ...state, lastCopy: { text: msg.text, ref: msg.ref } };
     case 'sessions':
       return { ...state, sessions: msg.sessions, sessionsCwd: msg.cwd };
+    case 'sessionsLive': {
+      // Patches the badges of the list already on screen (the daemon's view of it), leaving
+      // everything the transcripts gave us alone.
+      const remote = new Set(msg.remote);
+      let changed = false;
+      const sessions = state.sessions.map((s) => {
+        const live = msg.live[s.id];
+        const on = remote.has(s.id) || undefined;
+        if (s.live === live && s.remote === on) return s;
+        changed = true;
+        return { ...s, live, remote: on };
+      });
+      return changed ? { ...state, sessions } : state;
+    }
     case 'slashMeta':
       return { ...state, slashMeta: { ...state.slashMeta, ...msg.meta } };
     case 'slashResearching':

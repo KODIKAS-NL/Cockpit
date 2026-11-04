@@ -78,8 +78,9 @@ export class DaemonClient {
     return { ok: m.ok, url: m.url, error: m.error };
   }
 
-  stop(sessionId: string): void {
-    this.post({ op: 'stop', sessionId });
+  /** `byUser`: a person pressed Stop, so the daemon also drops Remote Control (see the op). */
+  stop(sessionId: string, byUser = false): void {
+    this.post({ op: 'stop', sessionId, ...(byUser ? { byUser: true } : {}) });
   }
 
   forget(sessionId: string): void {

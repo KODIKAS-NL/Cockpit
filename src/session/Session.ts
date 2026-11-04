@@ -615,8 +615,12 @@ export class Session {
     dlog('session', `interrupt (${this.sessionId ?? '?'})`);
   }
 
-  /** Stops the process; keeps the statistics. The next message respawns it. */
-  stop(): void {
+  /**
+   * Stops the process; keeps the statistics. The next message respawns it.
+   * `byUser`: a person pressed Stop (not a restart to apply a setting), which also drops
+   * Remote Control in the daemon — keep-alive would otherwise bring the process straight back.
+   */
+  stop(byUser = false): void {
     // Close the message in flight, or the timeline keeps its caret blinking.
     if (this.currentAssistantId) this.emit({ kind: 'assistantDone', id: this.currentAssistantId });
     this.restartAfterTurn = false;
@@ -626,7 +630,7 @@ export class Session {
     this.stats.endTurn(); // closes the turn in flight (idle time after it isn't counted)
     this.persist();
     if (this.cli) dlog('session', `stop (${this.sessionId ?? this.resumeId ?? '?'})`);
-    this.cli?.stop();
+    this.cli?.stop(byUser);
     this.cli = undefined;
     this.setBusy(false);
     this.resetBgTasks();

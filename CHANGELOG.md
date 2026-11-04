@@ -43,6 +43,14 @@ and the project adopts semantic versioning.
   The canvas is always white, whatever the VS Code theme.
 
 ### Fixed
+- **Stop really stops a conversation shared with the phone.** Pressing Stop on a session in the daemon app
+  (or the window's stop command) killed the process, and Remote Control's keep-alive started it again a
+  second later. A stop a person pressed now turns Remote Control off with it; a restart to apply a setting
+  still comes back as before. Needs the rebuilt daemon app.
+- **The dashboard's badges follow conversations no window has open.** Running and Remote Control were only
+  refreshed for conversations this window had in a tab, so a conversation shared from the phone or another
+  window kept the wrong icon until the dashboard was reopened. The daemon-owned badges are now refreshed on
+  their own, without re-reading a single transcript.
 - **One usage reading per machine, not per window.** Every window asked the account API on its own, every
   two minutes and at the end of each turn, which earned an HTTP 429 and dropped the panel to the local
   estimate. The reading is now shared through `~/.cockpit/usage-api.json`: the API is asked at most every

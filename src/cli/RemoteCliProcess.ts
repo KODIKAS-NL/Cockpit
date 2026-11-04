@@ -138,9 +138,9 @@ export class RemoteCliProcess extends EventEmitter implements CliProcess {
   }
 
   /** Ends the process in the daemon (model/permission change, explicit stop). */
-  stop(): void {
+  stop(byUser = false): void {
     if (this.sessionId) {
-      this.client.stop(this.sessionId);
+      this.client.stop(this.sessionId, byUser);
       // This instance is done either way (a later start makes a new one, which re-attaches).
       this.client.detach(this.sessionId);
     }

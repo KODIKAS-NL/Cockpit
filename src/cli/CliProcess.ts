@@ -20,8 +20,12 @@ export interface CliProcess extends EventEmitter {
   /** `payload`: the request's other fields (`set_model` → `{ model }`). */
   requestControl(subtype: string, timeoutMs?: number, payload?: Record<string, unknown>): Promise<unknown>;
   interrupt(): void;
-  /** Ends the engine process. The next message starts it again (with --resume). */
-  stop(): void;
+  /**
+   * Ends the engine process. The next message starts it again (with --resume).
+   * `byUser`: a person pressed Stop, not a restart to apply a setting — the daemon also turns
+   * Remote Control off for it, as that would otherwise start the process again at once.
+   */
+  stop(byUser?: boolean): void;
   /**
    * Lets go of the process WITHOUT ending it, when something else keeps it alive (the
    * daemon). For a process the extension host owns, there is nothing to let go of: it stops.

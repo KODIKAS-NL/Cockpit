@@ -271,6 +271,22 @@ describe('cockpit-daemon', () => {
     await until(() => cliLog().filter((l) => l.request?.subtype === 'remote_control').length > before);
   });
 
+  it('a stop a person pressed turns Remote Control off, so the process stays down', async () => {
+    const a = await peer('A');
+    const s = await a.open(project, spec({ args: ['--resume', 'sess-u'] }));
+    a.write({ op: 'remote', sessionId: s.session.id, on: true, reqId: 'ru1' });
+    await a.wait((m) => m.type === 'remote_result');
+    a.write({ op: 'stop', sessionId: s.session.id, byUser: true });
+    await a.wait((m) => m.type === 'remote_state' && (m as any).on === false);
+    await a.wait((m) => m.type === 'exit');
+    // Keep-alive restarts a remote session one second after a stop: it must not, here.
+    await sleep(1500);
+    const info = (await a.list()).find((x: any) => x.id === s.session.id);
+    expect(info.state).toBe('idle');
+    expect(info.remote).toBeUndefined();
+    expect(spawnsOf('sess-u').length).toBe(1);
+  }, 10_000);
+
   it('keeps Remote Control on when re-enabling fails once after a restart', async () => {
     const flaky = path.join(os.tmpdir(), `fake-rc-${process.pid}-${Date.now()}`);
     const a = await peer('A');

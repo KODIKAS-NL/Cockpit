@@ -392,10 +392,9 @@ export abstract class CockpitCore {
       emit: (msg) => {
         this.post(msg, tabId);
         // Remote Control went on or off — here, or in another window the daemon told us about.
-        // The Hub's phone icon shows that state, so the list is worth re-reading.
-        if (msg.kind === 'remoteState') {
-          void this.refreshDaemonSessions().then(() => this.sendSessions());
-        }
+        // The Hub's phone icon shows that state: only the badges, never the whole list (which
+        // re-reads every transcript).
+        if (msg.kind === 'remoteState') void this.sendSessionsLive();
       },
       onBusy: (busy) => {
         this.setTabStatus(tabId, busy ? 'busy' : 'idle');
@@ -528,7 +527,7 @@ export abstract class CockpitCore {
   stopActiveDaemonSession(): boolean {
     const s = this.sessions.get(this.activeTab);
     if (!s || !s.isPersistent()) return false;
-    s.stop();
+    s.stop(true); // a person asked: Remote Control goes off with it, or it comes right back
     void this.refreshDaemonSessions().then(() => this.sendSessions());
     return true;
   }
@@ -772,10 +771,12 @@ export abstract class CockpitCore {
   async reportDaemonStatus(): Promise<void> {
     // The Tootega engine runs locally: nothing to report for it.
     if (currentEngine() !== 'claude') {
+      this.daemonConnected = false;
       this.post({ kind: 'daemonStatus', enabled: false, connected: false });
       return;
     }
     const pid = await probeDaemon(this.daemonSocketPath(), 1000);
+    this.daemonConnected = pid !== undefined;
     this.post({ kind: 'daemonStatus', enabled: true, connected: pid !== undefined, pid });
   }
 
@@ -784,8 +785,34 @@ export abstract class CockpitCore {
   /** Keeps the status fresh (the daemon can stop or start without this window noticing). */
   protected startDaemonStatusTimer(): void {
     if (this.daemonStatusTimer) return;
-    this.daemonStatusTimer = setInterval(() => void this.reportDaemonStatus(), 5000);
+    this.daemonStatusTimer = setInterval(() => {
+      void this.reportDaemonStatus().then(() => this.sendSessionsLive());
+    }, 5000);
     this.daemonStatusTimer.unref?.();
+  }
+
+  protected daemonConnected = false;
+  private lastLive = '';
+
+  /**
+   * The badges that belong to the daemon — a conversation that is running, and one shared with
+   * the phone — for every session in the folder, not only the ones this window has open. The
+   * full list re-reads every transcript, which is far too expensive for a timer; this is a
+   * `list` on the socket, and it is only sent when something actually changed.
+   */
+  protected async sendSessionsLive(): Promise<void> {
+    if (!this.daemonConnected) return;
+    const live: Record<string, 'busy' | 'running'> = {};
+    const remote: string[] = [];
+    for (const d of await this.refreshDaemonSessions()) {
+      if (!d.cliSessionId) continue;
+      if (d.state !== 'idle') live[d.cliSessionId] = d.state;
+      if (d.remote?.on) remote.push(d.cliSessionId);
+    }
+    const key = JSON.stringify([live, remote]);
+    if (key === this.lastLive) return;
+    this.lastLive = key;
+    this.post({ kind: 'sessionsLive', live, remote });
   }
 
   protected startUsageTimer(): void {
