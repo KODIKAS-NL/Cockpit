@@ -661,6 +661,7 @@ export const ptBR: Partial<Strings> = {
   'bubble.queued': 'Na fila',
   'timeline.taskDone': 'Tarefa em segundo plano concluída',
   'timeline.taskFailed': 'Tarefa em segundo plano falhou',
+  'timeline.taskLess': 'Clique para encurtar',
   'bubble.queuedHint': 'O Claude recebe esta mensagem no próximo passo',
   'bubble.showLess': 'Mostrar menos',
   'confirm.cancel': 'Cancelar',

@@ -43,6 +43,9 @@ and the project adopts semantic versioning.
   The canvas is always white, whatever the VS Code theme.
 
 ### Fixed
+- **A background task's notice is one line again.** The engine's summary quotes the whole command, so a
+  long one (a heredoc, a chain of greps) filled the screen with a wall of grey text. The line is now
+  clipped with an ellipsis — hover shows all of it, and a click opens it in place.
 - **A conversation renamed on the phone is renamed everywhere.** A rename through Remote Control (or the
   CLI's `/title`) is recorded by the engine in the transcript, and Cockpit only read the name the model
   generates — so the dashboard, the chat tab and the daemon app all kept the old one. The name a person gave

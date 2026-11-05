@@ -3702,6 +3702,22 @@ body {
 .notice-banner.task-notice {
   opacity: 0.8;
 }
+/* The engine's summary quotes the whole command: one line, and the click opens it. */
+.task-notice-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.notice-banner.task-notice.open {
+  align-items: flex-start;
+}
+.notice-banner.task-notice.open .task-notice-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-y: auto;
+  max-height: 180px;
+}
 .notice-banner.task-notice.error .notice-banner-mark {
   color: var(--vscode-errorForeground);
 }

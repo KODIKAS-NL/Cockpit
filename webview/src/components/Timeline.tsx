@@ -538,11 +538,32 @@ function parseTaskNotice(text?: string): { status: string; summary: string } | u
 const TaskNoticeBanner = memo(function TaskNoticeBanner({ item, t }: { item: UserItem; t: Translator }) {
   const n = parseTaskNotice(item.text);
   const failed = n?.status === 'failed';
+  // The engine's summary carries the whole command ("Background command \"<...>\" completed"),
+  // which for a heredoc is thousands of characters. One line, and the click opens it.
+  const [open, setOpen] = useState(false);
   return (
-    <div className={`notice-banner task-notice ${failed ? 'error' : ''}`} id={`msg-${item.id}`}>
+    <div
+      className={`notice-banner task-notice ${failed ? 'error' : ''}${open ? ' open' : ''}`}
+      id={`msg-${item.id}`}
+    >
       <span className="notice-banner-mark">{failed ? '✕' : '✓'}</span>
       <span className="notice-banner-label">{t(failed ? 'timeline.taskFailed' : 'timeline.taskDone')}</span>
-      {n?.summary && <span className="notice-banner-text">{n.summary}</span>}
+      {n?.summary && (
+        <span
+          className="notice-banner-text task-notice-text"
+          role="button"
+          tabIndex={0}
+          title={open ? t('timeline.taskLess') : n.summary}
+          onClick={() => setOpen((v) => !v)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            setOpen((v) => !v);
+          }}
+        >
+          {n.summary}
+        </span>
+      )}
       {item.queued && (
         <span className="bubble-queued" title={t('bubble.queuedHint')}>
           {t('bubble.queued')}

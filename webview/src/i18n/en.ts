@@ -731,6 +731,7 @@ export const en = {
   'bubble.queued': 'Queued',
   'timeline.taskDone': 'Background task finished',
   'timeline.taskFailed': 'Background task failed',
+  'timeline.taskLess': 'Click to shorten',
   'bubble.queuedHint': 'Claude takes this message in at its next step',
   'bubble.showLess': 'Show less',
   'confirm.cancel': 'Cancel',
