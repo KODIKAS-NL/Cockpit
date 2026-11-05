@@ -1,12 +1,19 @@
 // Images pasted into the plan feedback and question answers. Those replies carry only text back to
-// the CLI, so the images are saved as files under `Planing/.attachment-temp/` and the text names
+// the CLI, so the images are saved as files under `<plan folder>/.attachment-temp/` and the text names
 // them: Claude reads them with its Read tool. They are removed once the turn that used them ends.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ImageAttachment } from '../../shared/protocol';
 
-const DIR = path.join('Planing', '.attachment-temp');
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Next to the plan files (`cockpitDaemon.planFolder`). With the plan file turned off there is no
+ * such folder, and these go under `.cockpit/`, which every workspace using Cockpit already has.
+ */
+function tempDir(root: string, folder = 'Planing'): string {
+  return path.join(root, folder.trim() || '.cockpit', '.attachment-temp');
+}
 
 export interface SavedImages {
   /** Workspace-relative, forward slashes: what the text names. */
@@ -14,11 +21,16 @@ export interface SavedImages {
   abs: string[];
 }
 
-export function saveFeedbackImages(root: string, images: ImageAttachment[], now = new Date()): SavedImages {
+export function saveFeedbackImages(
+  root: string,
+  images: ImageAttachment[],
+  now = new Date(),
+  folder?: string,
+): SavedImages {
   const out: SavedImages = { rel: [], abs: [] };
   if (!root || images.length === 0) return out;
   try {
-    const dir = path.join(root, DIR);
+    const dir = tempDir(root, folder);
     fs.mkdirSync(dir, { recursive: true });
     const stamp = now.getTime();
     images.forEach((img, i) => {
@@ -62,9 +74,9 @@ export function removeFeedbackImages(abs: string[]): void {
 }
 
 /** On startup: files left by a window that closed before the turn ended. */
-export function sweepFeedbackImages(root: string, now = Date.now()): void {
+export function sweepFeedbackImages(root: string, now = Date.now(), folder?: string): void {
   try {
-    const dir = path.join(root, DIR);
+    const dir = tempDir(root, folder);
     const old = fs
       .readdirSync(dir)
       .map((n) => path.join(dir, n))

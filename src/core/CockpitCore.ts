@@ -239,7 +239,8 @@ export abstract class CockpitCore {
     if (secrets) this.creds = new CredentialsStore(secrets);
     this.defaults = readClaudeDefaults();
     setOneMContextDisabled(oneMContextDisabled(this.workspaceCwd()));
-    sweepFeedbackImages(this.workspaceCwd()); // images left behind by a window that closed mid-turn
+    // images left behind by a window that closed mid-turn
+    sweepFeedbackImages(this.workspaceCwd(), Date.now(), this.planFolder());
     this.sweepUploads();
     this.observedDefaultModel = this.memory.get<string>('defaultModel');
     this.restoreDiscovery();
@@ -990,8 +991,17 @@ export abstract class CockpitCore {
   }
 
   /**
-   * Writes a plan-mode plan to `Planing/<timestamp>-<slug>.md` at the repo root and opens it in
-   * the editor. Returns the workspace-relative path, or undefined when nothing could be written.
+   * The folder plan files go to: `cockpitDaemon.planFolder`, relative to the workspace (an
+   * absolute path is taken as it is). Empty turns the file off.
+   */
+  protected planFolder(): string {
+    return (this.cfg().get<string>('planFolder', 'Planing') ?? '').trim();
+  }
+
+  /**
+   * Writes a plan-mode plan to `<plan folder>/<timestamp>-<slug>.md` and opens it in the editor.
+   * Returns the workspace-relative path, or undefined when nothing could be written — with
+   * `cockpitDaemon.planFolder` empty nothing is, and the approval card shows the plan inline.
    *
    * The file is the plan's primary surface now — the permission card keeps only the approval
    * gate. The name carries a sortable timestamp plus a short slug taken from the first heading,
@@ -1001,9 +1011,10 @@ export abstract class CockpitCore {
    */
   protected savePlanFile(plan: string, previous?: string): string | undefined {
     const root = this.workspaceCwd();
-    if (!root) return undefined;
+    const folder = this.planFolder();
+    if (!root || !folder) return undefined;
     try {
-      const dir = path.join(root, 'Planing');
+      const dir = path.resolve(root, folder);
       fs.mkdirSync(dir, { recursive: true });
 
       // Several windows on one daemon session each see the same ExitPlanMode prompt: the
@@ -3149,7 +3160,7 @@ export abstract class CockpitCore {
   /** Saves pasted feedback images and returns the text with their paths named. */
   protected attachFeedback(text: string, images?: import('../../shared/protocol').ImageAttachment[]): string {
     if (!images?.length) return text;
-    const saved = saveFeedbackImages(this.workspaceCwd(), images);
+    const saved = saveFeedbackImages(this.workspaceCwd(), images, new Date(), this.planFolder());
     this.feedbackImages.push(...saved.abs);
     return withImagePaths(text, saved.rel);
   }

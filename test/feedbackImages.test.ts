@@ -23,6 +23,18 @@ describe('feedback images', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
+  it('follows the plan folder, and goes under .cockpit when the plan file is off', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fbimg-'));
+    const mine = saveFeedbackImages(root, [{ mediaType: 'image/png', data: 'eA==' }], new Date(), 'docs/Plans');
+    expect(mine.rel[0]).toMatch(/^docs\/Plans\/\.attachment-temp\/\d+-1\.png$/);
+    const off = saveFeedbackImages(root, [{ mediaType: 'image/png', data: 'eA==' }], new Date(), '  ');
+    expect(off.rel[0]).toMatch(/^\.cockpit\/\.attachment-temp\/\d+-1\.png$/);
+    sweepFeedbackImages(root, Date.now() + 2 * 24 * 60 * 60 * 1000, 'docs/Plans');
+    expect(fs.existsSync(mine.abs[0])).toBe(false);
+    expect(fs.existsSync(off.abs[0])).toBe(true); // another folder: untouched
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
   it('sweeps files older than a day', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fbimg-'));
     const saved = saveFeedbackImages(root, [{ mediaType: 'image/png', data: 'eA==' }]);

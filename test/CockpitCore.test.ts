@@ -86,6 +86,18 @@ describe('CockpitCore', () => {
     expect(fs.existsSync(outside)).toBe(true);
   });
 
+  it('the plan folder follows the setting, and empty turns the file off', () => {
+    settings.values.set('planFolder', 'docs/Plans');
+    const made = core.savePlan('# Somewhere else')!;
+    expect(made).toMatch(/^docs\/Plans\/\d{4}-\d{2}-\d{2}-\d{4}-somewhere-else\.md$/);
+    expect(fs.readFileSync(path.join(dir, made), 'utf8')).toBe('# Somewhere else\n');
+
+    // Off: nothing is written, and the approval card falls back to the plan inline.
+    settings.values.set('planFolder', '  ');
+    expect(core.savePlan('# Not written')).toBeUndefined();
+    expect(fs.readdirSync(path.join(dir, 'docs', 'Plans'))).toHaveLength(1);
+  });
+
   it('init posts the config, the tabs and the CLI status', () => {
     core.send({ kind: 'init' } as WebviewToHost);
     const kinds = core.hub.got.map((m) => m.kind);
