@@ -6,7 +6,13 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { encodeCwd, listSessions, loadTranscript } from '../src/session/SessionStore';
+import {
+  encodeCwd,
+  listSessions,
+  loadTranscript,
+  readSessionTitle,
+  writeSessionTitle,
+} from '../src/session/SessionStore';
 
 describe('encodeCwd — matches the CLI folder format', () => {
   it('replaces every non-alphanumeric char with a single "-"', () => {
@@ -106,5 +112,79 @@ describe('transcripts bigger than a chunk', () => {
     const assistant = items.find((i) => i.kind === 'assistant') as { text: string };
     expect(assistant.text).toHaveLength(huge.length);
     expect(listSessions(cwd).find((s) => s.id === id)?.messageCount).toBe(2);
+  });
+});
+
+// A rename made outside this window — `/title`, or on the phone through Remote Control — is
+// recorded by the CLI as a `custom-title` line in the transcript. Cockpit used to read only
+// `ai-title`, so the dashboard, the tab and the daemon all kept showing the old name.
+describe('the name a person gave the conversation', () => {
+  const cwd = path.join(os.tmpdir(), `cockpit-title-${process.pid}`);
+  const dir = path.join(os.homedir(), '.claude', 'projects', encodeCwd(cwd));
+  const id = '11111111-2222-3333-4444-555555555555';
+  const file = path.join(dir, `${id}.jsonl`);
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  const write = (lines: unknown[]): void => {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+  };
+
+  it('is read from the end of the transcript, and wins over the generated one', () => {
+    // Filler ahead of it: the reader only looks at the tail, which is where the CLI keeps
+    // re-appending this record.
+    const filler = { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'y'.repeat(50_000) }] } };
+    write([
+      { type: 'user', message: { role: 'user', content: 'the first thing I asked' } },
+      { type: 'ai-title', aiTitle: 'A name the model made up' },
+      filler,
+      { type: 'custom-title', customTitle: 'Renamed on the phone', sessionId: id },
+    ]);
+
+    expect(readSessionTitle(cwd, id)).toBe('Renamed on the phone');
+    const info = listSessions(cwd).find((s) => s.id === id);
+    expect(info?.title).toBe('Renamed on the phone');
+    expect(info?.titleIsCustom).toBe(true);
+  });
+
+  it('takes the last one: renaming twice keeps the newer name', () => {
+    write([
+      { type: 'user', message: { role: 'user', content: 'ask' } },
+      { type: 'custom-title', customTitle: 'First name', sessionId: id },
+      { type: 'custom-title', customTitle: 'Second name', sessionId: id },
+    ]);
+    expect(readSessionTitle(cwd, id)).toBe('Second name');
+  });
+
+  it('cleared on purpose: falls back to the generated name', () => {
+    write([
+      { type: 'user', message: { role: 'user', content: 'ask' } },
+      { type: 'ai-title', aiTitle: 'A name the model made up' },
+      { type: 'custom-title', customTitle: '', sessionId: id },
+    ]);
+    expect(readSessionTitle(cwd, id)).toBeUndefined();
+    const info = listSessions(cwd).find((s) => s.id === id);
+    expect(info?.title).toBe('A name the model made up');
+    expect(info?.titleIsCustom).toBeFalsy();
+  });
+
+  it('a rename here is recorded the same way, so the CLI and the phone see it too', () => {
+    write([{ type: 'user', message: { role: 'user', content: 'ask' } }]);
+    expect(writeSessionTitle(cwd, id, '  Named here  ')).toBe(true);
+
+    expect(readSessionTitle(cwd, id)).toBe('Named here');
+    const last = JSON.parse(fs.readFileSync(file, 'utf8').trim().split('\n').pop() as string);
+    expect(last).toEqual({ type: 'custom-title', customTitle: 'Named here', sessionId: id });
+    // The transcript still parses: the rename appended a line, it did not rewrite the file.
+    expect(loadTranscript(cwd, id).filter((i) => i.kind === 'user')).toHaveLength(1);
+  });
+
+  it('no transcript to name: says so instead of creating one', () => {
+    expect(writeSessionTitle(cwd, id, 'Nowhere')).toBe(false);
+    expect(fs.existsSync(file)).toBe(false);
+    expect(readSessionTitle(cwd, id)).toBeUndefined();
   });
 });

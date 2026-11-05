@@ -12,6 +12,7 @@ import type { Daemon as DaemonT } from '../src/daemon/Daemon';
 import type { DaemonClient as DaemonClientT } from '../src/daemon/DaemonClient';
 import type { Session as SessionT, SessionHooks } from '../src/session/Session';
 import type { HostToWebview } from '../shared/protocol';
+import { encodeCwd } from '../src/session/SessionStore';
 
 const FAKE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fake-claude.mjs');
 
@@ -382,5 +383,30 @@ describe('a prompt typed on the phone', () => {
     } finally {
       delete process.env.FAKE_PHONE;
     }
+  });
+});
+
+// A rename on the phone (or `/title`) is written by the CLI into the transcript, and announced
+// nowhere else. The daemon's session list — what the menu bar app shows — used to keep the name
+// taken from the first prompt forever.
+describe('a rename made outside the window', () => {
+  it('reaches the daemon\'s session list', async () => {
+    const a = makeWindow(path.join(dir, 'd.sock'));
+    const client = clients[clients.length - 1];
+    a.session.send('the first thing I asked');
+    await until(() => !a.session.busy && !!a.session.sessionId, 'the turn ends with a session id');
+    const cliId = a.session.sessionId!;
+    const mine = async () => (await client.list()).find((s) => s.cliSessionId === cliId)!;
+    expect((await mine()).title).toBe('the first thing I asked');
+
+    const projects = path.join(dir, '.claude', 'projects', encodeCwd(project));
+    fs.mkdirSync(projects, { recursive: true });
+    fs.writeFileSync(
+      path.join(projects, `${cliId}.jsonl`),
+      JSON.stringify({ type: 'custom-title', customTitle: 'Renamed on the phone', sessionId: cliId }) + '\n',
+    );
+
+    expect((await mine()).title).toBe('Renamed on the phone');
+    a.session.detach();
   });
 });

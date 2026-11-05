@@ -237,9 +237,10 @@ export function reducer(state: UiState, action: Action): UiState {
       const sessions = state.sessions.map((s) => {
         const live = msg.live[s.id];
         const on = remote.has(s.id) || undefined;
-        if (s.live === live && s.remote === on) return s;
+        const title = msg.titles?.[s.id] || s.title;
+        if (s.live === live && s.remote === on && s.title === title) return s;
         changed = true;
-        return { ...s, live, remote: on };
+        return { ...s, live, remote: on, title };
       });
       return changed ? { ...state, sessions } : state;
     }

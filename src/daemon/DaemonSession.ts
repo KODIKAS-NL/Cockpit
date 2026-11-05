@@ -15,6 +15,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { StreamParser } from '../cli/StreamParser';
+import { readSessionTitle } from '../session/SessionStore';
 import { killGroup } from '../util/killTree';
 import {
   FILE_ARG_PREFIX,
@@ -171,7 +172,26 @@ export class DaemonSession {
     return this.pending.size;
   }
 
+  /**
+   * A name a person gave the conversation wins over the one taken from the first prompt: `/title`
+   * here, or a rename on the phone through Remote Control. The engine does not announce it — it
+   * writes a `custom-title` to the transcript — so this is read from there (a cached tail read).
+   */
+  private refreshTitle(): void {
+    if (!this.cliSessionId) return;
+    let named: string | undefined;
+    try {
+      named = readSessionTitle(this.cwd, this.cliSessionId);
+    } catch {
+      return; // no transcript yet: keep what the first prompt gave us
+    }
+    if (!named || named === this.title) return;
+    this.title = named;
+    this.hooks.changed();
+  }
+
   info(): DaemonSessionInfo {
+    this.refreshTitle();
     return {
       id: this.id,
       cwd: this.cwd,

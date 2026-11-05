@@ -34,6 +34,8 @@ import { ensurePricing, type PricingMap } from '../cli/ModelPricing';
 import {
   listSessions,
   loadTranscript,
+  readSessionTitle,
+  writeSessionTitle,
   deleteSession,
   deleteAllSessions,
   truncateTranscriptAt,
@@ -804,15 +806,37 @@ export abstract class CockpitCore {
     if (!this.daemonConnected) return;
     const live: Record<string, 'busy' | 'running'> = {};
     const remote: string[] = [];
+    const titles: Record<string, string> = {};
+    const cwd = this.workspaceCwd();
     for (const d of await this.refreshDaemonSessions()) {
       if (!d.cliSessionId) continue;
       if (d.state !== 'idle') live[d.cliSessionId] = d.state;
       if (d.remote?.on) remote.push(d.cliSessionId);
+      // A rename on the phone lands in the transcript, not in the event stream; the read is a
+      // cached 1 MB tail, so asking every tick costs a stat.
+      const title = readSessionTitle(cwd, d.cliSessionId);
+      if (title) titles[d.cliSessionId] = title;
     }
-    const key = JSON.stringify([live, remote]);
+    this.refreshTabTitles();
+    const key = JSON.stringify([live, remote, titles]);
     if (key === this.lastLive) return;
     this.lastLive = key;
-    this.post({ kind: 'sessionsLive', live, remote });
+    this.post({ kind: 'sessionsLive', live, remote, titles });
+  }
+
+  /**
+   * Picks up a name given to a conversation outside this window — `/title`, a rename on the
+   * phone — for the tabs that hold it. The engine does not announce it: it writes a
+   * `custom-title` to the transcript, and the read of it is cached.
+   */
+  protected refreshTabTitles(): void {
+    const cwd = this.workspaceCwd();
+    for (const [tabId, s] of this.sessions) {
+      const id = s.sessionId ?? s.resumeId;
+      if (!id) continue;
+      const title = readSessionTitle(cwd, id);
+      if (title && title !== this.tabMeta.get(tabId)?.title) this.setTabTitle(tabId, title);
+    }
   }
 
   protected startUsageTimer(): void {
@@ -1243,7 +1267,10 @@ export abstract class CockpitCore {
     const cwd = this.workspaceCwd();
     const names = this.memory.get<Record<string, string>>('sessionNames', {});
     const sessions = listSessions(cwd).map((s) =>
-      names[s.id] ? { ...s, title: names[s.id] } : s,
+      // A `custom-title` in the transcript is the name a person gave the conversation — here,
+      // with /title, or on the phone — and it is the newest word on the subject. The memento
+      // only still matters for a session with no transcript to write it to.
+      names[s.id] && !s.titleIsCustom ? { ...s, title: names[s.id] } : s,
     );
     // LIVE sessions (in-memory tabs) may not have a listable transcript on
     // disk yet on the CLI's first response. They are merged so the hub reflects running
@@ -1459,7 +1486,10 @@ export abstract class CockpitCore {
         : loadTranscript(this.workspaceCwd(), id);
     if (!this.tabMeta.get(tabId)?.title) {
       const names = this.memory.get<Record<string, string>>('sessionNames', {});
-      this.setTabTitle(tabId, names[id] || this.titleFromItems(items));
+      this.setTabTitle(
+        tabId,
+        readSessionTitle(this.workspaceCwd(), id) || names[id] || this.titleFromItems(items),
+      );
     }
     this.post({ kind: 'history', items }, tabId);
     // Repainting history clears the prompt cards: show the ones still waiting again.
@@ -1580,7 +1610,10 @@ export abstract class CockpitCore {
     if (s) this.restoreSessionModel(s, sessionId); // model/effort saved for this session
     const items = loadTranscript(this.workspaceCwd(), sessionId);
     const names = this.memory.get<Record<string, string>>('sessionNames', {});
-    this.setTabTitle(tab, names[sessionId] || this.titleFromItems(items));
+    this.setTabTitle(
+      tab,
+      readSessionTitle(this.workspaceCwd(), sessionId) || names[sessionId] || this.titleFromItems(items),
+    );
     this.post({ kind: 'history', items }, tab);
     this.postTabs();
     log(`Resuming session ${sessionId} (${items.length} items) in ${tab}`);
@@ -2122,6 +2155,9 @@ export abstract class CockpitCore {
     if (trimmed) next[id] = trimmed;
     else delete next[id];
     void this.memory.update('sessionNames', next);
+    // Writes the name into the transcript as well, the way the CLI's own /title does: one source
+    // of truth, so the rename also shows up in the CLI, on the phone and in every other window.
+    writeSessionTitle(this.workspaceCwd(), id, trimmed);
     // Immediately updates the title of that session's open tab/webview (when there is one).
     // Matched by sessionId (a turn already ran) OR resumeId (resumed without a turn yet).
     for (const [tabId, s] of this.sessions) {

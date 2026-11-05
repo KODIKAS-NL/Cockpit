@@ -43,6 +43,12 @@ and the project adopts semantic versioning.
   The canvas is always white, whatever the VS Code theme.
 
 ### Fixed
+- **A conversation renamed on the phone is renamed everywhere.** A rename through Remote Control (or the
+  CLI's `/title`) is recorded by the engine in the transcript, and Cockpit only read the name the model
+  generates — so the dashboard, the chat tab and the daemon app all kept the old one. The name a person gave
+  the conversation now wins, is picked up within seconds in the open tabs and the session list, and a rename
+  made here is written the same way, so the CLI and the phone show it too. The daemon half needs the rebuilt
+  daemon app.
 - **Stop really stops a conversation shared with the phone.** Pressing Stop on a session in the daemon app
   (or the window's stop command) killed the process, and Remote Control's keep-alive started it again a
   second later. A stop a person pressed now turns Remote Control off with it; a restart to apply a setting

@@ -397,6 +397,11 @@ export interface SessionInfo {
   assistantCount?: number; // mensagens do assistente
   toolCount?: number; // chamadas de tool (tool_use)
   model?: string; // last observed model
+  /**
+   * The title is one a person gave the conversation (`custom-title` in the transcript: `/title`,
+   * or a rename on the phone). It wins over a name this window stored for the session.
+   */
+  titleIsCustom?: boolean;
   // Daemon mode: the session's process is alive in cockpit-daemon (busy = a turn is running).
   live?: 'busy' | 'running';
   /** Remote Control is on for this conversation (the phone / claude.ai/code share it). */
@@ -548,7 +553,13 @@ type HostMsg =
    * dashboard opens; this is what keeps it current, including for conversations no window here
    * has open.
    */
-  | { kind: 'sessionsLive'; live: Record<string, 'busy' | 'running'>; remote: string[] }
+  | {
+      kind: 'sessionsLive';
+      live: Record<string, 'busy' | 'running'>;
+      remote: string[];
+      /** A name a person gave the conversation since the list was built (a rename on the phone). */
+      titles: Record<string, string>;
+    }
   | { kind: 'slashCommands'; commands: string[] }
   | { kind: 'slashMeta'; meta: Record<string, SlashCmdMeta> }
   | { kind: 'slashResearching'; busy: boolean }
