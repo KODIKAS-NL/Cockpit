@@ -520,9 +520,12 @@ type HostMsg =
       input: unknown;
       suggestions?: PermissionSuggestion[];
       oldText?: string; // current content on disk (Write) for the diff
-      // Plan mode (ExitPlanMode): workspace-relative path of the plan written to Planing/ and
-      // opened in the editor. The card then shows a link to it instead of the full markdown.
+      // Plan mode (ExitPlanMode): path of the plan file opened in the editor — the copy written to
+      // `cockpitDaemon.planFolder` (workspace-relative), or, with that setting empty, the engine's
+      // own plan file (absolute). The card then shows a link to it instead of the full markdown.
       planFile?: string;
+      /** The plan file is the engine's own (`~/.claude/plans/…`), not a copy in the workspace. */
+      planExternal?: boolean;
     }
   | { kind: 'askRequest'; requestId: string; questions: AskQuestion[] }
   // Daemon mode: another window answered this prompt (permission card or question).

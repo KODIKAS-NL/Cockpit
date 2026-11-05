@@ -232,6 +232,10 @@ function clip(s: string, n: number): string {
 function PlanModal({ t, req, onDecision, planApproval, docked, lastCopy, selectionRef }: Props) {
   const plan = String((req.input as Record<string, unknown>)?.plan ?? '');
   const planFile = req.planFile;
+  // The engine's own file lives outside the workspace: its full path is in the tooltip, the link
+  // shows the name. A copy in the workspace shows its relative path, which is short and useful.
+  const planLabel = req.planExternal ? planFile?.split(/[\\/]/).pop() || planFile : planFile;
+  const planFolder = planFile?.includes('/') ? planFile.slice(0, planFile.lastIndexOf('/') + 1) : '';
   const [editing, setEditing] = useState(false);
   const [maximized, setMaximized] = useState(false);
   const [draft, setDraft] = useState(plan);
@@ -295,9 +299,11 @@ function PlanModal({ t, req, onDecision, planApproval, docked, lastCopy, selecti
                   <span className="perm-plan-fileicon" aria-hidden>
                     <Icon name="file" />
                   </span>
-                  {planFile}
+                  {planLabel}
                 </button>
-                <div className="perm-plan-filenote">{t('permission.planSavedNote')}</div>
+                <div className="perm-plan-filenote">
+                  {req.planExternal ? t('permission.planOpenedNote') : t('permission.planSavedNote', planFolder)}
+                </div>
                 <RefTextarea
                   ref={notesRef}
                   t={t}

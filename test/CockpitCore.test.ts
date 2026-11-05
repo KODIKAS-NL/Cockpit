@@ -26,8 +26,8 @@ class TestCore extends CockpitCore {
   send(m: WebviewToHost): void {
     this.onWebviewMessage(m, HUB_ID);
   }
-  savePlan(plan: string, previous?: string): string | undefined {
-    return this.savePlanFile(plan, previous);
+  savePlan(plan: string, previous?: string, planFilePath?: string): string | undefined {
+    return this.savePlanFile(plan, previous, planFilePath);
   }
   protected hasPanel = () => false;
   protected panelVisible = () => false;
@@ -96,6 +96,22 @@ describe('CockpitCore', () => {
     settings.values.set('planFolder', '  ');
     expect(core.savePlan('# Not written')).toBeUndefined();
     expect(fs.readdirSync(path.join(dir, 'docs', 'Plans'))).toHaveLength(1);
+  });
+
+  it('with no plan folder the engine\'s own plan file is opened, not copied', () => {
+    settings.values.set('planFolder', '');
+    const own = path.join(dir, 'engine-plans', 'brave-plan.md');
+    fs.mkdirSync(path.dirname(own), { recursive: true });
+    fs.writeFileSync(own, '# The original\n');
+
+    expect(core.savePlan('# The original', undefined, own)).toBe(own);
+    expect(host.openedQuietly).toEqual([own]);
+    expect(fs.existsSync(path.join(dir, 'Planing'))).toBe(false);
+    expect(fs.readFileSync(own, 'utf8')).toBe('# The original\n'); // untouched
+
+    // No file from the engine either (an older CLI): the card falls back to the plan inline.
+    expect(core.savePlan('# Nowhere to open')).toBeUndefined();
+    expect(core.savePlan('# Gone', undefined, path.join(dir, 'missing.md'))).toBeUndefined();
   });
 
   it('init posts the config, the tabs and the CLI status', () => {

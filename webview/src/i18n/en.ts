@@ -670,7 +670,8 @@ export const en = {
   'permission.planMaximize': 'Maximize',
   'permission.planRestore': 'Restore',
   'permission.planSendNotes': 'Keep planning (send my notes)',
-  'permission.planSavedNote': 'Saved to Planing/ and opened in the editor. Review it there, then approve or keep planning.',
+  'permission.planSavedNote': 'Saved to {0} and opened in the editor. Review it there, then approve or keep planning.',
+  'permission.planOpenedNote': 'The engine\'s own plan file, opened in the editor. Review it there, then approve or keep planning.',
   'permission.planNotesPlaceholder': 'Notes for the agent (optional) — sent when you keep planning',
 
   'ask.title': 'Claude has a question',

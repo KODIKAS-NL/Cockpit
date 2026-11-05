@@ -96,7 +96,9 @@ export interface PermissionRequest {
   input: unknown;
   suggestions?: PermissionSuggestion[];
   oldText?: string;
-  planFile?: string; // ExitPlanMode: relative path of the plan saved under Planing/
+  planFile?: string; // ExitPlanMode: the plan file opened in the editor (a copy in the plan
+  // folder, workspace-relative; or the engine's own file, absolute)
+  planExternal?: boolean; // the plan file is the engine's own, not a copy in the workspace
 }
 
 export interface AskOption {

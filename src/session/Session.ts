@@ -59,12 +59,13 @@ export interface SessionHooks {
   fileText: (tool: string, input: unknown) => string | undefined;
   // Each tool_use (before execution): enables autosaving read/write files.
   onToolUse?: (tool: string, input: unknown) => void;
-  // Plan mode (ExitPlanMode): persist the proposed plan as a markdown file under Planing/ at the
-  // repo root and open it in the editor. Returns the workspace-relative path written, or undefined
-  // when nothing could be saved (no workspace, write error). The approval gate stays in the UI.
+  // Plan mode (ExitPlanMode): persist the proposed plan as a markdown file under the plan folder
+  // and open it in the editor. Returns the workspace-relative path written, or undefined when
+  // nothing could be saved (no workspace, write error). The approval gate stays in the UI.
   // `previous` is the file of the last revision of the same plan (sent back with "Keep planning"):
-  // a revision replaces it instead of adding a copy.
-  savePlan?: (plan: string, previous?: string) => string | undefined;
+  // a revision replaces it instead of adding a copy. `planFilePath` is the engine's own plan file,
+  // which is opened as it is when the plan folder is empty (no copy).
+  savePlan?: (plan: string, previous?: string, planFilePath?: string) => string | undefined;
   /** Executable for an engine. Without an argument: the window's default. */
   claudePath: (engine?: EngineId) => string;
   cwd: () => string;
@@ -1242,7 +1243,7 @@ export class Session {
             // silent regression.
             if (tool === 'ExitPlanMode' && !this.replaying) {
               const plan = typeof (input as any)?.plan === 'string' ? (input as any).plan : '';
-              if (plan) this.hooks.savePlan?.(plan, this.planFile);
+              if (plan) this.hooks.savePlan?.(plan, this.planFile, enginePlanFile(input));
               this.planFile = undefined;
             }
             this.decide(reqId, 'allow');
@@ -1257,10 +1258,13 @@ export class Session {
             // Plan mode: persist the plan to Planing/ and open it in the editor. The file is the
             // primary surface now; the permission card keeps only the approval gate.
             let planFile: string | undefined;
+            let planExternal = false;
             if (tool === 'ExitPlanMode' && !this.replaying) {
               const plan = typeof (input as any)?.plan === 'string' ? (input as any).plan : '';
-              if (plan) planFile = this.hooks.savePlan?.(plan, this.planFile) ?? this.planFile;
+              const own = enginePlanFile(input);
+              if (plan) planFile = this.hooks.savePlan?.(plan, this.planFile, own) ?? this.planFile;
               this.planFile = planFile;
+              planExternal = !!own && planFile === own;
             }
             const card: HostToWebview = {
               kind: 'permissionRequest',
@@ -1272,6 +1276,7 @@ export class Session {
               suggestions: suggestions as any,
               oldText: this.hooks.fileText(tool, input),
               planFile,
+              planExternal: planExternal || undefined,
             };
             this.pendingPromptMsg.set(reqId, card);
             this.emit(card);
@@ -1728,6 +1733,16 @@ function isAuthError(text: unknown): boolean {
 }
 
 /** One short line saying what a permission request is about: the command, the file, or the note. */
+/**
+ * The plan file the engine keeps for itself (`~/.claude/plans/<name>.md`), given in ExitPlanMode's
+ * input. With `cockpitDaemon.planFolder` empty it is what the card links to — the original, not a
+ * copy. An engine that does not provide one leaves the plan inline in the card.
+ */
+function enginePlanFile(input: unknown): string | undefined {
+  const p = (input as { planFilePath?: unknown } | undefined)?.planFilePath;
+  return typeof p === 'string' && p ? p : undefined;
+}
+
 function promptDetail(input: unknown, description?: string): string {
   const inp = (input ?? {}) as Record<string, unknown>;
   const pick =

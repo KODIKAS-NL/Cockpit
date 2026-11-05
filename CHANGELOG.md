@@ -7,10 +7,12 @@ and the project adopts semantic versioning.
 ## [Unreleased]
 
 ### Added
-- **The plan folder is a setting.** `cockpitDaemon.planFolder` (default `Planing`) says where a plan-mode
-  plan is written and opened from — any folder of the workspace, so you can rename it or keep plans out of
-  the way. Empty turns the file off: the plan goes back to being shown inside the approval card, editable.
-  Images pasted into plan feedback follow it (`<folder>/.attachment-temp/`, or `.cockpit/` with the file off).
+- **The plan folder is a setting, and the copy can be dropped.** `cockpitDaemon.planFolder` (default
+  `Planing`) says where a plan-mode plan is written and opened from — any folder of the workspace, so you
+  can rename it or keep plans out of the way. Empty: no copy is made at all and the card links to the
+  engine's own plan file (`~/.claude/plans/…`), the original it keeps while you plan; with an engine that
+  keeps none, the plan is shown inside the card, editable, as before. Images pasted into plan feedback
+  follow the folder (`<folder>/.attachment-temp/`, or `.cockpit/` with no folder set).
 - **A file the agent sends you is shown, not described.** `SendUserFile` — how Claude hands you a diagram, a
   report, a screenshot or a built artifact — used to render as a tool card with its raw JSON. It is now a file
   card: the caption, the image inline (click to open it in the viewer), and a line per file with its size that

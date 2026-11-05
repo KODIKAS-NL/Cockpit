@@ -457,7 +457,7 @@ export abstract class CockpitCore {
       },
       fileText: (tool, input) => this.currentFileText(tool, input),
       onToolUse: (tool, input) => this.autoSaveForTool(tool, input),
-      savePlan: (plan, previous) => this.savePlanFile(plan, previous),
+      savePlan: (plan, previous, planFilePath) => this.savePlanFile(plan, previous, planFilePath),
       claudePath: (engine) => this.claudePath(engine),
       cwd: () => this.workspaceCwd(),
       engine: () => currentEngine(),
@@ -1000,8 +1000,11 @@ export abstract class CockpitCore {
 
   /**
    * Writes a plan-mode plan to `<plan folder>/<timestamp>-<slug>.md` and opens it in the editor.
-   * Returns the workspace-relative path, or undefined when nothing could be written — with
-   * `cockpitDaemon.planFolder` empty nothing is, and the approval card shows the plan inline.
+   * Returns the workspace-relative path, or undefined when nothing could be written.
+   *
+   * With `cockpitDaemon.planFolder` empty no copy is made: the engine's own plan file
+   * (`planFilePath`, `~/.claude/plans/<name>.md`) is opened instead and its absolute path
+   * returned, so the card links to the original. Without one, the card shows the plan inline.
    *
    * The file is the plan's primary surface now — the permission card keeps only the approval
    * gate. The name carries a sortable timestamp plus a short slug taken from the first heading,
@@ -1009,10 +1012,16 @@ export abstract class CockpitCore {
    * the revision sent back with "Keep planning") replaces that file: the folder keeps one file per
    * plan, named after its last revision.
    */
-  protected savePlanFile(plan: string, previous?: string): string | undefined {
+  protected savePlanFile(plan: string, previous?: string, planFilePath?: string): string | undefined {
     const root = this.workspaceCwd();
     const folder = this.planFolder();
-    if (!root || !folder) return undefined;
+    if (!folder) {
+      // No folder to copy into: the engine's own file is the document, and it is already on disk.
+      if (!planFilePath || !fs.existsSync(planFilePath)) return undefined;
+      this.host.openQuietly(planFilePath);
+      return planFilePath;
+    }
+    if (!root) return undefined;
     try {
       const dir = path.resolve(root, folder);
       fs.mkdirSync(dir, { recursive: true });

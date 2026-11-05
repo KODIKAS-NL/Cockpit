@@ -600,7 +600,8 @@ export const ptBR: Partial<Strings> = {
   'permission.planMaximize': 'Maximizar',
   'permission.planRestore': 'Restaurar',
   'permission.planSendNotes': 'Continuar planejando (enviar minhas notas)',
-  'permission.planSavedNote': 'Salvo em Planing/ e aberto no editor. Revise por lá e então aprove ou continue planejando.',
+  'permission.planSavedNote': 'Salvo em {0} e aberto no editor. Revise por lá e então aprove ou continue planejando.',
+  'permission.planOpenedNote': 'O arquivo de plano do próprio engine, aberto no editor. Revise por lá e então aprove ou continue planejando.',
   'permission.planNotesPlaceholder': 'Notas para o agente (opcional) — enviadas ao continuar planejando',
 
   'ask.title': 'O Claude tem uma pergunta',

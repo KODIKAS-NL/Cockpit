@@ -77,7 +77,10 @@ export class FakeHost implements EditorHost {
   async openFile(p: string, opts?: { line?: number; preview?: boolean }): Promise<void> {
     this.opened.push({ path: p, ...opts });
   }
-  openQuietly(): void {}
+  readonly openedQuietly: string[] = [];
+  openQuietly(p: string): void {
+    this.openedQuietly.push(p);
+  }
   async previewFile(): Promise<void> {}
   async showDiff(): Promise<void> {}
   onSelection(): Disposable {
